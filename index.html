@@ -214,6 +214,7 @@ input{outline:none;}
 .attach-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 4px;
   border-radius:18px;border:2px dashed var(--border);font-size:18px;}
 .attach-btn span:last-child{font-size:10px;font-weight:700;color:var(--ink);}
+.attach-preview-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px;}
 .attach-preview{display:flex;align-items:center;gap:11px;padding:11px;border-radius:18px;
   background:var(--surface);}
 .attach-preview-icon{width:36px;height:36px;border-radius:14px;background:rgba(46,196,182,.16);
@@ -237,11 +238,6 @@ input{outline:none;}
 .viewer-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   overflow:hidden;padding:0 0 calc(20px + env(safe-area-inset-bottom,0px));}
 .viewer-body img{max-width:94vw;max-height:100%;object-fit:contain;border-radius:12px;}
-.viewer-pdf-wrap{width:100%;height:100%;display:flex;flex-direction:column;}
-.viewer-pdf-wrap iframe{flex:1;width:100%;border:none;background:#fff;}
-.viewer-open-browser{text-align:center;padding:10px;color:#C9C2E6;font-size:11px;text-decoration:underline;}
-.viewer-fallback{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:0 36px;}
-.viewer-fallback .stub-text{color:#C9C2E6;}
 
 .save-bar{flex-shrink:0;padding:14px 20px calc(14px + env(safe-area-inset-bottom,0px));}
 .save-btn{width:100%;padding:15px;border-radius:18px;background:var(--sunshine);
@@ -378,7 +374,7 @@ input{outline:none;}
       <p class="field-label">WARRANTY</p>
       <div id="add-warranty-area"></div>
 
-      <p class="field-label">ATTACH RECEIPT</p>
+      <p class="field-label">ATTACHMENTS</p>
       <div id="add-attachment-area"></div>
     </div>
   </div>
@@ -459,16 +455,7 @@ input{outline:none;}
     <button type="button" class="viewer-close" id="attach-viewer-close">✕</button>
   </div>
   <div class="viewer-body">
-    <img id="attach-viewer-img" class="hidden" alt="Attachment preview">
-    <div id="attach-viewer-pdf-wrap" class="viewer-pdf-wrap hidden">
-      <iframe id="attach-viewer-frame" title="Attachment PDF preview"></iframe>
-      <a id="attach-viewer-open-browser" class="viewer-open-browser" target="_blank" rel="noopener">Open in browser instead</a>
-    </div>
-    <div id="attach-viewer-fallback" class="viewer-fallback hidden">
-      <span class="stub-emoji">📁</span>
-      <p class="stub-text">This file type can't be previewed in-app.</p>
-      <a id="attach-viewer-download" class="save-btn" style="display:inline-block;text-decoration:none;">Download</a>
-    </div>
+    <img id="attach-viewer-img" alt="Attachment preview">
   </div>
 </div>
 
@@ -664,12 +651,12 @@ const state = {
   paymentMethods:[],
   selectedCategoryId:null,
   selectedPaymentId:null,
-  pendingAttachment:null, // {fileName, mimeType, type, arrayBuffer} — newly picked, not yet saved
+  pendingAttachments:[], // [{fileName, mimeType, type, arrayBuffer}] — newly picked this session, not yet saved
   editingExpenseId:null,  // null = adding a new expense, otherwise the id being edited
-  editingExpense:null,    // the full expense object being edited (for its attachmentId etc.)
-  existingAttachmentId:null,
-  existingAttachmentMeta:null,
-  removeExistingAttachment:false,
+  editingExpense:null,    // the full expense object being edited (for its attachmentIds etc.)
+  existingAttachmentIds:[],  // attachment ids already saved against this expense (read from the expense record)
+  existingAttachments:null,  // lazily fetched full records (incl. data) for existingAttachmentIds — null until fetched once
+  removedAttachmentIds:[],   // existing attachment ids removed this session; deleted from IndexedDB on save
   warrantyEnabled:false,        // is the "under warranty" toggle on for the expense being added/edited
   warrantyDurationMonths:null,  // 6/12/24 if a shortcut chip is selected, null if the date was hand-edited
   warrantyExpiry:null,          // ISO date string, or null
@@ -713,7 +700,8 @@ function deleteExpenseWithUndo(expense, { onChange } = {}){
   pendingDeletes[expense.id] = { expense, timer: setTimeout(async () => {
     delete pendingDeletes[expense.id];
     await DB.deleteExpense(expense.id);
-    if(expense.attachmentId) await DB.deleteAttachment(expense.attachmentId).catch(()=>{});
+    const attIds = (expense.attachmentIds && expense.attachmentIds.length) ? expense.attachmentIds : (expense.attachmentId ? [expense.attachmentId] : []);
+    for(const attId of attIds) await DB.deleteAttachment(attId).catch(()=>{});
   }, 4000) };
   if(onChange) onChange();
   showUndoToast('Expense deleted', () => {
@@ -1197,89 +1185,90 @@ function fileToArrayBuffer(file){
   });
 }
 
-/* ---- Attachment viewer: images render inline, PDFs render in an iframe
-   (so the document never goes `hidden` and can't retrigger the
-   picker/visibility auto-lock), anything else falls back to a download
-   link since browsers can't preview Word/other files in-app. ---- */
+/* ---- Attachment viewer: images get a full-screen in-app overlay. PDFs
+   open in a real browser tab — the device's native PDF viewer (pinch-zoom,
+   search, etc.) beats a cramped embedded frame, at the cost of briefly
+   backgrounding the page, so we mark that as an expected interruption
+   first (same flag used for the camera/gallery/file pickers) to avoid
+   retriggering the idle-lock. Word/other files can't be rendered by a
+   browser at all, so those go straight to a download, same as before. ---- */
 let attachViewerUrl=null;
 function viewAttachment({fileName, mimeType, type, arrayBuffer}={}){
   if(!arrayBuffer){ toast('Could not load attachment'); return; }
   if(attachViewerUrl) URL.revokeObjectURL(attachViewerUrl);
   attachViewerUrl = URL.createObjectURL(new Blob([arrayBuffer], {type: mimeType || 'application/octet-stream'}));
 
-  const img=document.getElementById('attach-viewer-img');
-  const pdfWrap=document.getElementById('attach-viewer-pdf-wrap');
-  const frame=document.getElementById('attach-viewer-frame');
-  const openBrowserLink=document.getElementById('attach-viewer-open-browser');
-  const fallback=document.getElementById('attach-viewer-fallback');
-  const dl=document.getElementById('attach-viewer-download');
-  img.classList.add('hidden'); pdfWrap.classList.add('hidden'); fallback.classList.add('hidden');
-
   if(type==='image'){
-    img.src=attachViewerUrl; img.classList.remove('hidden');
-  } else if(type==='pdf'){
-    frame.src=attachViewerUrl; openBrowserLink.href=attachViewerUrl;
-    pdfWrap.classList.remove('hidden');
-  } else {
-    dl.href=attachViewerUrl; dl.download=fileName || 'attachment';
-    fallback.classList.remove('hidden');
+    document.getElementById('attach-viewer-img').src=attachViewerUrl;
+    document.getElementById('attach-viewer-name').textContent=fileName || 'Attachment';
+    clearTimeout(autoLockTimer); // don't auto-lock mid-look at a photo
+    document.getElementById('attach-viewer-overlay').classList.add('show');
+    return;
   }
-  document.getElementById('attach-viewer-name').textContent=fileName || 'Attachment';
-  clearTimeout(autoLockTimer); // don't auto-lock mid-read of a long PDF/image
-  document.getElementById('attach-viewer-overlay').classList.add('show');
+
+  const a=document.createElement('a');
+  a.href=attachViewerUrl;
+  if(type==='pdf'){
+    beginPickerSuppression();
+    a.target='_blank'; a.rel='noopener';
+  } else {
+    a.download=fileName || 'attachment';
+  }
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 function closeAttachmentViewer(){
   document.getElementById('attach-viewer-overlay').classList.remove('show');
   document.getElementById('attach-viewer-img').src='';
-  document.getElementById('attach-viewer-frame').src='';
   if(attachViewerUrl){ URL.revokeObjectURL(attachViewerUrl); attachViewerUrl=null; }
   resetAutoLock();
 }
 async function renderAttachmentArea(){
   const area=document.getElementById('add-attachment-area');
-  if(state.pendingAttachment){
-    const a=state.pendingAttachment;
-    const icon = a.type==='pdf' ? '📕' : a.type==='word' ? '📘' : a.type==='image' ? '🖼️' : '📁';
-    area.innerHTML=`
-      <div class="attach-preview">
-        <div class="attach-preview-icon">${icon}</div>
-        <div class="attach-preview-info"><p>${esc(a.fileName)}</p><span>Attached ✓</span></div>
-        <button type="button" class="attach-icon-btn" id="attach-view-btn">👁️</button>
-        <button type="button" class="attach-icon-btn" id="attach-remove-btn">✕</button>
-      </div>`;
-    document.getElementById('attach-view-btn').onclick=()=>viewAttachment(a);
-    document.getElementById('attach-remove-btn').onclick=()=>{ state.pendingAttachment=null; renderAttachmentArea(); };
-  } else if(state.existingAttachmentId && !state.removeExistingAttachment){
-    if(!state.existingAttachmentMeta){
-      state.existingAttachmentMeta = await DB.getAttachment(state.existingAttachmentId);
-    }
-    const meta=state.existingAttachmentMeta;
-    const icon = meta && meta.type==='pdf' ? '📕' : meta && meta.type==='word' ? '📘' : meta && meta.type==='image' ? '🖼️' : '📁';
-    area.innerHTML=`
-      <div class="attach-preview">
-        <div class="attach-preview-icon">${icon}</div>
-        <div class="attach-preview-info"><p>${esc(meta ? meta.fileName : 'Attachment')}</p><span>Already attached</span></div>
-        <button type="button" class="attach-icon-btn" id="attach-view-btn">👁️</button>
-        <button type="button" class="attach-icon-btn" id="attach-remove-btn">✕</button>
-      </div>`;
-    document.getElementById('attach-view-btn').onclick=()=>viewAttachment({
-      fileName: meta ? meta.fileName : 'Attachment',
-      mimeType: meta ? meta.mimeType : null,
-      type: meta ? meta.type : 'other',
-      arrayBuffer: meta ? meta.data : null,
-    });
-    document.getElementById('attach-remove-btn').onclick=()=>{ state.removeExistingAttachment=true; renderAttachmentArea(); };
-  } else {
-    area.innerHTML=`
-      <div class="attach-grid">
-        <button type="button" class="attach-btn" id="attach-camera-btn"><span>📷</span><span>Camera</span></button>
-        <button type="button" class="attach-btn" id="attach-gallery-btn"><span>🖼️</span><span>Gallery</span></button>
-        <button type="button" class="attach-btn" id="attach-file-btn"><span>📄</span><span>File</span></button>
-      </div>`;
-    document.getElementById('attach-camera-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-camera-input').click(); };
-    document.getElementById('attach-gallery-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-gallery-input').click(); };
-    document.getElementById('attach-file-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-file-input').click(); };
+  if(state.existingAttachments===null){
+    state.existingAttachments = state.existingAttachmentIds.length
+      ? (await Promise.all(state.existingAttachmentIds.map(id => DB.getAttachment(id).catch(()=>null)))).filter(Boolean)
+      : [];
   }
+  const visibleExisting = state.existingAttachments.filter(a => !state.removedAttachmentIds.includes(a.id));
+  const items = [
+    ...visibleExisting.map(a => ({ id:a.id, fileName:a.fileName, mimeType:a.mimeType, type:a.type, data:a.data, statusLabel:'Already attached' })),
+    ...state.pendingAttachments.map((a, idx) => ({ idx, fileName:a.fileName, mimeType:a.mimeType, type:a.type, data:a.arrayBuffer, statusLabel:'Attached ✓' })),
+  ];
+
+  const previewsHTML = items.map(item=>{
+    const icon = item.type==='pdf' ? '📕' : item.type==='word' ? '📘' : item.type==='image' ? '🖼️' : '📁';
+    return `
+      <div class="attach-preview">
+        <div class="attach-preview-icon">${icon}</div>
+        <div class="attach-preview-info"><p>${esc(item.fileName)}</p><span>${esc(item.statusLabel)}</span></div>
+        <button type="button" class="attach-icon-btn" data-act="view">👁️</button>
+        <button type="button" class="attach-icon-btn" data-act="remove">✕</button>
+      </div>`;
+  }).join('');
+
+  area.innerHTML = `
+    ${items.length ? `<div class="attach-preview-list">${previewsHTML}</div>` : ''}
+    <div class="attach-grid">
+      <button type="button" class="attach-btn" id="attach-camera-btn"><span>📷</span><span>Camera</span></button>
+      <button type="button" class="attach-btn" id="attach-gallery-btn"><span>🖼️</span><span>Gallery</span></button>
+      <button type="button" class="attach-btn" id="attach-file-btn"><span>📄</span><span>File</span></button>
+    </div>`;
+
+  area.querySelectorAll('.attach-preview').forEach((row, i)=>{
+    const item=items[i];
+    row.querySelector('[data-act="view"]').onclick=()=>viewAttachment({ fileName:item.fileName, mimeType:item.mimeType, type:item.type, arrayBuffer:item.data });
+    row.querySelector('[data-act="remove"]').onclick=()=>{
+      if(item.idx===undefined) state.removedAttachmentIds.push(item.id);
+      else state.pendingAttachments.splice(item.idx, 1);
+      renderAttachmentArea();
+    };
+  });
+
+  document.getElementById('attach-camera-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-camera-input').click(); };
+  document.getElementById('attach-gallery-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-gallery-input').click(); };
+  document.getElementById('attach-file-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-file-input').click(); };
 }
 function openAddScreen(existing){
   state.returnScreen = getCurrentScreen();
@@ -1287,10 +1276,10 @@ function openAddScreen(existing){
   state.editingExpense = existing || null;
   state.selectedCategoryId = existing ? existing.categoryId : (state.categories[0] ? state.categories[0].id : null);
   state.selectedPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
-  state.pendingAttachment = null;
-  state.existingAttachmentId = existing ? (existing.attachmentId || null) : null;
-  state.existingAttachmentMeta = null;
-  state.removeExistingAttachment = false;
+  state.pendingAttachments = [];
+  state.existingAttachmentIds = existing ? ((existing.attachmentIds && existing.attachmentIds.length) ? existing.attachmentIds.slice() : (existing.attachmentId ? [existing.attachmentId] : [])) : [];
+  state.existingAttachments = null;
+  state.removedAttachmentIds = [];
   state.warrantyEnabled = existing ? !!existing.warrantyExpiry : false;
   state.warrantyDurationMonths = existing ? (existing.warrantyDurationMonths || null) : null;
   state.warrantyExpiry = existing ? (existing.warrantyExpiry || null) : null;
@@ -1320,33 +1309,35 @@ async function saveExpense(){
   const isEdit=!!state.editingExpenseId;
   const id=isEdit ? state.editingExpenseId : genId();
 
-  // If editing and the old attachment is being replaced or removed, delete it now.
-  let attachmentId = isEdit ? state.existingAttachmentId : null;
-  if(isEdit && state.existingAttachmentId && (state.removeExistingAttachment || state.pendingAttachment)){
-    await DB.deleteAttachment(state.existingAttachmentId).catch(()=>{});
-    attachmentId=null;
+  // Attachments removed this session are deleted now; anything kept stays
+  // as-is; anything newly picked gets saved fresh — ids are generated
+  // client-side, so the expense only needs a single write.
+  for(const remId of state.removedAttachmentIds){
+    await DB.deleteAttachment(remId).catch(()=>{});
   }
+  const keptIds = state.existingAttachments
+    .filter(a => !state.removedAttachmentIds.includes(a.id))
+    .map(a => a.id);
+  const newIds=[];
+  for(const pending of state.pendingAttachments){
+    const attId=genId();
+    await DB.saveAttachment({
+      id: attId, expenseId: id, type: pending.type,
+      fileName: pending.fileName, mimeType: pending.mimeType, data: pending.arrayBuffer,
+    });
+    newIds.push(attId);
+  }
+  const attachmentIds=[...keptIds, ...newIds];
 
   const expense={
     id, amount, categoryId: state.selectedCategoryId,
     paymentMethod: state.selectedPaymentId, // stores the payment method's id, despite the field name
-    date, note, attachmentId, recurringId:null,
+    date, note, attachmentIds, recurringId:null,
     warrantyExpiry: state.warrantyEnabled ? state.warrantyExpiry : null,
     warrantyDurationMonths: state.warrantyEnabled ? state.warrantyDurationMonths : null,
     createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
   };
   await DB.addExpense(expense); // put() — works for both create and update since the id matches
-
-  if(state.pendingAttachment){
-    const attId=genId();
-    await DB.saveAttachment({
-      id: attId, expenseId: id, type: state.pendingAttachment.type,
-      fileName: state.pendingAttachment.fileName, mimeType: state.pendingAttachment.mimeType,
-      data: state.pendingAttachment.arrayBuffer,
-    });
-    expense.attachmentId=attId;
-    await DB.addExpense(expense);
-  }
 
   toast(isEdit ? 'Expense updated ✓' : 'Expense saved ✓');
   goToReturnScreen();
@@ -1384,7 +1375,7 @@ document.getElementById('add-payment-row').addEventListener('click', (e) => {
     const file=e.target.files[0]; e.target.value='';
     if(!file) return;
     const arrayBuffer=await fileToArrayBuffer(file);
-    state.pendingAttachment={ fileName:file.name, mimeType:file.type, type:detectFileType(file.type,file.name), arrayBuffer };
+    state.pendingAttachments.push({ fileName:file.name, mimeType:file.type, type:detectFileType(file.type,file.name), arrayBuffer });
     renderAttachmentArea();
   });
   el.addEventListener('cancel', endPickerSuppression);
