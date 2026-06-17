@@ -132,14 +132,10 @@ input{outline:none;}
 .section-title{font-family:var(--font-display);font-size:14px;}
 .section-link{font-size:11px;color:var(--grape);font-weight:700;}
 
-.warranty-home-card{display:flex;align-items:center;gap:11px;padding:12px;border-radius:18px;
-  background:var(--surface);margin-bottom:4px;}
-.warranty-home-icon{width:36px;height:36px;border-radius:50%;background:rgba(134,87,224,.14);
-  display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
-.warranty-home-info{flex:1;min-width:0;}
-.warranty-home-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.warranty-home-sub{font-size:11px;color:var(--mint);font-weight:700;}
-.warranty-home-sub.expired{color:var(--coral);}
+.home-tabs{display:flex;gap:4px;background:var(--chip);border-radius:16px;padding:4px;margin-bottom:18px;}
+.home-tab{flex:1;text-align:center;padding:9px 0;border-radius:13px;font-size:12px;font-weight:700;
+  color:var(--muted);transition:background .15s,color .15s;}
+.home-tab.active{background:var(--grape);color:#fff;}
 .warranty-status{font-family:var(--font-mono);font-size:10px;font-weight:700;padding:5px 10px;
   border-radius:20px;white-space:nowrap;flex-shrink:0;}
 .warranty-status.active{background:rgba(46,196,182,.16);color:var(--mint);}
@@ -286,41 +282,38 @@ input{outline:none;}
         </div>
       </div>
 
-      <div class="spend-card">
-        <p class="spend-label">Spent this month</p>
-        <p class="spend-amount" id="home-total">₹0</p>
-        <p class="spend-count" id="home-count">0 expenses this month</p>
-      </div>
-      <div class="perforation">
-        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+      <div class="home-tabs" id="home-tabs">
+        <button type="button" class="home-tab active" data-hometab="overview">Overview</button>
+        <button type="button" class="home-tab" data-hometab="warranties">Warranties</button>
       </div>
 
-      <div class="donut-row">
-        <div class="donut" id="home-donut"><div class="donut-hole" id="home-donut-label">No data yet</div></div>
-        <div class="legend" id="home-legend"></div>
-      </div>
+      <div id="home-panel-overview">
+        <div class="spend-card">
+          <p class="spend-label">Spent this month</p>
+          <p class="spend-amount" id="home-total">₹0</p>
+          <p class="spend-count" id="home-count">0 expenses this month</p>
+        </div>
+        <div class="perforation">
+          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        </div>
 
-      <div id="home-warranty-section" class="hidden">
+        <div class="donut-row">
+          <div class="donut" id="home-donut"><div class="donut-hole" id="home-donut-label">No data yet</div></div>
+          <div class="legend" id="home-legend"></div>
+        </div>
+
         <div class="section-head">
-          <p class="section-title">Under warranty</p>
-          <span class="section-link" id="home-warranty-link">See all →</span>
+          <p class="section-title">Recent</p>
         </div>
-        <div class="warranty-home-card" id="home-warranty-card">
-          <span class="warranty-home-icon" id="home-warranty-icon">🛡️</span>
-          <div class="warranty-home-info">
-            <p class="warranty-home-title" id="home-warranty-title">—</p>
-            <span class="warranty-home-sub" id="home-warranty-sub">—</span>
-          </div>
-        </div>
+        <div id="home-recent-list"></div>
       </div>
 
-      <div class="section-head">
-        <p class="section-title">Recent</p>
+      <div id="home-panel-warranties" class="hidden">
+        <div id="home-warranties-list"></div>
       </div>
-      <div id="home-recent-list"></div>
     </div>
   </div>
 
@@ -402,17 +395,6 @@ input{outline:none;}
     <button class="fab-add">＋</button>
     <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Stats</span></div>
     <div class="nav-item" data-nav="settings"><span>⚙️</span><span class="nav-label">Settings</span></div>
-  </div>
-</div>
-
-<!-- ============================== WARRANTIES SCREEN ============================== -->
-<div class="screen is-hidden" id="warranties-screen">
-  <div class="topbar">
-    <p class="topbar-title">Warranties</p>
-    <button class="topbar-close" id="warranties-close-btn">✕</button>
-  </div>
-  <div class="scroll">
-    <div id="warranties-list" style="padding:0 20px 28px;"></div>
   </div>
 </div>
 
@@ -661,11 +643,12 @@ const state = {
   warrantyDurationMonths:null,  // 6/12/24 if a shortcut chip is selected, null if the date was hand-edited
   warrantyExpiry:null,          // ISO date string, or null
   returnScreen:'home-screen', // where to go back to after Add/Edit closes or saves
+  homeTab:'overview', // 'overview' or 'warranties' — which Home tab is active; persists across nav, lock/unlock, and Add/Edit since it's just app state, never reset
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
 /* ============================== SCREEN SYSTEM ============================== */
-const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','warranties-screen','stats-screen','settings-screen'];
+const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen'];
 function showScreen(id){
   SCREENS.forEach(s => document.getElementById(s).classList.toggle('is-hidden', s!==id));
 }
@@ -677,7 +660,6 @@ function goToReturnScreen(){
   showScreen(target);
   if(target==='home-screen') renderHome();
   else if(target==='transactions-screen') renderTransactions();
-  else if(target==='warranties-screen') renderWarranties();
 }
 
 /* ============================== TOAST ============================== */
@@ -840,27 +822,7 @@ async function getWarrantyExpenses(){
   const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
   return all.filter(e => e.warrantyExpiry);
 }
-function pickWarrantyHeadline(items){
-  const today=todayISO();
-  const active=items.filter(i=>i.warrantyExpiry>=today).sort((a,b)=>a.warrantyExpiry.localeCompare(b.warrantyExpiry));
-  if(active.length) return active[0];
-  return items.slice().sort((a,b)=>b.warrantyExpiry.localeCompare(a.warrantyExpiry))[0] || null;
-}
-async function renderHomeWarrantySection(){
-  const items=await getWarrantyExpenses();
-  const section=document.getElementById('home-warranty-section');
-  if(items.length===0){ section.classList.add('hidden'); return; }
-  section.classList.remove('hidden');
-  const headline=pickWarrantyHeadline(items);
-  const cat=state.categories.find(c=>c.id===headline.categoryId);
-  const status=formatWarrantyRemaining(headline.warrantyExpiry);
-  const others=items.length-1;
-  document.getElementById('home-warranty-icon').textContent = cat?cat.icon:'🛡️';
-  document.getElementById('home-warranty-title').textContent = headline.note || (cat?cat.name:'Item');
-  document.getElementById('home-warranty-sub').textContent = status.label + (others>0 ? ` · ${others} more tracked` : '');
-  document.getElementById('home-warranty-sub').className = 'warranty-home-sub' + (status.expired ? ' expired' : '');
-}
-async function renderHome(){
+async function renderHomeOverviewPanel(){
   const today=new Date();
   const monthStart=new Date(today.getFullYear(), today.getMonth(), 1);
   const startISO=(()=>{ const tz=monthStart.getTimezoneOffset()*60000; return new Date(monthStart-tz).toISOString().slice(0,10); })();
@@ -913,7 +875,59 @@ async function renderHome(){
     });
     addSwipeToDelete(list, handleHomeSwipeDelete);
   }
-  await renderHomeWarrantySection();
+}
+
+/* ============================== HOME TABS (Overview / Warranties) ============================== */
+async function renderHomeWarrantiesPanel(){
+  const items=await getWarrantyExpenses();
+  const container=document.getElementById('home-warranties-list'); container.innerHTML='';
+  if(items.length===0){
+    container.innerHTML='<p class="empty-hint">Mark a purchase as under warranty from the Add/Edit screen to see it here.</p>';
+    return;
+  }
+  const today=todayISO();
+  const active=items.filter(e=>e.warrantyExpiry>=today).sort((a,b)=>a.warrantyExpiry.localeCompare(b.warrantyExpiry));
+  const expired=items.filter(e=>e.warrantyExpiry<today).sort((a,b)=>b.warrantyExpiry.localeCompare(a.warrantyExpiry));
+
+  function renderGroup(label, list){
+    if(list.length===0) return;
+    container.insertAdjacentHTML('beforeend', `<p class="txn-group-label">${esc(label.toUpperCase())}</p>`);
+    list.forEach(e=>{
+      const cat=state.categories.find(c=>c.id===e.categoryId);
+      const status=formatWarrantyRemaining(e.warrantyExpiry);
+      container.insertAdjacentHTML('beforeend', `
+        <div class="recent-row" data-id="${e.id}">
+          <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
+          <div class="recent-info">
+            <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
+            <span class="recent-pm">${formatINR(e.amount)}</span>
+          </div>
+          <span class="warranty-status ${status.expired?'expired':'active'}">${esc(status.label)}</span>
+        </div>`);
+    });
+  }
+  renderGroup('Active', active);
+  renderGroup('Expired', expired);
+}
+function applyHomeTabUI(){
+  document.getElementById('home-panel-overview').classList.toggle('hidden', state.homeTab!=='overview');
+  document.getElementById('home-panel-warranties').classList.toggle('hidden', state.homeTab!=='warranties');
+  document.querySelectorAll('#home-tabs .home-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.hometab===state.homeTab);
+  });
+}
+function setHomeTab(tab){
+  state.homeTab=tab;
+  applyHomeTabUI();
+}
+// Both panels refresh on every call regardless of which tab is active, so
+// switching tabs never shows stale data, and locking mid-tab or returning
+// from Add/Edit "just works" since state.homeTab persists on its own —
+// nothing else needs to remember or restore it separately.
+async function renderHome(){
+  await renderHomeOverviewPanel();
+  await renderHomeWarrantiesPanel();
+  applyHomeTabUI();
 }
 
 /* ============================== SWIPE TO DELETE (Home) ============================== */
@@ -1043,39 +1057,6 @@ async function handleTxnDelete(id){
   const exp=await DB.getExpense(id);
   if(!exp) return;
   deleteExpenseWithUndo(exp, { onChange: renderTransactions });
-}
-
-/* ============================== WARRANTIES RENDER ============================== */
-async function renderWarranties(){
-  const items=await getWarrantyExpenses();
-  const container=document.getElementById('warranties-list'); container.innerHTML='';
-  if(items.length===0){
-    container.innerHTML='<p class="empty-hint">Mark a purchase as under warranty from the Add/Edit screen to see it here.</p>';
-    return;
-  }
-  const today=todayISO();
-  const active=items.filter(e=>e.warrantyExpiry>=today).sort((a,b)=>a.warrantyExpiry.localeCompare(b.warrantyExpiry));
-  const expired=items.filter(e=>e.warrantyExpiry<today).sort((a,b)=>b.warrantyExpiry.localeCompare(a.warrantyExpiry));
-
-  function renderGroup(label, list){
-    if(list.length===0) return;
-    container.insertAdjacentHTML('beforeend', `<p class="txn-group-label">${esc(label.toUpperCase())}</p>`);
-    list.forEach(e=>{
-      const cat=state.categories.find(c=>c.id===e.categoryId);
-      const status=formatWarrantyRemaining(e.warrantyExpiry);
-      container.insertAdjacentHTML('beforeend', `
-        <div class="recent-row" data-id="${e.id}">
-          <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
-          <div class="recent-info">
-            <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
-            <span class="recent-pm">${formatINR(e.amount)}</span>
-          </div>
-          <span class="warranty-status ${status.expired?'expired':'active'}">${esc(status.label)}</span>
-        </div>`);
-    });
-  }
-  renderGroup('Active', active);
-  renderGroup('Expired', expired);
 }
 
 /* ============================== ADD EXPENSE ============================== */
@@ -1398,10 +1379,11 @@ document.getElementById('txn-search').addEventListener('input', () => {
   txnSearchTimer=setTimeout(renderTransactions, 150);
 });
 
-document.getElementById('warranties-close-btn').addEventListener('click', () => { showScreen('home-screen'); renderHome(); });
-document.getElementById('home-warranty-card').addEventListener('click', () => { showScreen('warranties-screen'); renderWarranties(); });
-document.getElementById('home-warranty-link').addEventListener('click', () => { showScreen('warranties-screen'); renderWarranties(); });
-document.getElementById('warranties-list').addEventListener('click', (e) => {
+document.getElementById('home-tabs').addEventListener('click', (e) => {
+  const btn=e.target.closest('.home-tab'); if(!btn) return;
+  setHomeTab(btn.dataset.hometab);
+});
+document.getElementById('home-warranties-list').addEventListener('click', (e) => {
   const row=e.target.closest('.recent-row'); if(!row) return;
   openEditFromId(row.dataset.id);
 });
