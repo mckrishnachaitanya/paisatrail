@@ -79,8 +79,9 @@ input{outline:none;}
 #toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%) translateY(16px);
   background:var(--ink);color:var(--paper);padding:11px 20px;border-radius:20px;font-size:13px;font-weight:700;
   z-index:999;opacity:0;transition:all .22s;white-space:nowrap;pointer-events:none;max-width:88vw;
-  overflow:hidden;text-overflow:ellipsis;}
-#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:12px;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
+#toast-undo-btn{color:var(--sunshine);font-weight:800;font-size:13px;flex-shrink:0;}
 
 /* ============================== BOTTOM NAV ============================== */
 .bottom-nav{position:relative;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
@@ -141,6 +142,13 @@ input{outline:none;}
 .recent-amt{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--coral);
   flex-shrink:0;}
 .empty-hint{font-size:13px;color:var(--muted);text-align:center;padding:24px 0;}
+
+/* ============================== TRANSACTIONS ============================== */
+.search-bar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-radius:14px;background:var(--surface);}
+.search-bar input{flex:1;border:none;background:transparent;font-size:14px;color:var(--ink);}
+.txn-group-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.03em;margin:14px 0 8px;}
+.txn-delete{font-size:15px;color:var(--muted);width:26px;height:26px;flex-shrink:0;display:flex;
+  align-items:center;justify-content:center;}
 
 /* ============================== ADD SCREEN ============================== */
 .receipt-card{background:var(--sunshine);border-radius:20px;padding:20px 20px 24px;text-align:center;}
@@ -265,8 +273,11 @@ input{outline:none;}
 <!-- ============================== ADD EXPENSE SCREEN ============================== -->
 <div class="screen is-hidden" id="add-screen">
   <div class="topbar">
-    <p class="topbar-title">Add expense</p>
-    <button class="topbar-close" id="add-close-btn">✕</button>
+    <p class="topbar-title" id="add-screen-title">Add expense</p>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="topbar-close hidden" id="add-delete-btn">🗑️</button>
+      <button class="topbar-close" id="add-close-btn">✕</button>
+    </div>
   </div>
 
   <div class="scroll">
@@ -307,11 +318,17 @@ input{outline:none;}
   </div>
 </div>
 
-<!-- ============================== TRANSACTIONS (stub) ============================== -->
+<!-- ============================== TRANSACTIONS SCREEN ============================== -->
 <div class="screen is-hidden" id="transactions-screen">
-  <div class="stub-wrap">
-    <span class="stub-emoji">🚧</span>
-    <p class="stub-text">Transactions list, search and filters land in the next build pass.</p>
+  <div class="scroll">
+    <div style="padding:0 20px 12px;">
+      <p class="topbar-title" style="margin:14px 0 12px;">Transactions</p>
+      <div class="search-bar">
+        <span>🔍</span>
+        <input id="txn-search" type="text" placeholder="Search expenses...">
+      </div>
+      <div id="txn-list" style="margin-top:14px;"></div>
+    </div>
   </div>
   <div class="bottom-nav">
     <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
@@ -421,6 +438,14 @@ const DB = {
     tx.objectStore('expenses').delete(id);
     await txDone(tx);
   },
+  async getExpense(id){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('expenses','readonly').objectStore('expenses').get(id);
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
   async getExpensesByDateRange(startISO, endISO){
     const db=await openDB();
     return new Promise((resolve,reject)=>{
@@ -470,6 +495,20 @@ const DB = {
     tx.objectStore('attachments').put(att);
     await txDone(tx);
   },
+  async getAttachment(id){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('attachments','readonly').objectStore('attachments').get(id);
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
+  async deleteAttachment(id){
+    const db=await openDB();
+    const tx=db.transaction('attachments','readwrite');
+    tx.objectStore('attachments').delete(id);
+    await txDone(tx);
+  },
   async seedDefaults(){
     const cats=await this.getAllCategories();
     if(cats.length===0){
@@ -506,13 +545,29 @@ const state = {
   paymentMethods:[],
   selectedCategoryId:null,
   selectedPaymentId:null,
-  pendingAttachment:null, // {fileName, mimeType, type, arrayBuffer}
+  pendingAttachment:null, // {fileName, mimeType, type, arrayBuffer} — newly picked, not yet saved
+  editingExpenseId:null,  // null = adding a new expense, otherwise the id being edited
+  editingExpense:null,    // the full expense object being edited (for its attachmentId etc.)
+  existingAttachmentId:null,
+  existingAttachmentMeta:null,
+  removeExistingAttachment:false,
+  returnScreen:'home-screen', // where to go back to after Add/Edit closes or saves
 };
+const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
 /* ============================== SCREEN SYSTEM ============================== */
 const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen'];
 function showScreen(id){
   SCREENS.forEach(s => document.getElementById(s).classList.toggle('is-hidden', s!==id));
+}
+function getCurrentScreen(){
+  return SCREENS.find(s => s!=='pin-screen' && s!=='add-screen' && !document.getElementById(s).classList.contains('is-hidden')) || 'home-screen';
+}
+function goToReturnScreen(){
+  const target = state.returnScreen || 'home-screen';
+  showScreen(target);
+  if(target==='home-screen') renderHome();
+  else if(target==='transactions-screen') renderTransactions();
 }
 
 /* ============================== TOAST ============================== */
@@ -522,6 +577,27 @@ function toast(msg, dur=2000){
   t.textContent=msg; t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>t.classList.remove('show'), dur);
+}
+function showUndoToast(msg, onUndo, dur=4000){
+  const t=document.getElementById('toast');
+  t.innerHTML = `<span>${esc(msg)}</span><button id="toast-undo-btn">Undo</button>`;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  document.getElementById('toast-undo-btn').onclick = () => { onUndo(); t.classList.remove('show'); };
+  toastTimer=setTimeout(()=>t.classList.remove('show'), dur);
+}
+function deleteExpenseWithUndo(expense, { onChange } = {}){
+  pendingDeletes[expense.id] = { expense, timer: setTimeout(async () => {
+    delete pendingDeletes[expense.id];
+    await DB.deleteExpense(expense.id);
+    if(expense.attachmentId) await DB.deleteAttachment(expense.attachmentId).catch(()=>{});
+  }, 4000) };
+  if(onChange) onChange();
+  showUndoToast('Expense deleted', () => {
+    const pending=pendingDeletes[expense.id];
+    if(pending){ clearTimeout(pending.timer); delete pendingDeletes[expense.id]; }
+    if(onChange) onChange();
+  });
 }
 
 /* ============================== PIN LOCK ============================== */
@@ -655,7 +731,7 @@ async function renderHome(){
   const startISO=(()=>{ const tz=monthStart.getTimezoneOffset()*60000; return new Date(monthStart-tz).toISOString().slice(0,10); })();
   const endISO=todayISO();
 
-  const expenses=await DB.getExpensesByDateRange(startISO, endISO);
+  const expenses=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id]);
   const total=expenses.reduce((s,e)=>s+Number(e.amount),0);
 
   document.getElementById('home-total').textContent=formatINR(total);
@@ -688,7 +764,7 @@ async function renderHome(){
       const cat=state.categories.find(c=>c.id===e.categoryId);
       const pm=state.paymentMethods.find(p=>p.id===e.paymentMethod);
       list.insertAdjacentHTML('beforeend', `
-        <div class="recent-row">
+        <div class="recent-row" data-id="${e.id}">
           <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
           <div class="recent-info">
             <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
@@ -698,6 +774,65 @@ async function renderHome(){
         </div>`);
     });
   }
+}
+
+/* ============================== TRANSACTIONS RENDER ============================== */
+function formatGroupLabel(dateISO){
+  const today=todayISO();
+  const yest=(()=>{ const d=new Date(); d.setDate(d.getDate()-1); const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); })();
+  if(dateISO===today) return 'Today';
+  if(dateISO===yest) return 'Yesterday';
+  return new Date(dateISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+}
+async function renderTransactions(){
+  const search=(document.getElementById('txn-search').value||'').toLowerCase().trim();
+  let list=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
+
+  if(search){
+    list=list.filter(e=>{
+      const cat=state.categories.find(c=>c.id===e.categoryId);
+      const pm=state.paymentMethods.find(p=>p.id===e.paymentMethod);
+      const hay=`${e.note||''} ${cat?cat.name:''} ${pm?pm.name:''}`.toLowerCase();
+      return hay.includes(search);
+    });
+  }
+  list.sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
+
+  const container=document.getElementById('txn-list'); container.innerHTML='';
+  if(list.length===0){
+    container.innerHTML=`<p class="empty-hint">${search ? 'No expenses match your search.' : 'No expenses yet — tap + to add your first one.'}</p>`;
+    return;
+  }
+  let lastGroup=null;
+  list.forEach(e=>{
+    const groupLabel=formatGroupLabel(e.date);
+    if(groupLabel!==lastGroup){
+      container.insertAdjacentHTML('beforeend', `<p class="txn-group-label">${esc(groupLabel.toUpperCase())}</p>`);
+      lastGroup=groupLabel;
+    }
+    const cat=state.categories.find(c=>c.id===e.categoryId);
+    const pm=state.paymentMethods.find(p=>p.id===e.paymentMethod);
+    container.insertAdjacentHTML('beforeend', `
+      <div class="recent-row" data-id="${e.id}">
+        <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
+        <div class="recent-info">
+          <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
+          <span class="recent-pm">${pm?esc(pm.name):'—'}</span>
+        </div>
+        <span class="recent-amt">-${formatINR(e.amount)}</span>
+        <button class="txn-delete" data-del="${e.id}">🗑️</button>
+      </div>`);
+  });
+}
+async function openEditFromId(id){
+  const exp=await DB.getExpense(id);
+  if(!exp){ toast('That expense was not found'); return; }
+  openAddScreen(exp);
+}
+async function handleTxnDelete(id){
+  const exp=await DB.getExpense(id);
+  if(!exp) return;
+  deleteExpenseWithUndo(exp, { onChange: renderTransactions });
 }
 
 /* ============================== ADD EXPENSE ============================== */
@@ -740,19 +875,9 @@ function fileToArrayBuffer(file){
     reader.readAsArrayBuffer(file);
   });
 }
-function renderAttachmentArea(){
+async function renderAttachmentArea(){
   const area=document.getElementById('add-attachment-area');
-  if(!state.pendingAttachment){
-    area.innerHTML=`
-      <div class="attach-grid">
-        <button type="button" class="attach-btn" id="attach-camera-btn"><span>📷</span><span>Camera</span></button>
-        <button type="button" class="attach-btn" id="attach-gallery-btn"><span>🖼️</span><span>Gallery</span></button>
-        <button type="button" class="attach-btn" id="attach-file-btn"><span>📄</span><span>File</span></button>
-      </div>`;
-    document.getElementById('attach-camera-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-camera-input').click(); };
-    document.getElementById('attach-gallery-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-gallery-input').click(); };
-    document.getElementById('attach-file-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-file-input').click(); };
-  } else {
+  if(state.pendingAttachment){
     const a=state.pendingAttachment;
     const icon = a.type==='pdf' ? '📕' : a.type==='word' ? '📘' : a.type==='image' ? '🖼️' : '📁';
     area.innerHTML=`
@@ -762,15 +887,48 @@ function renderAttachmentArea(){
         <button type="button" id="attach-remove-btn">✕</button>
       </div>`;
     document.getElementById('attach-remove-btn').onclick=()=>{ state.pendingAttachment=null; renderAttachmentArea(); };
+  } else if(state.existingAttachmentId && !state.removeExistingAttachment){
+    if(!state.existingAttachmentMeta){
+      state.existingAttachmentMeta = await DB.getAttachment(state.existingAttachmentId);
+    }
+    const meta=state.existingAttachmentMeta;
+    const icon = meta && meta.type==='pdf' ? '📕' : meta && meta.type==='word' ? '📘' : meta && meta.type==='image' ? '🖼️' : '📁';
+    area.innerHTML=`
+      <div class="attach-preview">
+        <div class="attach-preview-icon">${icon}</div>
+        <div class="attach-preview-info"><p>${esc(meta ? meta.fileName : 'Attachment')}</p><span>Already attached</span></div>
+        <button type="button" id="attach-remove-btn">✕</button>
+      </div>`;
+    document.getElementById('attach-remove-btn').onclick=()=>{ state.removeExistingAttachment=true; renderAttachmentArea(); };
+  } else {
+    area.innerHTML=`
+      <div class="attach-grid">
+        <button type="button" class="attach-btn" id="attach-camera-btn"><span>📷</span><span>Camera</span></button>
+        <button type="button" class="attach-btn" id="attach-gallery-btn"><span>🖼️</span><span>Gallery</span></button>
+        <button type="button" class="attach-btn" id="attach-file-btn"><span>📄</span><span>File</span></button>
+      </div>`;
+    document.getElementById('attach-camera-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-camera-input').click(); };
+    document.getElementById('attach-gallery-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-gallery-input').click(); };
+    document.getElementById('attach-file-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-file-input').click(); };
   }
 }
-function openAddScreen(){
-  state.selectedCategoryId = state.categories[0] ? state.categories[0].id : null;
-  state.selectedPaymentId = state.paymentMethods[0] ? state.paymentMethods[0].id : null;
+function openAddScreen(existing){
+  state.returnScreen = getCurrentScreen();
+  state.editingExpenseId = existing ? existing.id : null;
+  state.editingExpense = existing || null;
+  state.selectedCategoryId = existing ? existing.categoryId : (state.categories[0] ? state.categories[0].id : null);
+  state.selectedPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
   state.pendingAttachment = null;
-  document.getElementById('add-amount').value='';
-  document.getElementById('add-note').value='';
-  document.getElementById('add-date').value=todayISO();
+  state.existingAttachmentId = existing ? (existing.attachmentId || null) : null;
+  state.existingAttachmentMeta = null;
+  state.removeExistingAttachment = false;
+
+  document.getElementById('add-screen-title').textContent = existing ? 'Edit expense' : 'Add expense';
+  document.getElementById('add-save-btn').textContent = existing ? 'Save changes' : 'Save expense';
+  document.getElementById('add-delete-btn').classList.toggle('hidden', !existing);
+  document.getElementById('add-amount').value = existing ? existing.amount : '';
+  document.getElementById('add-note').value = existing ? (existing.note || '') : '';
+  document.getElementById('add-date').value = existing ? existing.date : todayISO();
   renderCategoryGrid();
   renderPaymentChips();
   renderAttachmentArea();
@@ -784,13 +942,23 @@ async function saveExpense(){
 
   const date=document.getElementById('add-date').value || todayISO();
   const note=document.getElementById('add-note').value.trim();
-  const id=genId();
+  const isEdit=!!state.editingExpenseId;
+  const id=isEdit ? state.editingExpenseId : genId();
+
+  // If editing and the old attachment is being replaced or removed, delete it now.
+  let attachmentId = isEdit ? state.existingAttachmentId : null;
+  if(isEdit && state.existingAttachmentId && (state.removeExistingAttachment || state.pendingAttachment)){
+    await DB.deleteAttachment(state.existingAttachmentId).catch(()=>{});
+    attachmentId=null;
+  }
+
   const expense={
     id, amount, categoryId: state.selectedCategoryId,
     paymentMethod: state.selectedPaymentId, // stores the payment method's id, despite the field name
-    date, note, attachmentId:null, recurringId:null, createdAt: Date.now(),
+    date, note, attachmentId, recurringId:null,
+    createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
   };
-  await DB.addExpense(expense);
+  await DB.addExpense(expense); // put() — works for both create and update since the id matches
 
   if(state.pendingAttachment){
     const attId=genId();
@@ -803,18 +971,21 @@ async function saveExpense(){
     await DB.addExpense(expense);
   }
 
-  toast('Expense saved ✓');
-  showScreen('home-screen');
-  renderHome();
+  toast(isEdit ? 'Expense updated ✓' : 'Expense saved ✓');
+  goToReturnScreen();
 }
 
 /* ============================== EVENT WIRING ============================== */
 document.querySelectorAll('#pin-screen .num-btn[data-n]').forEach(b => b.addEventListener('click', () => handlePINDigit(b.dataset.n)));
 document.getElementById('pin-del-btn').addEventListener('click', () => { state.pinBuffer=state.pinBuffer.slice(0,-1); updatePINDots(); });
 
-document.querySelectorAll('.fab-add').forEach(b => b.addEventListener('click', openAddScreen));
-document.getElementById('add-close-btn').addEventListener('click', () => showScreen('home-screen'));
+document.querySelectorAll('.fab-add').forEach(b => b.addEventListener('click', () => openAddScreen()));
+document.getElementById('add-close-btn').addEventListener('click', () => goToReturnScreen());
 document.getElementById('add-save-btn').addEventListener('click', saveExpense);
+document.getElementById('add-delete-btn').addEventListener('click', () => {
+  if(!state.editingExpense) return;
+  deleteExpenseWithUndo(state.editingExpense, { onChange: goToReturnScreen });
+});
 
 document.getElementById('add-category-grid').addEventListener('click', (e) => {
   const btn=e.target.closest('.cat-chip'); if(!btn) return;
@@ -840,11 +1011,28 @@ document.getElementById('add-payment-row').addEventListener('click', (e) => {
   el.addEventListener('cancel', endPickerSuppression);
 });
 
+document.getElementById('home-recent-list').addEventListener('click', (e) => {
+  const row=e.target.closest('.recent-row'); if(!row) return;
+  openEditFromId(row.dataset.id);
+});
+document.getElementById('txn-list').addEventListener('click', (e) => {
+  const delBtn=e.target.closest('.txn-delete');
+  if(delBtn){ handleTxnDelete(delBtn.dataset.del); return; }
+  const row=e.target.closest('.recent-row');
+  if(row) openEditFromId(row.dataset.id);
+});
+let txnSearchTimer;
+document.getElementById('txn-search').addEventListener('input', () => {
+  clearTimeout(txnSearchTimer);
+  txnSearchTimer=setTimeout(renderTransactions, 150);
+});
+
 document.querySelectorAll('[data-nav]').forEach(item => {
   item.addEventListener('click', () => {
     const nav=item.dataset.nav;
     showScreen(nav+'-screen');
     if(nav==='home') renderHome();
+    if(nav==='transactions') renderTransactions();
   });
 });
 
