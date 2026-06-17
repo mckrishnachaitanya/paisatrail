@@ -1,1 +1,8 @@
-
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#8657E0"/>
+  <circle cx="256" cy="216" r="118" fill="#FFC23C"/>
+  <circle cx="256" cy="216" r="118" fill="none" stroke="#241F3D" stroke-width="8" opacity="0.18"/>
+  <text x="256" y="260" font-family="Georgia, 'Times New Roman', serif" font-size="140" font-weight="700" text-anchor="middle" fill="#241F3D">&#8377;</text>
+  <circle cx="160" cy="372" r="44" fill="#FF6B5B"/>
+  <circle cx="352" cy="372" r="44" fill="#2EC4B6"/>
+</svg>
