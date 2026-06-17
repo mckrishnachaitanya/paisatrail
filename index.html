@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2A1F4D">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/icon.svg">
+<title>PaisaTrail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Space+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================== TOKENS ============================== */
+:root{
+  --paper:#FFFCF7;
+  --ink:#241F3D;
+  --sunshine:#FFC23C;
+  --coral:#FF6B5B;
+  --mint:#2EC4B6;
+  --grape:#8657E0;
+  --canvas:#2A1F4D;
+  --sky:#5BA8FF;
+  --pink:#FF8FB3;
+  --surface:#FBF8FF;
+  --chip:#EFEAFB;
+  --muted:#9088A8;
+  --border:#E4DEF2;
+  --radius:20px;
+  --radius-sm:14px;
+  --font-display:'Fredoka',sans-serif;
+  --font-body:'Plus Jakarta Sans',sans-serif;
+  --font-mono:'Space Mono',monospace;
+}
+
+/* ============================== RESET ============================== */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;background:var(--canvas);}
+body{font-family:var(--font-body);color:var(--ink);-webkit-font-smoothing:antialiased;}
+button,input{font-family:inherit;}
+button{cursor:pointer;background:none;border:none;color:inherit;}
+input{outline:none;}
+.hidden{display:none !important;}
+
+/* ============================== SCREEN SYSTEM ============================== */
+.screen{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;overflow:hidden;
+  opacity:1;transition:opacity .2s,transform .2s;z-index:10;}
+.screen.is-hidden{opacity:0;pointer-events:none;transform:translateY(10px);z-index:0;}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+
+/* ============================== PIN SCREEN ============================== */
+#pin-screen{align-items:center;justify-content:center;gap:26px;padding:40px 24px;background:var(--canvas);}
+.pin-brand{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.pin-brand-icon{width:76px;height:76px;border-radius:24px;background:var(--grape);
+  display:flex;align-items:center;justify-content:center;font-size:34px;}
+.pin-brand-name{font-family:var(--font-display);font-size:24px;font-weight:700;color:var(--sunshine);}
+.pin-brand-sub{font-size:13px;color:#D8D0F0;text-align:center;}
+.pin-label{font-size:14px;font-weight:600;color:#D8D0F0;text-align:center;min-height:18px;}
+.pin-label.error{color:var(--coral);}
+.pin-dots{display:flex;gap:14px;}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid #4B3E7A;background:transparent;
+  transition:background .15s,border-color .15s,transform .15s cubic-bezier(.34,1.56,.64,1),box-shadow .15s;}
+.pin-dot.filled{background:var(--sunshine);border-color:var(--sunshine);
+  box-shadow:0 0 0 4px rgba(255,194,60,.18);transform:scale(1.15);}
+.pin-dot.error{background:var(--coral);border-color:var(--coral);animation:shake .3s;}
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;max-width:260px;}
+.num-btn{aspect-ratio:1;border-radius:50%;border:1.5px solid #4B3E7A;background:rgba(255,255,255,.04);
+  color:var(--paper);font-size:21px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  transition:transform .12s cubic-bezier(.34,1.56,.64,1),background .12s;}
+.num-btn:active{transform:scale(.85);background:rgba(255,255,255,.1);}
+.num-btn.del{font-size:17px;background:transparent;border-color:transparent;color:#B0A7CC;}
+.num-btn.empty{background:transparent;border:none;pointer-events:none;}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}60%{transform:translateX(7px)}}
+
+/* ============================== TOAST ============================== */
+#toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%) translateY(16px);
+  background:var(--ink);color:var(--paper);padding:11px 20px;border-radius:20px;font-size:13px;font-weight:700;
+  z-index:999;opacity:0;transition:all .22s;white-space:nowrap;pointer-events:none;max-width:88vw;
+  overflow:hidden;text-overflow:ellipsis;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ============================== BOTTOM NAV ============================== */
+.bottom-nav{position:relative;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  padding:10px 28px calc(10px + env(safe-area-inset-bottom,0px));background:var(--paper);
+  border-top:1px solid var(--border);}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:19px;color:var(--muted);
+  width:40px;}
+.nav-item.active{color:var(--grape);}
+.nav-label{font-size:9px;font-weight:700;letter-spacing:.02em;}
+.fab-add{width:54px;height:54px;border-radius:50%;background:var(--sunshine);display:flex;
+  align-items:center;justify-content:center;font-size:24px;font-weight:800;color:var(--ink);
+  margin-top:-26px;box-shadow:0 8px 18px rgba(255,194,60,.5);border:4px solid var(--paper);}
+.fab-add:active{transform:scale(.92);}
+
+/* ============================== TOP BAR (Add screen) ============================== */
+.topbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px 8px;}
+.topbar-title{font-family:var(--font-display);font-size:17px;font-weight:600;}
+.topbar-close{font-size:20px;color:var(--muted);width:32px;height:32px;display:flex;
+  align-items:center;justify-content:center;}
+
+/* ============================== HOME ============================== */
+#home-body{padding:0 20px 28px;}
+.home-header{display:flex;align-items:center;justify-content:space-between;margin:8px 0 16px;}
+.greeting{font-family:var(--font-display);font-size:17px;}
+.month-label{font-size:12px;color:var(--muted);}
+
+.spend-card{background:var(--grape);border-radius:24px;padding:20px;color:white;}
+.spend-label{font-size:12px;color:#E4D9FF;}
+.spend-amount{font-family:var(--font-mono);font-size:30px;font-weight:700;margin-top:4px;}
+.spend-count{font-size:12px;color:#E4D9FF;margin-top:4px;}
+
+.perforation{display:flex;justify-content:space-between;padding:0 12px;transform:translateY(-5px);}
+.perf-dot{width:7px;height:7px;border-radius:50%;background:var(--paper);}
+
+.donut-row{display:flex;align-items:center;gap:18px;margin-top:6px;}
+.donut{width:88px;height:88px;border-radius:50%;flex-shrink:0;position:relative;}
+.donut-hole{position:absolute;inset:13px;background:var(--paper);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);
+  font-weight:700;text-align:center;line-height:1.2;}
+.legend{flex:1;display:flex;flex-direction:column;gap:6px;}
+.legend-row{display:flex;align-items:center;justify-content:space-between;font-size:12px;}
+.legend-left{display:flex;align-items:center;gap:7px;}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.legend-pct{color:var(--muted);font-weight:700;}
+
+.section-head{display:flex;align-items:center;justify-content:space-between;margin:22px 0 10px;}
+.section-title{font-family:var(--font-display);font-size:14px;}
+
+.recent-row{display:flex;align-items:center;gap:11px;padding:10px;border-radius:18px;
+  background:var(--surface);margin-bottom:8px;}
+.recent-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:16px;flex-shrink:0;}
+.recent-info{flex:1;min-width:0;}
+.recent-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.recent-pm{font-size:9px;font-weight:700;color:var(--grape);background:var(--chip);
+  padding:2px 8px;border-radius:20px;display:inline-block;margin-top:3px;}
+.recent-amt{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--coral);
+  flex-shrink:0;}
+.empty-hint{font-size:13px;color:var(--muted);text-align:center;padding:24px 0;}
+
+/* ============================== ADD SCREEN ============================== */
+.receipt-card{background:var(--sunshine);border-radius:20px;padding:20px 20px 24px;text-align:center;}
+.receipt-label{font-size:12px;font-weight:700;color:#7A5400;}
+.receipt-amount-wrap{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:4px;}
+.receipt-currency{font-family:var(--font-mono);font-size:26px;font-weight:700;color:var(--ink);}
+#add-amount{font-family:var(--font-mono);font-size:38px;font-weight:700;color:var(--ink);
+  background:transparent;border:none;width:100%;text-align:center;}
+#add-amount::placeholder{color:rgba(36,31,61,.35);}
+
+.field-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.03em;
+  margin:18px 0 8px;}
+#add-date{width:100%;padding:11px 14px;border-radius:14px;background:var(--surface);
+  border:1.5px solid transparent;color:var(--ink);font-size:14px;}
+#add-note{width:100%;padding:11px 14px;border-radius:14px;background:var(--surface);
+  border:none;font-size:14px;color:var(--ink);}
+
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.cat-chip{display:flex;flex-direction:column;align-items:center;gap:4px;padding:11px 4px;
+  border-radius:18px;border:2px solid transparent;background:var(--surface);}
+.cat-emoji{font-size:19px;}
+.cat-name{font-size:10px;font-weight:700;}
+
+.pay-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;}
+.pay-row::-webkit-scrollbar{display:none;}
+.pay-chip{display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:20px;
+  background:var(--surface);font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+
+.attach-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.attach-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 4px;
+  border-radius:18px;border:2px dashed var(--border);font-size:18px;}
+.attach-btn span:last-child{font-size:10px;font-weight:700;color:var(--ink);}
+.attach-preview{display:flex;align-items:center;gap:11px;padding:11px;border-radius:18px;
+  background:var(--surface);}
+.attach-preview-icon{width:36px;height:36px;border-radius:14px;background:rgba(46,196,182,.16);
+  display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.attach-preview-info{flex:1;min-width:0;}
+.attach-preview-info p{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.attach-preview-info span{font-size:10px;color:var(--mint);font-weight:700;}
+#attach-remove-btn{font-size:15px;color:var(--muted);width:26px;height:26px;}
+
+.save-bar{flex-shrink:0;padding:14px 20px calc(14px + env(safe-area-inset-bottom,0px));}
+.save-btn{width:100%;padding:15px;border-radius:18px;background:var(--sunshine);
+  font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--ink);}
+.save-btn:active{transform:scale(.98);}
+
+/* ============================== STUB SCREENS ============================== */
+.stub-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;padding:0 40px;text-align:center;}
+.stub-emoji{font-size:36px;}
+.stub-text{font-size:13px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<!-- ============================== PIN SCREEN ============================== -->
+<div class="screen" id="pin-screen">
+  <div class="pin-brand">
+    <div class="pin-brand-icon">💰</div>
+    <div class="pin-brand-name">PaisaTrail</div>
+    <div class="pin-brand-sub" id="pin-subtitle">Your personal expense tracker</div>
+  </div>
+  <div class="pin-label" id="pin-label">Enter your 6-digit PIN</div>
+  <div class="pin-dots" id="pin-dots">
+    <div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div>
+    <div class="pin-dot" id="d4"></div><div class="pin-dot" id="d5"></div>
+  </div>
+  <div class="numpad">
+    <button class="num-btn" data-n="1">1</button><button class="num-btn" data-n="2">2</button><button class="num-btn" data-n="3">3</button>
+    <button class="num-btn" data-n="4">4</button><button class="num-btn" data-n="5">5</button><button class="num-btn" data-n="6">6</button>
+    <button class="num-btn" data-n="7">7</button><button class="num-btn" data-n="8">8</button><button class="num-btn" data-n="9">9</button>
+    <button class="num-btn empty"></button><button class="num-btn" data-n="0">0</button>
+    <button class="num-btn del" id="pin-del-btn">⌫</button>
+  </div>
+</div>
+
+<!-- ============================== HOME SCREEN ============================== -->
+<div class="screen is-hidden" id="home-screen">
+  <div class="scroll">
+    <div id="home-body">
+      <div class="home-header">
+        <div>
+          <p class="greeting">Hey there 👋</p>
+          <p class="month-label" id="home-month-label">—</p>
+        </div>
+      </div>
+
+      <div class="spend-card">
+        <p class="spend-label">Spent this month</p>
+        <p class="spend-amount" id="home-total">₹0</p>
+        <p class="spend-count" id="home-count">0 expenses this month</p>
+      </div>
+      <div class="perforation">
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+      </div>
+
+      <div class="donut-row">
+        <div class="donut" id="home-donut"><div class="donut-hole" id="home-donut-label">No data yet</div></div>
+        <div class="legend" id="home-legend"></div>
+      </div>
+
+      <div class="section-head">
+        <p class="section-title">Recent</p>
+      </div>
+      <div id="home-recent-list"></div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <div class="nav-item active" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
+    <div class="nav-item" data-nav="transactions"><span>📋</span><span class="nav-label">List</span></div>
+    <button class="fab-add">＋</button>
+    <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Stats</span></div>
+    <div class="nav-item" data-nav="settings"><span>⚙️</span><span class="nav-label">Settings</span></div>
+  </div>
+</div>
+
+<!-- ============================== ADD EXPENSE SCREEN ============================== -->
+<div class="screen is-hidden" id="add-screen">
+  <div class="topbar">
+    <p class="topbar-title">Add expense</p>
+    <button class="topbar-close" id="add-close-btn">✕</button>
+  </div>
+
+  <div class="scroll">
+    <div style="padding:0 20px 12px;">
+      <div class="receipt-card">
+        <p class="receipt-label">Amount</p>
+        <div class="receipt-amount-wrap">
+          <span class="receipt-currency">₹</span>
+          <input id="add-amount" type="number" inputmode="decimal" placeholder="0" min="0" step="0.01">
+        </div>
+      </div>
+      <div class="perforation">
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+      </div>
+
+      <p class="field-label">DATE</p>
+      <input id="add-date" type="date">
+
+      <p class="field-label">CATEGORY</p>
+      <div class="cat-grid" id="add-category-grid"></div>
+
+      <p class="field-label">PAID VIA</p>
+      <div class="pay-row" id="add-payment-row"></div>
+
+      <p class="field-label">NOTE</p>
+      <input id="add-note" type="text" placeholder="What was this for?">
+
+      <p class="field-label">ATTACH RECEIPT</p>
+      <div id="add-attachment-area"></div>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <button class="save-btn" id="add-save-btn">Save expense</button>
+  </div>
+</div>
+
+<!-- ============================== TRANSACTIONS (stub) ============================== -->
+<div class="screen is-hidden" id="transactions-screen">
+  <div class="stub-wrap">
+    <span class="stub-emoji">🚧</span>
+    <p class="stub-text">Transactions list, search and filters land in the next build pass.</p>
+  </div>
+  <div class="bottom-nav">
+    <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
+    <div class="nav-item active" data-nav="transactions"><span>📋</span><span class="nav-label">List</span></div>
+    <button class="fab-add">＋</button>
+    <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Stats</span></div>
+    <div class="nav-item" data-nav="settings"><span>⚙️</span><span class="nav-label">Settings</span></div>
+  </div>
+</div>
+
+<!-- ============================== STATS (stub) ============================== -->
+<div class="screen is-hidden" id="stats-screen">
+  <div class="stub-wrap">
+    <span class="stub-emoji">📊</span>
+    <p class="stub-text">Stats with category and payment-method breakdowns are coming soon.</p>
+  </div>
+  <div class="bottom-nav">
+    <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
+    <div class="nav-item" data-nav="transactions"><span>📋</span><span class="nav-label">List</span></div>
+    <button class="fab-add">＋</button>
+    <div class="nav-item active" data-nav="stats"><span>📊</span><span class="nav-label">Stats</span></div>
+    <div class="nav-item" data-nav="settings"><span>⚙️</span><span class="nav-label">Settings</span></div>
+  </div>
+</div>
+
+<!-- ============================== SETTINGS (stub) ============================== -->
+<div class="screen is-hidden" id="settings-screen">
+  <div class="stub-wrap">
+    <span class="stub-emoji">⚙️</span>
+    <p class="stub-text">Manage categories, payment methods, and export/import land in the next build pass.</p>
+  </div>
+  <div class="bottom-nav">
+    <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
+    <div class="nav-item" data-nav="transactions"><span>📋</span><span class="nav-label">List</span></div>
+    <button class="fab-add">＋</button>
+    <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Stats</span></div>
+    <div class="nav-item active" data-nav="settings"><span>⚙️</span><span class="nav-label">Settings</span></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- hidden file inputs for attachments -->
+<input type="file" id="attach-camera-input" accept="image/*" capture="environment" class="hidden">
+<input type="file" id="attach-gallery-input" accept="image/*" class="hidden">
+<input type="file" id="attach-file-input" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="hidden">
+
+<script>
+'use strict';
+
+/* ============================== HELPERS ============================== */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function genId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function todayISO(){ const d=new Date(); const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); }
+function formatINR(n){ const num=Number(n)||0; return '₹' + num.toLocaleString('en-IN',{maximumFractionDigits:2}); }
+
+const Store = {
+  get(k){ return localStorage.getItem(k); },
+  set(k,v){ localStorage.setItem(k,v); },
+};
+
+const Crypto = {
+  enc: new TextEncoder(),
+  async hashPIN(pin){
+    const buf = await crypto.subtle.digest('SHA-256', this.enc.encode(pin));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  },
+};
+
+/* ============================== DATA LAYER (IndexedDB) ============================== */
+const DB_NAME='PaisaTrailDB', DB_VERSION=1;
+let _dbInstance=null;
+
+function openDB(){
+  if(_dbInstance) return Promise.resolve(_dbInstance);
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded=(e)=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains('expenses')){
+        const s=db.createObjectStore('expenses',{keyPath:'id'});
+        s.createIndex('date','date',{unique:false});
+        s.createIndex('categoryId','categoryId',{unique:false});
+        s.createIndex('paymentMethod','paymentMethod',{unique:false});
+      }
+      if(!db.objectStoreNames.contains('categories')) db.createObjectStore('categories',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('paymentMethods')) db.createObjectStore('paymentMethods',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('attachments')) db.createObjectStore('attachments',{keyPath:'id'});
+    };
+    req.onsuccess=(e)=>{ _dbInstance=e.target.result; resolve(_dbInstance); };
+    req.onerror=(e)=>reject(e.target.error);
+  });
+}
+function txDone(tx){ return new Promise((res,rej)=>{ tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
+
+const DB = {
+  async addExpense(exp){
+    const db=await openDB();
+    const tx=db.transaction('expenses','readwrite');
+    tx.objectStore('expenses').put(exp);
+    await txDone(tx);
+    return exp;
+  },
+  async deleteExpense(id){
+    const db=await openDB();
+    const tx=db.transaction('expenses','readwrite');
+    tx.objectStore('expenses').delete(id);
+    await txDone(tx);
+  },
+  async getExpensesByDateRange(startISO, endISO){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction('expenses','readonly');
+      const idx=tx.objectStore('expenses').index('date');
+      const range=IDBKeyRange.bound(startISO, endISO);
+      const out=[];
+      const req=idx.openCursor(range);
+      req.onsuccess=(e)=>{
+        const cur=e.target.result;
+        if(cur){ out.push(cur.value); cur.continue(); } else resolve(out);
+      };
+      req.onerror=()=>reject(req.error);
+    });
+  },
+  async getAllCategories(){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('categories','readonly').objectStore('categories').getAll();
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
+  async getAllPaymentMethods(){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('paymentMethods','readonly').objectStore('paymentMethods').getAll();
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
+  async putCategory(cat){
+    const db=await openDB();
+    const tx=db.transaction('categories','readwrite');
+    tx.objectStore('categories').put(cat);
+    await txDone(tx);
+  },
+  async putPaymentMethod(pm){
+    const db=await openDB();
+    const tx=db.transaction('paymentMethods','readwrite');
+    tx.objectStore('paymentMethods').put(pm);
+    await txDone(tx);
+  },
+  async saveAttachment(att){
+    const db=await openDB();
+    const tx=db.transaction('attachments','readwrite');
+    tx.objectStore('attachments').put(att);
+    await txDone(tx);
+  },
+  async seedDefaults(){
+    const cats=await this.getAllCategories();
+    if(cats.length===0){
+      const defaults=[
+        {id:genId(), name:'Food', icon:'🍔', color:'#FF6B5B', isDefault:true},
+        {id:genId(), name:'Travel', icon:'🚗', color:'#2EC4B6', isDefault:true},
+        {id:genId(), name:'Shopping', icon:'🛍️', color:'#8657E0', isDefault:true},
+        {id:genId(), name:'Bills', icon:'📱', color:'#FFC23C', isDefault:true},
+        {id:genId(), name:'Health', icon:'💊', color:'#5BA8FF', isDefault:true},
+        {id:genId(), name:'Other', icon:'✨', color:'#FF8FB3', isDefault:true},
+      ];
+      for(const c of defaults) await this.putCategory(c);
+    }
+    const pms=await this.getAllPaymentMethods();
+    if(pms.length===0){
+      const defaults=[
+        {id:genId(), name:'UPI', icon:'📲', isDefault:true},
+        {id:genId(), name:'Credit Card', icon:'💳', isDefault:true},
+        {id:genId(), name:'Debit Card', icon:'💳', isDefault:true},
+        {id:genId(), name:'Cash', icon:'💵', isDefault:true},
+        {id:genId(), name:'Net Banking', icon:'🏦', isDefault:true},
+      ];
+      for(const p of defaults) await this.putPaymentMethod(p);
+    }
+  },
+};
+
+/* ============================== APP STATE ============================== */
+const state = {
+  unlocked:false,
+  pinMode:'unlock',
+  pinBuffer:'',
+  categories:[],
+  paymentMethods:[],
+  selectedCategoryId:null,
+  selectedPaymentId:null,
+  pendingAttachment:null, // {fileName, mimeType, type, arrayBuffer}
+};
+
+/* ============================== SCREEN SYSTEM ============================== */
+const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen'];
+function showScreen(id){
+  SCREENS.forEach(s => document.getElementById(s).classList.toggle('is-hidden', s!==id));
+}
+
+/* ============================== TOAST ============================== */
+let toastTimer;
+function toast(msg, dur=2000){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+/* ============================== PIN LOCK ============================== */
+function initPINScreen(mode){
+  state.pinMode=mode; state.pinBuffer=''; updatePINDots();
+  const lbl=document.getElementById('pin-label'); lbl.className='pin-label';
+  const sub=document.getElementById('pin-subtitle');
+  if(mode==='setup'){
+    lbl.textContent='Create a 6-digit PIN'; sub.textContent='This protects PaisaTrail on this phone';
+  } else if(mode==='setup-confirm'){
+    lbl.textContent='Confirm your PIN';
+  } else {
+    lbl.textContent='Enter your PIN'; sub.textContent='Your personal expense tracker';
+    const lock=parseInt(Store.get('pt_lockout')||'0');
+    if(Date.now()<lock){
+      lbl.textContent=`Too many attempts. Wait ${Math.ceil((lock-Date.now())/1000)}s`;
+      lbl.classList.add('error');
+    }
+  }
+}
+function updatePINDots(err=false){
+  for(let i=0;i<6;i++){
+    const d=document.getElementById('d'+i);
+    d.classList.toggle('filled', i<state.pinBuffer.length && !err);
+    d.classList.toggle('error', err);
+  }
+}
+function pinError(msg){
+  updatePINDots(true);
+  const lbl=document.getElementById('pin-label');
+  lbl.textContent=msg; lbl.className='pin-label error';
+  setTimeout(()=>{ state.pinBuffer=''; updatePINDots(false); lbl.className='pin-label'; }, 900);
+}
+let pinTemp='';
+async function handlePINDigit(d){
+  if(state.pinMode==='unlock'){
+    const lock=parseInt(Store.get('pt_lockout')||'0');
+    if(Date.now()<lock){ pinError(`Locked. Wait ${Math.ceil((lock-Date.now())/1000)}s`); return; }
+  }
+  if(state.pinBuffer.length>=6) return;
+  state.pinBuffer += d; updatePINDots();
+  if(state.pinBuffer.length<6) return;
+
+  const entered=state.pinBuffer;
+  await new Promise(r=>setTimeout(r,100));
+
+  if(state.pinMode==='setup'){
+    pinTemp=entered; initPINScreen('setup-confirm');
+  } else if(state.pinMode==='setup-confirm'){
+    if(entered!==pinTemp){ pinError('PINs do not match'); state.pinMode='setup'; return; }
+    Store.set('pt_pin', await Crypto.hashPIN(entered));
+    unlockSuccess();
+  } else if(state.pinMode==='unlock'){
+    const hash=await Crypto.hashPIN(entered);
+    if(hash!==Store.get('pt_pin')){
+      const fails=(parseInt(Store.get('pt_fails')||'0'))+1;
+      Store.set('pt_fails', String(fails));
+      if(fails>=5){ Store.set('pt_lockout', String(Date.now()+30000)); Store.set('pt_fails','0'); pinError('Locked for 30s'); }
+      else pinError(`Wrong PIN · ${5-fails} left`);
+      return;
+    }
+    Store.set('pt_fails','0');
+    unlockSuccess();
+  }
+}
+async function unlockSuccess(){
+  state.unlocked=true;
+  await DB.seedDefaults();
+  state.categories=await DB.getAllCategories();
+  state.paymentMethods=await DB.getAllPaymentMethods();
+  showScreen('home-screen');
+  renderHome();
+  resetAutoLock();
+}
+
+/* ============================== IDLE AUTO-LOCK ============================== */
+let autoLockTimer=null;
+const AUTO_LOCK_MS = 2*60*1000;
+function resetAutoLock(){
+  clearTimeout(autoLockTimer);
+  if(!state.unlocked) return;
+  autoLockTimer=setTimeout(lockVault, AUTO_LOCK_MS);
+}
+function lockVault(){
+  state.unlocked=false;
+  clearTimeout(autoLockTimer);
+  initPINScreen('unlock');
+  showScreen('pin-screen');
+}
+document.addEventListener('touchstart', resetAutoLock, {passive:true});
+document.addEventListener('click', resetAutoLock);
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden && state.unlocked) lockVault(); });
+
+/* ============================== HOME RENDER ============================== */
+function buildDonutGradient(catTotals, total){
+  if(total<=0) return 'conic-gradient(var(--border) 0% 100%)';
+  let acc=0; const parts=[];
+  catTotals.forEach(c=>{ const pct=(c.amount/total)*100; parts.push(`${c.color} ${acc}% ${acc+pct}%`); acc+=pct; });
+  return `conic-gradient(${parts.join(', ')})`;
+}
+async function renderHome(){
+  const today=new Date();
+  const monthStart=new Date(today.getFullYear(), today.getMonth(), 1);
+  const startISO=(()=>{ const tz=monthStart.getTimezoneOffset()*60000; return new Date(monthStart-tz).toISOString().slice(0,10); })();
+  const endISO=todayISO();
+
+  const expenses=await DB.getExpensesByDateRange(startISO, endISO);
+  const total=expenses.reduce((s,e)=>s+Number(e.amount),0);
+
+  document.getElementById('home-total').textContent=formatINR(total);
+  document.getElementById('home-month-label').textContent=today.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  document.getElementById('home-count').textContent=`${expenses.length} expense${expenses.length===1?'':'s'} this month`;
+
+  const byCat={};
+  expenses.forEach(e=>{ byCat[e.categoryId]=(byCat[e.categoryId]||0)+Number(e.amount); });
+  const catTotals=Object.entries(byCat).map(([catId,amt])=>{
+    const cat=state.categories.find(c=>c.id===catId);
+    return { name: cat?cat.name:'Other', color: cat?cat.color:'#9088A8', amount: amt };
+  }).sort((a,b)=>b.amount-a.amount);
+
+  document.getElementById('home-donut').style.background=buildDonutGradient(catTotals, total);
+  document.getElementById('home-donut-label').textContent = total>0 ? `${catTotals.length} ${catTotals.length===1?'cat':'cats'}` : 'No data yet';
+
+  const legend=document.getElementById('home-legend'); legend.innerHTML='';
+  catTotals.slice(0,5).forEach(c=>{
+    const pct = total>0 ? Math.round((c.amount/total)*100) : 0;
+    legend.insertAdjacentHTML('beforeend', `<div class="legend-row"><span class="legend-left"><span class="legend-dot" style="background:${c.color}"></span>${esc(c.name)}</span><span class="legend-pct">${pct}%</span></div>`);
+  });
+  if(catTotals.length===0) legend.innerHTML='<p class="empty-hint" style="padding:0;">Add an expense to see your breakdown</p>';
+
+  const recent=[...expenses].sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt)).slice(0,5);
+  const list=document.getElementById('home-recent-list'); list.innerHTML='';
+  if(recent.length===0){
+    list.innerHTML='<p class="empty-hint">No expenses yet — tap + to add your first one.</p>';
+  } else {
+    recent.forEach(e=>{
+      const cat=state.categories.find(c=>c.id===e.categoryId);
+      const pm=state.paymentMethods.find(p=>p.id===e.paymentMethod);
+      list.insertAdjacentHTML('beforeend', `
+        <div class="recent-row">
+          <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
+          <div class="recent-info">
+            <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
+            <span class="recent-pm">${pm?esc(pm.name):'—'}</span>
+          </div>
+          <span class="recent-amt">-${formatINR(e.amount)}</span>
+        </div>`);
+    });
+  }
+}
+
+/* ============================== ADD EXPENSE ============================== */
+function renderCategoryGrid(){
+  const grid=document.getElementById('add-category-grid'); grid.innerHTML='';
+  state.categories.forEach(cat=>{
+    const selected=state.selectedCategoryId===cat.id;
+    const bg = selected ? cat.color+'26' : 'var(--surface)';
+    const border = selected ? cat.color : 'transparent';
+    grid.insertAdjacentHTML('beforeend', `
+      <button type="button" class="cat-chip" data-cat="${cat.id}" style="background:${bg};border-color:${border}">
+        <span class="cat-emoji">${cat.icon}</span><span class="cat-name">${esc(cat.name)}</span>
+      </button>`);
+  });
+}
+function renderPaymentChips(){
+  const row=document.getElementById('add-payment-row'); row.innerHTML='';
+  state.paymentMethods.forEach(pm=>{
+    const selected=state.selectedPaymentId===pm.id;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    row.insertAdjacentHTML('beforeend', `
+      <button type="button" class="pay-chip" data-pay="${pm.id}" style="background:${bg};color:${color}">
+        <span>${pm.icon}</span>${esc(pm.name)}
+      </button>`);
+  });
+}
+function detectFileType(mimeType, name){
+  const m=(mimeType||'').toLowerCase(), n=(name||'').toLowerCase();
+  if(m==='application/pdf' || n.endsWith('.pdf')) return 'pdf';
+  if(m.startsWith('image/')) return 'image';
+  if(m.includes('word') || n.endsWith('.doc') || n.endsWith('.docx')) return 'word';
+  return 'other';
+}
+function fileToArrayBuffer(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+function renderAttachmentArea(){
+  const area=document.getElementById('add-attachment-area');
+  if(!state.pendingAttachment){
+    area.innerHTML=`
+      <div class="attach-grid">
+        <button type="button" class="attach-btn" id="attach-camera-btn"><span>📷</span><span>Camera</span></button>
+        <button type="button" class="attach-btn" id="attach-gallery-btn"><span>🖼️</span><span>Gallery</span></button>
+        <button type="button" class="attach-btn" id="attach-file-btn"><span>📄</span><span>File</span></button>
+      </div>`;
+    document.getElementById('attach-camera-btn').onclick=()=>document.getElementById('attach-camera-input').click();
+    document.getElementById('attach-gallery-btn').onclick=()=>document.getElementById('attach-gallery-input').click();
+    document.getElementById('attach-file-btn').onclick=()=>document.getElementById('attach-file-input').click();
+  } else {
+    const a=state.pendingAttachment;
+    const icon = a.type==='pdf' ? '📕' : a.type==='word' ? '📘' : a.type==='image' ? '🖼️' : '📁';
+    area.innerHTML=`
+      <div class="attach-preview">
+        <div class="attach-preview-icon">${icon}</div>
+        <div class="attach-preview-info"><p>${esc(a.fileName)}</p><span>Attached ✓</span></div>
+        <button type="button" id="attach-remove-btn">✕</button>
+      </div>`;
+    document.getElementById('attach-remove-btn').onclick=()=>{ state.pendingAttachment=null; renderAttachmentArea(); };
+  }
+}
+function openAddScreen(){
+  state.selectedCategoryId = state.categories[0] ? state.categories[0].id : null;
+  state.selectedPaymentId = state.paymentMethods[0] ? state.paymentMethods[0].id : null;
+  state.pendingAttachment = null;
+  document.getElementById('add-amount').value='';
+  document.getElementById('add-note').value='';
+  document.getElementById('add-date').value=todayISO();
+  renderCategoryGrid();
+  renderPaymentChips();
+  renderAttachmentArea();
+  showScreen('add-screen');
+}
+async function saveExpense(){
+  const amount=parseFloat(document.getElementById('add-amount').value);
+  if(!amount || amount<=0){ toast('Enter a valid amount'); return; }
+  if(!state.selectedCategoryId){ toast('Pick a category'); return; }
+  if(!state.selectedPaymentId){ toast('Pick a payment method'); return; }
+
+  const date=document.getElementById('add-date').value || todayISO();
+  const note=document.getElementById('add-note').value.trim();
+  const id=genId();
+  const expense={
+    id, amount, categoryId: state.selectedCategoryId,
+    paymentMethod: state.selectedPaymentId, // stores the payment method's id, despite the field name
+    date, note, attachmentId:null, recurringId:null, createdAt: Date.now(),
+  };
+  await DB.addExpense(expense);
+
+  if(state.pendingAttachment){
+    const attId=genId();
+    await DB.saveAttachment({
+      id: attId, expenseId: id, type: state.pendingAttachment.type,
+      fileName: state.pendingAttachment.fileName, mimeType: state.pendingAttachment.mimeType,
+      data: state.pendingAttachment.arrayBuffer,
+    });
+    expense.attachmentId=attId;
+    await DB.addExpense(expense);
+  }
+
+  toast('Expense saved ✓');
+  showScreen('home-screen');
+  renderHome();
+}
+
+/* ============================== EVENT WIRING ============================== */
+document.querySelectorAll('#pin-screen .num-btn[data-n]').forEach(b => b.addEventListener('click', () => handlePINDigit(b.dataset.n)));
+document.getElementById('pin-del-btn').addEventListener('click', () => { state.pinBuffer=state.pinBuffer.slice(0,-1); updatePINDots(); });
+
+document.querySelectorAll('.fab-add').forEach(b => b.addEventListener('click', openAddScreen));
+document.getElementById('add-close-btn').addEventListener('click', () => showScreen('home-screen'));
+document.getElementById('add-save-btn').addEventListener('click', saveExpense);
+
+document.getElementById('add-category-grid').addEventListener('click', (e) => {
+  const btn=e.target.closest('.cat-chip'); if(!btn) return;
+  state.selectedCategoryId=btn.dataset.cat;
+  renderCategoryGrid();
+});
+document.getElementById('add-payment-row').addEventListener('click', (e) => {
+  const btn=e.target.closest('.pay-chip'); if(!btn) return;
+  state.selectedPaymentId=btn.dataset.pay;
+  renderPaymentChips();
+});
+
+['attach-camera-input','attach-gallery-input','attach-file-input'].forEach(id => {
+  document.getElementById(id).addEventListener('change', async (e) => {
+    const file=e.target.files[0]; e.target.value='';
+    if(!file) return;
+    const arrayBuffer=await fileToArrayBuffer(file);
+    state.pendingAttachment={ fileName:file.name, mimeType:file.type, type:detectFileType(file.type,file.name), arrayBuffer };
+    renderAttachmentArea();
+  });
+});
+
+document.querySelectorAll('[data-nav]').forEach(item => {
+  item.addEventListener('click', () => {
+    const nav=item.dataset.nav;
+    showScreen(nav+'-screen');
+    if(nav==='home') renderHome();
+  });
+});
+
+/* ============================== INIT ============================== */
+function init(){
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed', err));
+  }
+  const hasPin=!!Store.get('pt_pin');
+  initPINScreen(hasPin ? 'unlock' : 'setup');
+  showScreen('pin-screen');
+}
+init();
+</script>
+</body>
+</html>
