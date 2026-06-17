@@ -587,13 +587,16 @@ async function handlePINDigit(d){
     unlockSuccess();
   }
 }
+let screenBeforeLock=null;
 async function unlockSuccess(){
   state.unlocked=true;
   await DB.seedDefaults();
   state.categories=await DB.getAllCategories();
   state.paymentMethods=await DB.getAllPaymentMethods();
-  showScreen('home-screen');
-  renderHome();
+  const target = screenBeforeLock || 'home-screen';
+  showScreen(target);
+  if(target==='home-screen') renderHome(); // add-screen etc. keep their existing in-progress DOM as-is
+  screenBeforeLock=null;
   resetAutoLock();
 }
 
@@ -606,6 +609,8 @@ function resetAutoLock(){
   autoLockTimer=setTimeout(lockVault, AUTO_LOCK_MS);
 }
 function lockVault(){
+  if(!state.unlocked) return;
+  screenBeforeLock = SCREENS.find(s => s!=='pin-screen' && !document.getElementById(s).classList.contains('is-hidden')) || 'home-screen';
   state.unlocked=false;
   clearTimeout(autoLockTimer);
   initPINScreen('unlock');
@@ -613,7 +618,29 @@ function lockVault(){
 }
 document.addEventListener('touchstart', resetAutoLock, {passive:true});
 document.addEventListener('click', resetAutoLock);
-document.addEventListener('visibilitychange', ()=>{ if(document.hidden && state.unlocked) lockVault(); });
+
+// Opening the camera/gallery/file picker briefly hides the page (Android
+// shows a native picker on top), which used to trigger an immediate false
+// lock. suppressLockOnHide marks that hide as expected so we don't lock —
+// with a safety timeout in case the picker is left open a long time.
+let suppressLockOnHide=false;
+let suppressLockTimer=null;
+function beginPickerSuppression(){
+  suppressLockOnHide=true;
+  clearTimeout(suppressLockTimer);
+  suppressLockTimer=setTimeout(()=>{ suppressLockOnHide=false; }, 90000);
+}
+function endPickerSuppression(){
+  suppressLockOnHide=false;
+  clearTimeout(suppressLockTimer);
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){
+    if(!suppressLockOnHide && state.unlocked) lockVault();
+  } else if(state.unlocked){
+    resetAutoLock();
+  }
+});
 
 /* ============================== HOME RENDER ============================== */
 function buildDonutGradient(catTotals, total){
@@ -722,9 +749,9 @@ function renderAttachmentArea(){
         <button type="button" class="attach-btn" id="attach-gallery-btn"><span>🖼️</span><span>Gallery</span></button>
         <button type="button" class="attach-btn" id="attach-file-btn"><span>📄</span><span>File</span></button>
       </div>`;
-    document.getElementById('attach-camera-btn').onclick=()=>document.getElementById('attach-camera-input').click();
-    document.getElementById('attach-gallery-btn').onclick=()=>document.getElementById('attach-gallery-input').click();
-    document.getElementById('attach-file-btn').onclick=()=>document.getElementById('attach-file-input').click();
+    document.getElementById('attach-camera-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-camera-input').click(); };
+    document.getElementById('attach-gallery-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-gallery-input').click(); };
+    document.getElementById('attach-file-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-file-input').click(); };
   } else {
     const a=state.pendingAttachment;
     const icon = a.type==='pdf' ? '📕' : a.type==='word' ? '📘' : a.type==='image' ? '🖼️' : '📁';
@@ -801,13 +828,16 @@ document.getElementById('add-payment-row').addEventListener('click', (e) => {
 });
 
 ['attach-camera-input','attach-gallery-input','attach-file-input'].forEach(id => {
-  document.getElementById(id).addEventListener('change', async (e) => {
+  const el=document.getElementById(id);
+  el.addEventListener('change', async (e) => {
+    endPickerSuppression();
     const file=e.target.files[0]; e.target.value='';
     if(!file) return;
     const arrayBuffer=await fileToArrayBuffer(file);
     state.pendingAttachment={ fileName:file.name, mimeType:file.type, type:detectFileType(file.type,file.name), arrayBuffer };
     renderAttachmentArea();
   });
+  el.addEventListener('cancel', endPickerSuppression);
 });
 
 document.querySelectorAll('[data-nav]').forEach(item => {
