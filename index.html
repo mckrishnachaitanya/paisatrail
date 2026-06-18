@@ -241,10 +241,79 @@ input{outline:none;}
 .save-btn:active{transform:scale(.98);}
 
 /* ============================== STUB SCREENS ============================== */
-.stub-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:8px;padding:0 40px;text-align:center;}
-.stub-emoji{font-size:36px;}
 .stub-text{font-size:13px;color:var(--muted);}
+
+/* ============================== SETTINGS ============================== */
+.settings-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px;border-radius:18px;
+  background:var(--surface);text-align:left;}
+.settings-row-icon{width:38px;height:38px;border-radius:50%;background:rgba(255,107,91,.14);
+  display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.settings-row-info{flex:1;min-width:0;}
+.settings-row-title{font-size:14px;font-weight:700;}
+.settings-row-sub{font-size:11px;color:var(--muted);margin-top:2px;display:block;}
+.settings-row-chevron{font-size:18px;color:var(--muted);flex-shrink:0;}
+
+/* Reusable segmented control — Bulk delete's mode switch today, Insights'
+   period/view switches later. Visually mirrors .home-tabs but kept
+   separate since that one's specifically Home's Overview/Warranties tab. */
+.segmented-tabs{display:flex;gap:4px;background:var(--chip);border-radius:16px;padding:4px;}
+.segmented-tab{flex:1;text-align:center;padding:9px 0;border-radius:13px;font-size:12px;font-weight:700;
+  color:var(--muted);transition:background .15s,color .15s;}
+.segmented-tab.active{background:var(--grape);color:#fff;}
+
+/* ============================== BULK DELETE ============================== */
+.danger-btn{width:100%;padding:15px;border-radius:18px;background:var(--coral);color:#fff;
+  font-family:var(--font-display);font-weight:600;font-size:15px;}
+.danger-btn:active{transform:scale(.98);}
+.danger-btn:disabled{opacity:.45;}
+.bulkdelete-checkbox{width:20px;height:20px;border-radius:7px;border:2px solid var(--border);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;
+  transition:background .12s,border-color .12s;}
+.bulkdelete-checkbox.checked{background:var(--grape);border-color:var(--grape);}
+.bulkdelete-checkbox.checked::after{content:'✓';}
+
+.confirm-overlay{position:fixed;inset:0;z-index:800;background:rgba(36,31,61,.55);
+  backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;
+  padding:24px;opacity:0;pointer-events:none;transition:opacity .2s;}
+.confirm-overlay.show{opacity:1;pointer-events:auto;}
+.confirm-sheet{width:100%;max-width:340px;background:var(--paper);border-radius:24px;
+  padding:28px 22px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;}
+.confirm-sheet-icon{width:56px;height:56px;border-radius:18px;background:rgba(255,107,91,.14);
+  display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:6px;}
+.confirm-sheet-title{font-family:var(--font-display);font-size:17px;font-weight:600;}
+.confirm-sheet-sub{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.confirm-sheet-cancel{width:100%;padding:13px;border-radius:16px;border:1.5px solid var(--border);
+  background:transparent;font-size:14px;font-weight:700;color:var(--ink);margin-top:8px;}
+
+/* ============================== INSIGHTS ============================== */
+.ins-period-stepper{display:flex;align-items:center;justify-content:space-between;margin-top:14px;}
+.ins-step-btn{width:34px;height:34px;border-radius:50%;background:var(--surface);font-size:16px;
+  font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ins-step-btn:disabled{opacity:.35;}
+.ins-period-label{font-family:var(--font-display);font-size:14px;font-weight:600;text-align:center;flex:1;}
+.ins-custom-range{display:flex;gap:10px;margin-top:14px;}
+.ins-custom-range>div{flex:1;}
+
+.ins-cat-row{display:flex;align-items:center;gap:11px;padding:11px;border-radius:18px;
+  background:var(--surface);margin-bottom:8px;}
+.ins-cat-icon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:15px;flex-shrink:0;}
+.ins-cat-info{flex:1;min-width:0;}
+.ins-cat-name{font-size:13px;font-weight:700;}
+.ins-cat-prev{font-size:10px;color:var(--muted);margin-top:2px;display:block;}
+.ins-cat-amt-wrap{text-align:right;flex-shrink:0;}
+.ins-cat-amt{font-family:var(--font-mono);font-size:13px;font-weight:700;}
+.ins-delta{font-size:10px;font-weight:700;margin-top:2px;display:block;}
+.ins-delta.up{color:var(--coral);}
+.ins-delta.down{color:var(--mint);}
+.ins-delta.flat{color:var(--muted);}
+
+.ins-compare-card{display:flex;align-items:center;gap:10px;padding:18px;border-radius:20px;background:var(--surface);}
+.ins-compare-side{flex:1;text-align:center;}
+.ins-compare-label{font-size:10px;color:var(--muted);font-weight:700;}
+.ins-compare-amt{font-family:var(--font-mono);font-size:18px;font-weight:700;margin-top:4px;display:block;}
+.ins-compare-amt.strong{color:var(--grape);}
+.ins-compare-arrow{font-size:16px;color:var(--muted);flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -321,7 +390,7 @@ input{outline:none;}
     <div class="nav-item active" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
     <div class="nav-item" data-nav="transactions"><span>📋</span><span class="nav-label">List</span></div>
     <button class="fab-add">＋</button>
-    <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Stats</span></div>
+    <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Insights</span></div>
     <div class="nav-item" data-nav="settings"><span>⚙️</span><span class="nav-label">Settings</span></div>
   </div>
 </div>
@@ -393,38 +462,135 @@ input{outline:none;}
     <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
     <div class="nav-item active" data-nav="transactions"><span>📋</span><span class="nav-label">List</span></div>
     <button class="fab-add">＋</button>
-    <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Stats</span></div>
+    <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Insights</span></div>
     <div class="nav-item" data-nav="settings"><span>⚙️</span><span class="nav-label">Settings</span></div>
   </div>
 </div>
 
-<!-- ============================== STATS (stub) ============================== -->
+<!-- ============================== INSIGHTS ============================== -->
 <div class="screen is-hidden" id="stats-screen">
-  <div class="stub-wrap">
-    <span class="stub-emoji">📊</span>
-    <p class="stub-text">Stats with category and payment-method breakdowns are coming soon.</p>
+  <div class="scroll">
+    <div style="padding:0 20px 12px;">
+      <p class="topbar-title" style="margin:14px 0 16px;">Insights</p>
+
+      <div class="segmented-tabs" id="ins-period-type-tabs">
+        <button type="button" class="segmented-tab" data-instype="week">Week</button>
+        <button type="button" class="segmented-tab active" data-instype="month">Month</button>
+        <button type="button" class="segmented-tab" data-instype="year">Year</button>
+        <button type="button" class="segmented-tab" data-instype="custom">Custom</button>
+      </div>
+
+      <div class="ins-period-stepper" id="ins-period-stepper">
+        <button type="button" class="ins-step-btn" id="ins-prev-btn">‹</button>
+        <p class="ins-period-label" id="ins-period-label">—</p>
+        <button type="button" class="ins-step-btn" id="ins-next-btn">›</button>
+      </div>
+      <div class="ins-custom-range hidden" id="ins-custom-range">
+        <div>
+          <p class="field-label" style="margin:0 0 4px;">FROM</p>
+          <input type="date" class="date-input" id="ins-custom-start">
+        </div>
+        <div>
+          <p class="field-label" style="margin:0 0 4px;">TO</p>
+          <input type="date" class="date-input" id="ins-custom-end">
+        </div>
+      </div>
+
+      <div class="segmented-tabs" id="ins-view-tabs" style="margin-top:16px;">
+        <button type="button" class="segmented-tab active" data-insview="categories">Categories</button>
+        <button type="button" class="segmented-tab" data-insview="compare">Compare</button>
+        <button type="button" class="segmented-tab" data-insview="payment">Payment</button>
+      </div>
+
+      <div id="ins-categories-panel" style="margin-top:16px;"></div>
+
+      <div id="ins-compare-panel" class="hidden" style="margin-top:16px;">
+        <div class="cat-grid" id="ins-compare-cat-grid"></div>
+        <div id="ins-compare-result" style="margin-top:14px;"></div>
+      </div>
+
+      <div id="ins-payment-panel" class="hidden" style="margin-top:16px;"></div>
+    </div>
   </div>
   <div class="bottom-nav">
     <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
     <div class="nav-item" data-nav="transactions"><span>📋</span><span class="nav-label">List</span></div>
     <button class="fab-add">＋</button>
-    <div class="nav-item active" data-nav="stats"><span>📊</span><span class="nav-label">Stats</span></div>
+    <div class="nav-item active" data-nav="stats"><span>📊</span><span class="nav-label">Insights</span></div>
     <div class="nav-item" data-nav="settings"><span>⚙️</span><span class="nav-label">Settings</span></div>
   </div>
 </div>
 
-<!-- ============================== SETTINGS (stub) ============================== -->
+<!-- ============================== SETTINGS ============================== -->
 <div class="screen is-hidden" id="settings-screen">
-  <div class="stub-wrap">
-    <span class="stub-emoji">⚙️</span>
-    <p class="stub-text">Manage categories, payment methods, and export/import land in the next build pass.</p>
+  <div class="scroll">
+    <div style="padding:0 20px 12px;">
+      <p class="topbar-title" style="margin:14px 0 16px;">Settings</p>
+      <p class="field-label" style="margin-top:0;">DATA</p>
+      <button type="button" class="settings-row" id="settings-bulkdelete-btn">
+        <span class="settings-row-icon">🗑️</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Clear old expenses</p>
+          <span class="settings-row-sub">Bulk delete by age, or pick expenses one by one</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>
+      <p class="stub-text" style="text-align:left;margin-top:18px;">Managing categories and payment methods, export/import, and changing your PIN land in a future build pass.</p>
+    </div>
   </div>
   <div class="bottom-nav">
     <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
     <div class="nav-item" data-nav="transactions"><span>📋</span><span class="nav-label">List</span></div>
     <button class="fab-add">＋</button>
-    <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Stats</span></div>
+    <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Insights</span></div>
     <div class="nav-item active" data-nav="settings"><span>⚙️</span><span class="nav-label">Settings</span></div>
+  </div>
+</div>
+
+<!-- ============================== BULK DELETE ============================== -->
+<div class="screen is-hidden" id="bulkdelete-screen">
+  <div class="topbar">
+    <p class="topbar-title">Clear old expenses</p>
+    <button class="topbar-close" id="bulkdelete-close-btn">✕</button>
+  </div>
+  <div class="scroll">
+    <div style="padding:0 20px 28px;">
+      <div class="segmented-tabs" id="bulkdelete-mode-tabs">
+        <button type="button" class="segmented-tab active" data-bdmode="age">By age</button>
+        <button type="button" class="segmented-tab" data-bdmode="manual">Pick manually</button>
+      </div>
+
+      <div id="bulkdelete-age-panel" style="margin-top:18px;">
+        <p class="field-label" style="margin-top:0;">DELETE EXPENSES OLDER THAN</p>
+        <div class="pay-row">
+          <button type="button" class="pay-chip" data-age="6">6 months</button>
+          <button type="button" class="pay-chip" data-age="12">1 year</button>
+          <button type="button" class="pay-chip" data-age="custom">Custom date</button>
+        </div>
+        <input id="bulkdelete-cutoff-date" type="date" class="date-input hidden" style="margin-top:10px;">
+        <p class="empty-hint" id="bulkdelete-age-preview" style="padding:24px 0;">Pick an option above to see what'll be cleared.</p>
+        <button type="button" class="danger-btn hidden" id="bulkdelete-age-go-btn"></button>
+      </div>
+
+      <div id="bulkdelete-manual-panel" class="hidden" style="margin-top:18px;">
+        <div id="bulkdelete-manual-list"></div>
+      </div>
+    </div>
+  </div>
+  <div class="save-bar hidden" id="bulkdelete-manual-bar">
+    <p style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:8px;" id="bulkdelete-manual-summary">0 selected</p>
+    <button type="button" class="danger-btn" id="bulkdelete-manual-go-btn">Delete selected</button>
+  </div>
+</div>
+
+<!-- ============================== BULK DELETE CONFIRM ============================== -->
+<div id="bulkdelete-confirm-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">🗑️</div>
+    <p class="confirm-sheet-title" id="bulkdelete-confirm-title">Delete these expenses?</p>
+    <p class="confirm-sheet-sub" id="bulkdelete-confirm-sub">This can be undone for a few seconds after.</p>
+    <button type="button" class="danger-btn" id="bulkdelete-confirm-btn">Delete</button>
+    <button type="button" class="confirm-sheet-cancel" id="bulkdelete-confirm-cancel-btn">Cancel</button>
   </div>
 </div>
 
@@ -644,11 +810,20 @@ const state = {
   warrantyExpiry:null,          // ISO date string, or null
   returnScreen:'home-screen', // where to go back to after Add/Edit closes or saves
   homeTab:'overview', // 'overview' or 'warranties' — which Home tab is active; persists across nav, lock/unlock, and Add/Edit since it's just app state, never reset
+  bdMode:'age',          // 'age' or 'manual' — which Bulk Delete sub-mode is active
+  bdCutoffISO:null,      // computed/chosen cutoff date for age-based bulk delete; null until a chip or date is picked
+  bdManualSelected:new Set(), // ids ticked in manual bulk-delete mode
+  bdPendingBatch:[],     // the expense objects currently shown in the confirm dialog, awaiting Delete/Cancel
+  insPeriodType:'month',     // 'week'|'month'|'year'|'custom' — persists across navigation, like state.homeTab
+  insStartISO:monthBounds(todayISO()).startISO, // current period's bounds (inclusive) — only recomputed when the user steps/changes type, never reset on nav
+  insEndISO:monthBounds(todayISO()).endISO,
+  insView:'categories',      // 'categories'|'compare'|'payment' — which Insights sub-view is showing; persists across navigation
+  insCompareCategoryId:null, // selected category for Compare — lazily defaults to the first category the first time Compare is viewed, then persists
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
 /* ============================== SCREEN SYSTEM ============================== */
-const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen'];
+const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen'];
 function showScreen(id){
   SCREENS.forEach(s => document.getElementById(s).classList.toggle('is-hidden', s!==id));
 }
@@ -678,7 +853,8 @@ function showUndoToast(msg, onUndo, dur=4000){
   document.getElementById('toast-undo-btn').onclick = () => { onUndo(); t.classList.remove('show'); };
   toastTimer=setTimeout(()=>t.classList.remove('show'), dur);
 }
-function deleteExpenseWithUndo(expense, { onChange } = {}){
+function deleteExpenseWithUndo(expense, { onChange, onUndo } = {}){
+  const undo = onUndo || onChange || refreshAllExpenseViews;
   pendingDeletes[expense.id] = { expense, timer: setTimeout(async () => {
     delete pendingDeletes[expense.id];
     await DB.deleteExpense(expense.id);
@@ -689,7 +865,43 @@ function deleteExpenseWithUndo(expense, { onChange } = {}){
   showUndoToast('Expense deleted', () => {
     const pending=pendingDeletes[expense.id];
     if(pending){ clearTimeout(pending.timer); delete pendingDeletes[expense.id]; }
-    if(onChange) onChange();
+    undo();
+  });
+}
+// Refreshes every screen that can show expense-derived data (Home's two
+// tabs plus Transactions), regardless of which one is currently visible.
+// Cheap enough at this app's scale, and far more robust than tracking
+// exactly which screen the user is looking at when Undo gets tapped —
+// the bug this fixes: deleting from Transactions, switching to Home's
+// Warranties tab, then hitting Undo left Warranties showing stale data
+// until the next unrelated navigation re-rendered it.
+async function refreshAllExpenseViews(){
+  await renderHome();
+  await renderTransactions();
+}
+// Batch version of deleteExpenseWithUndo, for bulk delete. One shared timer
+// and one Undo action cover the whole batch, rather than one per expense —
+// but every entry still lands in the same pendingDeletes map keyed by id,
+// so renderHome/renderTransactions/getWarrantyExpenses hide all of them
+// immediately without any changes to their existing filters.
+function deleteExpensesWithUndo(expenses, { onChange, onUndo } = {}){
+  if(!expenses || !expenses.length) return;
+  const undo = onUndo || onChange || refreshAllExpenseViews;
+  const ids = expenses.map(e => e.id);
+  const timer = setTimeout(async () => {
+    ids.forEach(id => delete pendingDeletes[id]);
+    for(const exp of expenses){
+      await DB.deleteExpense(exp.id);
+      const attIds = (exp.attachmentIds && exp.attachmentIds.length) ? exp.attachmentIds : (exp.attachmentId ? [exp.attachmentId] : []);
+      for(const attId of attIds) await DB.deleteAttachment(attId).catch(()=>{});
+    }
+  }, 4000);
+  expenses.forEach(exp => { pendingDeletes[exp.id] = { expense: exp, timer }; });
+  if(onChange) onChange();
+  showUndoToast(`Deleted ${expenses.length} expense${expenses.length===1?'':'s'}`, () => {
+    clearTimeout(timer);
+    ids.forEach(id => delete pendingDeletes[id]);
+    undo();
   });
 }
 
@@ -997,7 +1209,7 @@ function addSwipeToDelete(container, onDelete){
 async function handleHomeSwipeDelete(id){
   const exp=await DB.getExpense(id);
   if(!exp) return;
-  deleteExpenseWithUndo(exp, { onChange: renderHome });
+  deleteExpenseWithUndo(exp, { onChange: refreshAllExpenseViews });
 }
 
 /* ============================== TRANSACTIONS RENDER ============================== */
@@ -1056,7 +1268,339 @@ async function openEditFromId(id){
 async function handleTxnDelete(id){
   const exp=await DB.getExpense(id);
   if(!exp) return;
-  deleteExpenseWithUndo(exp, { onChange: renderTransactions });
+  deleteExpenseWithUndo(exp, { onChange: refreshAllExpenseViews });
+}
+
+/* ============================== BULK DELETE ============================== */
+async function getExpensesOlderThan(cutoffISO){
+  const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
+  return all.filter(e => e.date < cutoffISO);
+}
+
+let bdAgeMatchedCache=[];   // expenses currently matched by the selected age cutoff
+let bdManualListCache=[];  // expenses currently shown in the manual-select list
+
+function openBulkDeleteScreen(){
+  state.bdMode='age';
+  state.bdCutoffISO=null;
+  state.bdManualSelected=new Set();
+  bdAgeMatchedCache=[];
+  bdManualListCache=[];
+  document.querySelectorAll('#bulkdelete-age-panel [data-age]').forEach(b=>{ b.style.background='var(--surface)'; b.style.color='var(--ink)'; });
+  document.getElementById('bulkdelete-cutoff-date').classList.add('hidden');
+  document.getElementById('bulkdelete-cutoff-date').value='';
+  document.getElementById('bulkdelete-age-preview').textContent="Pick an option above to see what'll be cleared.";
+  document.getElementById('bulkdelete-age-go-btn').classList.add('hidden');
+  setBulkDeleteMode('age');
+  showScreen('bulkdelete-screen');
+}
+function setBulkDeleteMode(mode){
+  state.bdMode=mode;
+  document.querySelectorAll('#bulkdelete-mode-tabs .segmented-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.bdmode===mode);
+  });
+  document.getElementById('bulkdelete-age-panel').classList.toggle('hidden', mode!=='age');
+  document.getElementById('bulkdelete-manual-panel').classList.toggle('hidden', mode!=='manual');
+  document.getElementById('bulkdelete-manual-bar').classList.toggle('hidden', mode!=='manual' || state.bdManualSelected.size===0);
+  if(mode==='manual') renderBulkDeleteManualList();
+}
+
+async function updateAgePreview(){
+  const preview=document.getElementById('bulkdelete-age-preview');
+  const goBtn=document.getElementById('bulkdelete-age-go-btn');
+  if(!state.bdCutoffISO){
+    preview.textContent="Pick an option above to see what'll be cleared.";
+    goBtn.classList.add('hidden');
+    bdAgeMatchedCache=[];
+    return;
+  }
+  bdAgeMatchedCache=await getExpensesOlderThan(state.bdCutoffISO);
+  if(bdAgeMatchedCache.length===0){
+    preview.textContent="Nothing older than that — you're all caught up.";
+    goBtn.classList.add('hidden');
+    return;
+  }
+  const total=bdAgeMatchedCache.reduce((s,e)=>s+Number(e.amount),0);
+  preview.textContent=`${bdAgeMatchedCache.length} expense${bdAgeMatchedCache.length===1?'':'s'} · ${formatINR(total)} will be cleared.`;
+  goBtn.textContent=`Delete ${bdAgeMatchedCache.length} expense${bdAgeMatchedCache.length===1?'':'s'}`;
+  goBtn.classList.remove('hidden');
+}
+
+async function renderBulkDeleteManualList(){
+  const list=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
+  list.sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
+  bdManualListCache=list;
+  const container=document.getElementById('bulkdelete-manual-list'); container.innerHTML='';
+  if(list.length===0){
+    container.innerHTML='<p class="empty-hint">No expenses to show.</p>';
+    return;
+  }
+  let lastGroup=null;
+  list.forEach(e=>{
+    const groupLabel=formatGroupLabel(e.date);
+    if(groupLabel!==lastGroup){
+      container.insertAdjacentHTML('beforeend', `<p class="txn-group-label">${esc(groupLabel.toUpperCase())}</p>`);
+      lastGroup=groupLabel;
+    }
+    const cat=state.categories.find(c=>c.id===e.categoryId);
+    const pm=state.paymentMethods.find(p=>p.id===e.paymentMethod);
+    const checked=state.bdManualSelected.has(e.id);
+    container.insertAdjacentHTML('beforeend', `
+      <div class="recent-row" data-id="${e.id}">
+        <span class="bulkdelete-checkbox ${checked?'checked':''}"></span>
+        <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
+        <div class="recent-info">
+          <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
+          <span class="recent-pm">${pm?esc(pm.name):'—'}</span>
+        </div>
+        <span class="recent-amt">-${formatINR(e.amount)}</span>
+      </div>`);
+  });
+}
+function updateBulkDeleteManualSummary(){
+  const selected=bdManualListCache.filter(e => state.bdManualSelected.has(e.id));
+  const bar=document.getElementById('bulkdelete-manual-bar');
+  if(selected.length===0){ bar.classList.add('hidden'); return; }
+  bar.classList.remove('hidden');
+  const total=selected.reduce((s,e)=>s+Number(e.amount),0);
+  document.getElementById('bulkdelete-manual-summary').textContent=`${selected.length} selected · ${formatINR(total)}`;
+}
+
+function openBulkDeleteConfirm(batch){
+  state.bdPendingBatch=batch;
+  const total=batch.reduce((s,e)=>s+Number(e.amount),0);
+  document.getElementById('bulkdelete-confirm-title').textContent=`Delete ${batch.length} expense${batch.length===1?'':'s'}?`;
+  document.getElementById('bulkdelete-confirm-sub').textContent=`Totalling ${formatINR(total)}. You can undo for a few seconds after.`;
+  document.getElementById('bulkdelete-confirm-overlay').classList.add('show');
+}
+function closeBulkDeleteConfirm(){
+  document.getElementById('bulkdelete-confirm-overlay').classList.remove('show');
+}
+
+/* ============================== INSIGHTS ============================== */
+function dateToISO(d){ const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); }
+function addDays(d, n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+
+function weekBounds(refISO){
+  const d=new Date(refISO+'T00:00:00');
+  const start=addDays(d, -d.getDay()); // back up to the most recent Sunday
+  return { startISO: dateToISO(start), endISO: dateToISO(addDays(start,6)) };
+}
+function monthBounds(refISO){
+  const d=new Date(refISO+'T00:00:00');
+  const start=new Date(d.getFullYear(), d.getMonth(), 1);
+  const end=new Date(d.getFullYear(), d.getMonth()+1, 0); // day 0 = last day of the previous month
+  return { startISO: dateToISO(start), endISO: dateToISO(end) };
+}
+function yearBounds(refISO){
+  const d=new Date(refISO+'T00:00:00');
+  return { startISO: dateToISO(new Date(d.getFullYear(),0,1)), endISO: dateToISO(new Date(d.getFullYear(),11,31)) };
+}
+function stepPeriod(type, startISO, dir){
+  if(type==='week') return weekBounds(dateToISO(addDays(new Date(startISO+'T00:00:00'), 7*dir)));
+  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()+dir); return monthBounds(dateToISO(d)); }
+  if(type==='year'){ const d=new Date(startISO+'T00:00:00'); d.setFullYear(d.getFullYear()+dir); return yearBounds(dateToISO(d)); }
+  return null;
+}
+// For Custom, "previous period" has no calendar-natural equivalent, so we
+// fall back to the same number of days immediately before the chosen range.
+function previousPeriodBounds(type, startISO, endISO){
+  if(type==='week') return weekBounds(dateToISO(addDays(new Date(startISO+'T00:00:00'), -7)));
+  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()-1); return monthBounds(dateToISO(d)); }
+  if(type==='year'){ const d=new Date(startISO+'T00:00:00'); d.setFullYear(d.getFullYear()-1); return yearBounds(dateToISO(d)); }
+  const start=new Date(startISO+'T00:00:00'), end=new Date(endISO+'T00:00:00');
+  const lengthDays=Math.round((end-start)/86400000)+1;
+  const prevEnd=addDays(start,-1);
+  return { startISO: dateToISO(addDays(prevEnd, -(lengthDays-1))), endISO: dateToISO(prevEnd) };
+}
+function formatPeriodLabel(type, startISO, endISO){
+  if(type==='custom' && (!startISO || !endISO)) return 'Pick a date range';
+  if(type==='month') return new Date(startISO+'T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  if(type==='year') return new Date(startISO+'T00:00:00').getFullYear().toString();
+  const s=new Date(startISO+'T00:00:00'), e=new Date(endISO+'T00:00:00');
+  return `${s.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}`;
+}
+function previousPeriodPhrase(type){
+  return type==='week' ? 'vs last week' : type==='month' ? 'vs last month' : type==='year' ? 'vs last year' : 'vs previous period';
+}
+function formatDelta(current, previous){
+  if(previous<=0 && current<=0) return { label:'No spend', cls:'flat' };
+  if(previous<=0) return { label:'New this period', cls:'up' };
+  if(current<=0) return { label:`No spend (was ${formatINR(previous)})`, cls:'down' };
+  const pct=Math.round(((current-previous)/previous)*100);
+  if(pct===0) return { label:'No change', cls:'flat' };
+  return { label:`${pct>0?'▲':'▼'} ${Math.abs(pct)}%`, cls: pct>0?'up':'down' };
+}
+async function getCategoryTotalsForPeriod(startISO, endISO){
+  const expenses=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id]);
+  const byCat={};
+  expenses.forEach(e=>{ byCat[e.categoryId]=(byCat[e.categoryId]||0)+Number(e.amount); });
+  return byCat;
+}
+async function getPaymentTotalsForPeriod(startISO, endISO){
+  const expenses=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id]);
+  const byPm={};
+  expenses.forEach(e=>{ byPm[e.paymentMethod]=(byPm[e.paymentMethod]||0)+Number(e.amount); });
+  return byPm;
+}
+
+function applyInsightsPeriodTypeUI(){
+  document.querySelectorAll('#ins-period-type-tabs .segmented-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.instype===state.insPeriodType);
+  });
+  const isCustom = state.insPeriodType==='custom';
+  document.getElementById('ins-period-stepper').classList.toggle('hidden', isCustom);
+  document.getElementById('ins-custom-range').classList.toggle('hidden', !isCustom);
+}
+function setInsightsPeriodType(type){
+  state.insPeriodType=type;
+  if(type==='week'){ const b=weekBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
+  else if(type==='month'){ const b=monthBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
+  else if(type==='year'){ const b=yearBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
+  else { state.insStartISO=null; state.insEndISO=null; document.getElementById('ins-custom-start').value=''; document.getElementById('ins-custom-end').value=''; }
+  applyInsightsPeriodTypeUI();
+  renderInsights();
+}
+function stepInsightsPeriod(dir){
+  if(state.insPeriodType==='custom') return;
+  const b=stepPeriod(state.insPeriodType, state.insStartISO, dir);
+  state.insStartISO=b.startISO; state.insEndISO=b.endISO;
+  renderInsights();
+}
+function setInsightsView(view){
+  state.insView=view;
+  document.querySelectorAll('#ins-view-tabs .segmented-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.insview===view);
+  });
+  document.getElementById('ins-categories-panel').classList.toggle('hidden', view!=='categories');
+  document.getElementById('ins-compare-panel').classList.toggle('hidden', view!=='compare');
+  document.getElementById('ins-payment-panel').classList.toggle('hidden', view!=='payment');
+  renderInsights();
+}
+
+function renderBreakdownRows(rows, phrase){
+  // Shared row markup for both the Categories and Payment views — same
+  // shape (icon, name, current amount, previous-period amount + delta),
+  // just grouped by a different field.
+  return rows.map(r=>{
+    const delta=formatDelta(r.current, r.previous);
+    return `
+      <div class="ins-cat-row">
+        <div class="ins-cat-icon" style="background:${r.color}22">${r.icon}</div>
+        <div class="ins-cat-info">
+          <p class="ins-cat-name">${esc(r.name)}</p>
+          <span class="ins-cat-prev">${formatINR(r.previous)} ${phrase}</span>
+        </div>
+        <div class="ins-cat-amt-wrap">
+          <p class="ins-cat-amt">${formatINR(r.current)}</p>
+          <span class="ins-delta ${delta.cls}">${delta.label}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+async function renderInsightsCategoriesPanel(){
+  const container=document.getElementById('ins-categories-panel');
+  if(state.insPeriodType==='custom' && (!state.insStartISO || !state.insEndISO)){
+    container.innerHTML='<p class="empty-hint">Pick a from and to date above.</p>';
+    return;
+  }
+  if(state.insPeriodType==='custom' && state.insStartISO>state.insEndISO){
+    container.innerHTML='<p class="empty-hint">The from date is after the to date.</p>';
+    return;
+  }
+  const curTotals=await getCategoryTotalsForPeriod(state.insStartISO, state.insEndISO);
+  const prevBounds=previousPeriodBounds(state.insPeriodType, state.insStartISO, state.insEndISO);
+  const prevTotals=await getCategoryTotalsForPeriod(prevBounds.startISO, prevBounds.endISO);
+  const allCatIds=new Set([...Object.keys(curTotals), ...Object.keys(prevTotals)]);
+  const rows=[...allCatIds].map(catId=>{
+    const cat=state.categories.find(c=>c.id===catId);
+    return { name: cat?cat.name:'Other', icon: cat?cat.icon:'❔', color: cat?cat.color:'#9088A8',
+      current: curTotals[catId]||0, previous: prevTotals[catId]||0 };
+  }).filter(r=>r.current>0 || r.previous>0).sort((a,b)=>b.current-a.current);
+
+  if(rows.length===0){ container.innerHTML='<p class="empty-hint">No expenses in this period.</p>'; return; }
+  const grandTotal=rows.reduce((s,r)=>s+r.current,0);
+  container.innerHTML = `<p class="spend-count" style="margin:0 0 12px;color:var(--muted);">${formatINR(grandTotal)} total this period</p>` +
+    renderBreakdownRows(rows, previousPeriodPhrase(state.insPeriodType));
+}
+async function renderInsightsPaymentPanel(){
+  const container=document.getElementById('ins-payment-panel');
+  if(state.insPeriodType==='custom' && (!state.insStartISO || !state.insEndISO)){
+    container.innerHTML='<p class="empty-hint">Pick a from and to date above.</p>';
+    return;
+  }
+  if(state.insPeriodType==='custom' && state.insStartISO>state.insEndISO){
+    container.innerHTML='<p class="empty-hint">The from date is after the to date.</p>';
+    return;
+  }
+  const curTotals=await getPaymentTotalsForPeriod(state.insStartISO, state.insEndISO);
+  const prevBounds=previousPeriodBounds(state.insPeriodType, state.insStartISO, state.insEndISO);
+  const prevTotals=await getPaymentTotalsForPeriod(prevBounds.startISO, prevBounds.endISO);
+  const allIds=new Set([...Object.keys(curTotals), ...Object.keys(prevTotals)]);
+  const rows=[...allIds].map(pmId=>{
+    const pm=state.paymentMethods.find(p=>p.id===pmId);
+    return { name: pm?pm.name:'Other', icon: pm?pm.icon:'❔', color:'#8657E0',
+      current: curTotals[pmId]||0, previous: prevTotals[pmId]||0 };
+  }).filter(r=>r.current>0 || r.previous>0).sort((a,b)=>b.current-a.current);
+
+  if(rows.length===0){ container.innerHTML='<p class="empty-hint">No expenses in this period.</p>'; return; }
+  const grandTotal=rows.reduce((s,r)=>s+r.current,0);
+  container.innerHTML = `<p class="spend-count" style="margin:0 0 12px;color:var(--muted);">${formatINR(grandTotal)} total this period</p>` +
+    renderBreakdownRows(rows, previousPeriodPhrase(state.insPeriodType));
+}
+function renderInsightsCompareCatGrid(){
+  // Lazy default: only picks a category the first time Compare is viewed
+  // with nothing selected yet. After that, whatever's selected persists
+  // across navigation, same as the period type and view.
+  if(!state.insCompareCategoryId && state.categories.length) state.insCompareCategoryId=state.categories[0].id;
+  const grid=document.getElementById('ins-compare-cat-grid'); grid.innerHTML='';
+  state.categories.forEach(cat=>{
+    const selected=state.insCompareCategoryId===cat.id;
+    const bg = selected ? cat.color+'26' : 'var(--surface)';
+    const border = selected ? cat.color : 'transparent';
+    grid.insertAdjacentHTML('beforeend', `
+      <button type="button" class="cat-chip" data-cat="${cat.id}" style="background:${bg};border-color:${border}">
+        <span class="cat-emoji">${cat.icon}</span><span class="cat-name">${esc(cat.name)}</span>
+      </button>`);
+  });
+}
+async function renderInsightsCompareResult(){
+  const result=document.getElementById('ins-compare-result');
+  if(!state.insCompareCategoryId){ result.innerHTML='<p class="empty-hint">Pick a category above.</p>'; return; }
+  if(state.insPeriodType==='custom' && (!state.insStartISO || !state.insEndISO)){
+    result.innerHTML='<p class="empty-hint">Pick a from and to date above.</p>';
+    return;
+  }
+  if(state.insPeriodType==='custom' && state.insStartISO>state.insEndISO){
+    result.innerHTML='<p class="empty-hint">The from date is after the to date.</p>';
+    return;
+  }
+  const curTotals=await getCategoryTotalsForPeriod(state.insStartISO, state.insEndISO);
+  const prevBounds=previousPeriodBounds(state.insPeriodType, state.insStartISO, state.insEndISO);
+  const prevTotals=await getCategoryTotalsForPeriod(prevBounds.startISO, prevBounds.endISO);
+  const current=curTotals[state.insCompareCategoryId]||0;
+  const previous=prevTotals[state.insCompareCategoryId]||0;
+  const delta=formatDelta(current, previous);
+  result.innerHTML = `
+    <div class="ins-compare-card">
+      <div class="ins-compare-side">
+        <span class="ins-compare-label">${esc(formatPeriodLabel(state.insPeriodType, prevBounds.startISO, prevBounds.endISO))}</span>
+        <span class="ins-compare-amt">${formatINR(previous)}</span>
+      </div>
+      <div class="ins-compare-arrow">→</div>
+      <div class="ins-compare-side">
+        <span class="ins-compare-label">${esc(formatPeriodLabel(state.insPeriodType, state.insStartISO, state.insEndISO))}</span>
+        <span class="ins-compare-amt strong">${formatINR(current)}</span>
+      </div>
+    </div>
+    <p class="ins-delta ${delta.cls}" style="text-align:center;font-size:13px;margin-top:10px;">${delta.label} ${esc(previousPeriodPhrase(state.insPeriodType))}</p>`;
+}
+async function renderInsights(){
+  document.getElementById('ins-period-label').textContent = formatPeriodLabel(state.insPeriodType, state.insStartISO, state.insEndISO);
+  document.getElementById('ins-next-btn').disabled = state.insPeriodType!=='custom' && state.insEndISO>=todayISO();
+  if(state.insView==='categories') await renderInsightsCategoriesPanel();
+  else if(state.insView==='compare'){ renderInsightsCompareCatGrid(); await renderInsightsCompareResult(); }
+  else if(state.insView==='payment') await renderInsightsPaymentPanel();
 }
 
 /* ============================== ADD EXPENSE ============================== */
@@ -1334,7 +1878,7 @@ document.getElementById('attach-viewer-close').addEventListener('click', closeAt
 document.getElementById('add-save-btn').addEventListener('click', saveExpense);
 document.getElementById('add-delete-btn').addEventListener('click', () => {
   if(!state.editingExpense) return;
-  deleteExpenseWithUndo(state.editingExpense, { onChange: goToReturnScreen });
+  deleteExpenseWithUndo(state.editingExpense, { onChange: goToReturnScreen, onUndo: refreshAllExpenseViews });
 });
 
 document.getElementById('add-category-grid').addEventListener('click', (e) => {
@@ -1388,12 +1932,97 @@ document.getElementById('home-warranties-list').addEventListener('click', (e) =>
   openEditFromId(row.dataset.id);
 });
 
+document.getElementById('settings-bulkdelete-btn').addEventListener('click', openBulkDeleteScreen);
+document.getElementById('bulkdelete-close-btn').addEventListener('click', () => showScreen('settings-screen'));
+document.getElementById('bulkdelete-mode-tabs').addEventListener('click', (e) => {
+  const btn=e.target.closest('.segmented-tab'); if(!btn) return;
+  setBulkDeleteMode(btn.dataset.bdmode);
+});
+document.querySelectorAll('#bulkdelete-age-panel [data-age]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#bulkdelete-age-panel [data-age]').forEach(b => {
+      const selected=b===btn;
+      b.style.background = selected ? 'var(--grape)' : 'var(--surface)';
+      b.style.color = selected ? 'white' : 'var(--ink)';
+    });
+    const dateInput=document.getElementById('bulkdelete-cutoff-date');
+    if(btn.dataset.age==='custom'){
+      dateInput.classList.remove('hidden');
+      state.bdCutoffISO = dateInput.value || null;
+    } else {
+      dateInput.classList.add('hidden');
+      state.bdCutoffISO = addMonthsISO(todayISO(), -parseInt(btn.dataset.age,10));
+    }
+    updateAgePreview();
+  });
+});
+document.getElementById('bulkdelete-cutoff-date').addEventListener('change', (e) => {
+  state.bdCutoffISO = e.target.value || null;
+  updateAgePreview();
+});
+document.getElementById('bulkdelete-age-go-btn').addEventListener('click', () => {
+  if(!bdAgeMatchedCache.length) return;
+  openBulkDeleteConfirm(bdAgeMatchedCache);
+});
+document.getElementById('bulkdelete-manual-list').addEventListener('click', (e) => {
+  const row=e.target.closest('.recent-row'); if(!row) return;
+  const id=row.dataset.id;
+  if(state.bdManualSelected.has(id)) state.bdManualSelected.delete(id);
+  else state.bdManualSelected.add(id);
+  const box=row.querySelector('.bulkdelete-checkbox');
+  if(box) box.classList.toggle('checked', state.bdManualSelected.has(id));
+  updateBulkDeleteManualSummary();
+});
+document.getElementById('bulkdelete-manual-go-btn').addEventListener('click', () => {
+  const selected=bdManualListCache.filter(e => state.bdManualSelected.has(e.id));
+  if(!selected.length) return;
+  openBulkDeleteConfirm(selected);
+});
+document.getElementById('bulkdelete-confirm-cancel-btn').addEventListener('click', closeBulkDeleteConfirm);
+document.getElementById('bulkdelete-confirm-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='bulkdelete-confirm-overlay') closeBulkDeleteConfirm();
+});
+document.getElementById('bulkdelete-confirm-btn').addEventListener('click', () => {
+  const batch=state.bdPendingBatch;
+  closeBulkDeleteConfirm();
+  deleteExpensesWithUndo(batch, {
+    onChange: () => { refreshAllExpenseViews(); showScreen('settings-screen'); },
+    onUndo: refreshAllExpenseViews,
+  });
+});
+
+document.getElementById('ins-period-type-tabs').addEventListener('click', (e) => {
+  const btn=e.target.closest('.segmented-tab'); if(!btn) return;
+  setInsightsPeriodType(btn.dataset.instype);
+});
+document.getElementById('ins-prev-btn').addEventListener('click', () => stepInsightsPeriod(-1));
+document.getElementById('ins-next-btn').addEventListener('click', () => stepInsightsPeriod(1));
+document.getElementById('ins-view-tabs').addEventListener('click', (e) => {
+  const btn=e.target.closest('.segmented-tab'); if(!btn) return;
+  setInsightsView(btn.dataset.insview);
+});
+document.getElementById('ins-compare-cat-grid').addEventListener('click', (e) => {
+  const btn=e.target.closest('.cat-chip'); if(!btn) return;
+  state.insCompareCategoryId=btn.dataset.cat;
+  renderInsightsCompareCatGrid();
+  renderInsightsCompareResult();
+});
+document.getElementById('ins-custom-start').addEventListener('change', (e) => {
+  state.insStartISO=e.target.value||null;
+  renderInsights();
+});
+document.getElementById('ins-custom-end').addEventListener('change', (e) => {
+  state.insEndISO=e.target.value||null;
+  renderInsights();
+});
+
 document.querySelectorAll('[data-nav]').forEach(item => {
   item.addEventListener('click', () => {
     const nav=item.dataset.nav;
     showScreen(nav+'-screen');
     if(nav==='home') renderHome();
     if(nav==='transactions') renderTransactions();
+    if(nav==='stats') renderInsights();
   });
 });
 
