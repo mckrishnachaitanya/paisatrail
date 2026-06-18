@@ -399,6 +399,7 @@ input{outline:none;}
       <div class="home-tabs" id="home-tabs">
         <button type="button" class="home-tab active" data-hometab="overview">Overview</button>
         <button type="button" class="home-tab" data-hometab="warranties">Warranties</button>
+        <button type="button" class="home-tab" data-hometab="forecast">Forecast</button>
       </div>
 
       <div id="home-panel-overview">
@@ -428,6 +429,24 @@ input{outline:none;}
 
       <div id="home-panel-warranties" class="hidden">
         <div id="home-warranties-list"></div>
+      </div>
+
+      <div id="home-panel-forecast" class="hidden">
+        <div class="segmented-tabs" id="forecast-window-tabs">
+          <button type="button" class="segmented-tab active" data-forecastwindow="month">Rest of this month</button>
+          <button type="button" class="segmented-tab" data-forecastwindow="rolling30">Next 30 days</button>
+        </div>
+        <div class="spend-card" style="margin-top:14px;">
+          <p class="spend-label" id="forecast-total-label">Projected total this month</p>
+          <p class="spend-amount" id="forecast-total">₹0</p>
+        </div>
+        <div class="legend" id="forecast-breakdown" style="margin-top:14px;"></div>
+        <p class="field-label" style="margin-top:14px;">ESTIMATE "OTHER SPENDING" FROM</p>
+        <div class="pay-row" id="forecast-lookback-row"></div>
+        <div class="section-head">
+          <p class="section-title">Upcoming recurring</p>
+        </div>
+        <div id="forecast-upcoming-list"></div>
       </div>
     </div>
   </div>
@@ -1306,7 +1325,9 @@ const state = {
   recurringEnabled:false, // is the "Make this recurring" toggle on (only meaningful when recurringLinkedId is null)
   recurringFrequency:'monthly', // 'weekly'|'monthly'|'yearly' chosen while recurringEnabled
   returnScreen:'home-screen', // where to go back to after Add/Edit closes or saves
-  homeTab:'overview', // 'overview' or 'warranties' — which Home tab is active; persists across nav, lock/unlock, and Add/Edit since it's just app state, never reset
+  homeTab:'overview', // 'overview'|'warranties'|'forecast' — which Home tab is active; persists across nav, lock/unlock, and Add/Edit since it's just app state, never reset
+  forecastWindow:'month', // 'month'|'rolling30' — which Forecast sub-window is selected; persists like homeTab
+  forecastLookbackDays:30, // 30|90|180 — how many trailing days the "estimated other spending" average is based on; persists like forecastWindow
   bdMode:'age',          // 'age' or 'manual' — which Bulk Delete sub-mode is active
   bdCutoffISO:null,      // computed/chosen cutoff date for age-based bulk delete; null until a chip or date is picked
   bdManualSelected:new Set(), // ids ticked in manual bulk-delete mode
@@ -1723,6 +1744,7 @@ async function renderHomeWarrantiesPanel(){
 function applyHomeTabUI(){
   document.getElementById('home-panel-overview').classList.toggle('hidden', state.homeTab!=='overview');
   document.getElementById('home-panel-warranties').classList.toggle('hidden', state.homeTab!=='warranties');
+  document.getElementById('home-panel-forecast').classList.toggle('hidden', state.homeTab!=='forecast');
   document.querySelectorAll('#home-tabs .home-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.hometab===state.homeTab);
   });
@@ -1731,13 +1753,14 @@ function setHomeTab(tab){
   state.homeTab=tab;
   applyHomeTabUI();
 }
-// Both panels refresh on every call regardless of which tab is active, so
+// All three panels refresh on every call regardless of which tab is active, so
 // switching tabs never shows stale data, and locking mid-tab or returning
 // from Add/Edit "just works" since state.homeTab persists on its own —
 // nothing else needs to remember or restore it separately.
 async function renderHome(){
   await renderHomeOverviewPanel();
   await renderHomeWarrantiesPanel();
+  await renderHomeForecastPanel();
   applyHomeTabUI();
 }
 
@@ -2976,6 +2999,113 @@ function requestDeleteRecurring(){
   openManageDeleteConfirm('recurring', id, rule.name);
 }
 
+/* ============================== CASH-FLOW FORECASTING ============================== */
+// Pure read-only simulation — walks each active rule's nextDueISO forward
+// using the exact same advanceRecurringDate clamping logic the real
+// catch-up engine uses, but never mutates the rule or writes to IndexedDB.
+// Safe to call as often as the Forecast tab re-renders.
+function projectRecurringTotal(windowEndISO){
+  let total=0;
+  const items=[];
+  for(const rule of state.recurringRules){
+    if(!rule.active) continue;
+    let cursor=rule.nextDueISO;
+    let count=0;
+    while(cursor<=windowEndISO && count<RECURRING_CATCHUP_CAP){
+      if(rule.endDate && cursor>rule.endDate) break;
+      total+=Number(rule.amount);
+      items.push({ name:rule.name, amount:rule.amount, dateISO:cursor, categoryId:rule.categoryId });
+      cursor=advanceRecurringDate(rule, cursor);
+      count++;
+    }
+  }
+  items.sort((a,b)=>a.dateISO.localeCompare(b.dateISO));
+  return { total, items };
+}
+// Estimates everything that ISN'T a known recurring rule — food, shopping,
+// one-off purchases — from a trailing daily average. Excludes expenses that
+// already have a recurringId so the same spending never gets counted both
+// here and in projectRecurringTotal. Returns null (not 0) when there's no
+// history at all, so the UI can say "not enough data" instead of a
+// confident-looking ₹0 that would just be wrong.
+const FORECAST_ROLLING_WINDOW_DAYS=30; // length of the "Next 30 days" forward view itself — not user-configurable, it's what defines that option
+const FORECAST_LOOKBACK_OPTIONS=[30,90,180]; // user-configurable: how far back to average for the "estimated other" figure
+async function estimateDailyOtherSpend(lookbackDays){
+  const today=todayISO();
+  const lookbackStartISO=dateToISO(addDays(new Date(today+'T00:00:00'), -lookbackDays));
+  const expenses=(await DB.getExpensesByDateRange(lookbackStartISO, today)).filter(e => !pendingDeletes[e.id] && !e.recurringId);
+  if(expenses.length===0) return null;
+  const total=expenses.reduce((s,e)=>s+Number(e.amount),0);
+  return total/lookbackDays;
+}
+function setForecastWindow(win){
+  state.forecastWindow=win;
+  renderHomeForecastPanel();
+}
+function setForecastLookback(days){
+  state.forecastLookbackDays=days;
+  renderHomeForecastPanel();
+}
+async function renderHomeForecastPanel(){
+  document.querySelectorAll('#forecast-window-tabs .segmented-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.forecastwindow===state.forecastWindow);
+  });
+  const lookbackRow=document.getElementById('forecast-lookback-row');
+  lookbackRow.innerHTML=FORECAST_LOOKBACK_OPTIONS.map(days=>{
+    const selected=days===state.forecastLookbackDays;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    return `<button type="button" class="pay-chip" data-lookback="${days}" style="background:${bg};color:${color}">Last ${days} days</button>`;
+  }).join('');
+  const today=todayISO();
+  const isMonth=state.forecastWindow==='month';
+  let windowEndISO, remainingDays, spentSoFar=0;
+  if(isMonth){
+    const now=new Date();
+    windowEndISO=dateToISO(new Date(now.getFullYear(), now.getMonth()+1, 0));
+    remainingDays=Math.max(0, Math.round((new Date(windowEndISO+'T00:00:00') - new Date(today+'T00:00:00'))/86400000));
+    const monthStartISO=dateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
+    spentSoFar=(await DB.getExpensesByDateRange(monthStartISO, today)).filter(e => !pendingDeletes[e.id]).reduce((s,e)=>s+Number(e.amount),0);
+  } else {
+    windowEndISO=dateToISO(addDays(new Date(today+'T00:00:00'), FORECAST_ROLLING_WINDOW_DAYS));
+    remainingDays=FORECAST_ROLLING_WINDOW_DAYS;
+  }
+
+  const { total:recurringTotal, items:upcoming } = projectRecurringTotal(windowEndISO);
+  const dailyOtherRate=await estimateDailyOtherSpend(state.forecastLookbackDays);
+  const estimatedOther = dailyOtherRate!=null ? dailyOtherRate*remainingDays : null;
+  const projectedTotal = spentSoFar + recurringTotal + (estimatedOther || 0);
+
+  document.getElementById('forecast-total-label').textContent = isMonth ? 'Projected total this month' : 'Projected total, next 30 days';
+  document.getElementById('forecast-total').textContent = formatINR(projectedTotal);
+
+  const breakdown=document.getElementById('forecast-breakdown'); breakdown.innerHTML='';
+  if(isMonth){
+    breakdown.insertAdjacentHTML('beforeend', `<div class="legend-row"><span>Spent so far</span><span>${formatINR(spentSoFar)}</span></div>`);
+  }
+  breakdown.insertAdjacentHTML('beforeend', `<div class="legend-row"><span>Recurring still due</span><span>${formatINR(recurringTotal)}</span></div>`);
+  breakdown.insertAdjacentHTML('beforeend', `<div class="legend-row"><span>Estimated other spending</span><span>${estimatedOther!=null ? '~'+formatINR(estimatedOther) : `Not enough history yet (last ${state.forecastLookbackDays} days)`}</span></div>`);
+
+  const list=document.getElementById('forecast-upcoming-list'); list.innerHTML='';
+  if(upcoming.length===0){
+    list.innerHTML='<p class="empty-hint">No recurring expenses due in this window.</p>';
+  } else {
+    upcoming.forEach(item=>{
+      const cat=state.categories.find(c=>c.id===item.categoryId);
+      const dateLabel=new Date(item.dateISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+      list.insertAdjacentHTML('beforeend', `
+        <div class="recent-row">
+          <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'🔁'}</div>
+          <div class="recent-info">
+            <p class="recent-title">${esc(item.name)}</p>
+            <span class="recent-pm">Due ${esc(dateLabel)}</span>
+          </div>
+          <span class="recent-amt">${formatINR(item.amount)}</span>
+        </div>`);
+    });
+  }
+}
+
 /* ============================== INSIGHTS ============================== */
 function dateToISO(d){ const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); }
 function addDays(d, n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
@@ -3723,6 +3853,14 @@ document.getElementById('home-tabs').addEventListener('click', (e) => {
   setHomeTab(btn.dataset.hometab);
 });
 document.getElementById('home-warranty-banner').addEventListener('click', () => setHomeTab('warranties'));
+document.getElementById('forecast-window-tabs').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-forecastwindow]'); if(!btn) return;
+  setForecastWindow(btn.dataset.forecastwindow);
+});
+document.getElementById('forecast-lookback-row').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-lookback]'); if(!btn) return;
+  setForecastLookback(Number(btn.dataset.lookback));
+});
 document.getElementById('home-warranties-list').addEventListener('click', (e) => {
   const row=e.target.closest('.recent-row'); if(!row) return;
   openEditFromId(row.dataset.id);
