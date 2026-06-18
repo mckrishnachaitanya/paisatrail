@@ -68,6 +68,14 @@ input{outline:none;}
 .pin-dot.error{background:var(--coral);border-color:var(--coral);animation:shake .3s;}
 .numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;max-width:260px;}
 .pin-cancel-btn{margin-top:18px;font-size:13px;font-weight:700;color:#B0A7CC;}
+/* Generic on/off switch — first use is Biometric unlock in Settings, but
+   built reusable for any future binary setting rather than one-off markup. */
+.switch{width:44px;height:26px;border-radius:14px;background:var(--border);flex-shrink:0;
+  position:relative;transition:background .2s;}
+.switch.on{background:var(--mint);}
+.switch-thumb{width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;
+  top:3px;left:3px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
+.switch.on .switch-thumb{left:21px;}
 .num-btn{aspect-ratio:1;border-radius:50%;border:1.5px solid #4B3E7A;background:rgba(255,255,255,.04);
   color:var(--paper);font-size:21px;font-weight:700;display:flex;align-items:center;justify-content:center;
   transition:transform .12s cubic-bezier(.34,1.56,.64,1),background .12s;}
@@ -390,6 +398,7 @@ input{outline:none;}
     <button class="num-btn del" id="pin-del-btn">⌫</button>
   </div>
   <button type="button" class="pin-cancel-btn hidden" id="pin-cancel-btn">Cancel</button>
+  <button type="button" class="pin-cancel-btn hidden" id="pin-biometric-btn">👆 Use biometric instead</button>
 </div>
 
 <!-- ============================== HOME SCREEN ============================== -->
@@ -718,6 +727,14 @@ input{outline:none;}
           <span class="settings-row-sub">Update the 6-digit PIN that protects this app</span>
         </div>
         <span class="settings-row-chevron">›</span>
+      </button>
+      <button type="button" class="settings-row" id="settings-biometric-row" style="margin-top:8px;">
+        <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">🔐</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Biometric unlock</p>
+          <span class="settings-row-sub" id="settings-biometric-sub">Use fingerprint or face instead of typing your PIN</span>
+        </div>
+        <div class="switch" id="settings-biometric-switch"><div class="switch-thumb"></div></div>
       </button>
     </div>
   </div>
@@ -1089,6 +1106,75 @@ const Crypto = {
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
   },
 };
+
+/* ============================== BIOMETRIC UNLOCK (WebAuthn) ============================== */
+// Opt-in, faster front door layered on top of the PIN — the PIN remains the
+// underlying credential and the automatic fallback if biometric isn't
+// enabled, isn't available, fails, or is cancelled. Never a replacement.
+function isBioEnabled(){ return Store.get('pt_bio')==='1'; }
+function isBioAvailable(){ return !!(window.PublicKeyCredential); }
+async function registerBiometric(){
+  try{
+    const challenge=crypto.getRandomValues(new Uint8Array(32));
+    const userId=crypto.getRandomValues(new Uint8Array(16));
+    const cred=await navigator.credentials.create({
+      publicKey:{
+        challenge,
+        rp:{ name:'PaisaTrail', id:window.location.hostname },
+        user:{ id:userId, name:'paisatrail-user', displayName:'PaisaTrail User' },
+        pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+        authenticatorSelection:{ userVerification:'required', authenticatorAttachment:'platform' },
+        timeout:30000,
+      }
+    });
+    // The registration prompt itself only succeeds against whatever
+    // fingerprint/face is already enrolled on this device — that's the
+    // actual security checkpoint, no separate PIN re-entry needed here.
+    const credId=btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+    Store.set('pt_bio_cred', credId);
+    Store.set('pt_bio','1');
+    return true;
+  } catch(e){ return false; }
+}
+async function attemptBiometric(){
+  try{
+    const credIdB64=Store.get('pt_bio_cred');
+    if(!credIdB64) return false;
+    const credIdBytes=Uint8Array.from(atob(credIdB64), c=>c.charCodeAt(0));
+    const challenge=crypto.getRandomValues(new Uint8Array(32));
+    const cred=await navigator.credentials.get({
+      publicKey:{
+        challenge, timeout:30000, userVerification:'required',
+        rpId:window.location.hostname,
+        allowCredentials:[{type:'public-key', id:credIdBytes}],
+      }
+    });
+    return !!cred;
+  } catch(e){ return false; } // includes the user cancelling the OS prompt — silent, falls back to PIN
+}
+function disableBiometric(){
+  Store.set('pt_bio','0');
+  Store.set('pt_bio_cred','');
+}
+function renderBiometricRow(){
+  const sw=document.getElementById('settings-biometric-switch');
+  const sub=document.getElementById('settings-biometric-sub');
+  if(!sw) return;
+  const on=isBioEnabled();
+  sw.classList.toggle('on', on);
+  sub.textContent = on ? 'Fingerprint or face unlocks the app — tap to turn off' : 'Use fingerprint or face instead of typing your PIN';
+}
+// Auto-fires the OS prompt the moment the unlock screen appears (Krishna's
+// call — no extra tap needed). Re-usable for the PIN screen's manual
+// "Use biometric instead" retry too, since the logic is identical either way.
+async function tryAutoBiometric(){
+  if(!isBioEnabled() || !isBioAvailable()) return;
+  const ok=await attemptBiometric();
+  // Guard against the user having already typed their PIN by hand while
+  // the OS biometric sheet was up (both run concurrently, not exclusively)
+  // — don't double-fire unlockSuccess() or unlock a screen that's moved on.
+  if(ok && !state.unlocked && state.pinMode==='unlock') unlockSuccess();
+}
 
 /* ============================== DATA LAYER (IndexedDB) ============================== */
 const DB_NAME='PaisaTrailDB', DB_VERSION=4;
@@ -1515,6 +1601,7 @@ function initPINScreen(mode){
   const lbl=document.getElementById('pin-label'); lbl.className='pin-label';
   const sub=document.getElementById('pin-subtitle');
   document.getElementById('pin-cancel-btn').classList.toggle('hidden', !mode.startsWith('change-'));
+  document.getElementById('pin-biometric-btn').classList.toggle('hidden', !(mode==='unlock' && isBioEnabled() && isBioAvailable()));
   if(mode==='setup'){
     lbl.textContent='Create a 6-digit PIN'; sub.textContent='This protects PaisaTrail on this phone';
   } else if(mode==='setup-confirm'){
@@ -1650,8 +1737,15 @@ function lockVault(){
   screenBeforeLock = SCREENS.find(s => s!=='pin-screen' && !document.getElementById(s).classList.contains('is-hidden')) || 'home-screen';
   state.unlocked=false;
   clearTimeout(autoLockTimer);
+  enterUnlockScreen();
+}
+// Single entry point for showing the unlock screen — used by lockVault()
+// and cold-start init() — so the auto biometric attempt always fires
+// exactly once per lock, never skipped and never duplicated.
+function enterUnlockScreen(){
   initPINScreen('unlock');
   showScreen('pin-screen');
+  tryAutoBiometric();
 }
 document.addEventListener('touchstart', resetAutoLock, {passive:true});
 document.addEventListener('click', resetAutoLock);
@@ -1936,36 +2030,46 @@ function updateTxnFilterBtnState(){
   btn.textContent = count>0 ? `Filter • ${count}` : 'Filter';
   btn.classList.toggle('active', count>0);
 }
+let txnRenderSeq=0; // bumped on every render so an in-flight, now-superseded
+                     // DB read can detect a newer one has since started and
+                     // skip its DOM write instead of overwriting the fresher
+                     // result — fixes the filter button occasionally lagging
+                     // a beat behind rapid filter changes.
 async function renderTransactions(){
+  const mySeq=++txnRenderSeq;
   const search=(document.getElementById('txn-search').value||'').toLowerCase().trim();
   const list=await getFilteredTransactions();
+  if(mySeq!==txnRenderSeq) return; // a newer filter/search change started while this query was in flight; that call's result wins instead
   updateTxnFilterBtnState();
 
   const container=document.getElementById('txn-list'); container.innerHTML='';
   if(list.length===0){
     container.innerHTML=`<p class="empty-hint">${(search||hasActiveTxnFilters()) ? 'No expenses match your search or filters.' : 'No expenses yet — tap + to add your first one.'}</p>`;
-    return;
+  } else {
+    let lastGroup=null;
+    list.forEach(e=>{
+      const groupLabel=formatGroupLabel(e.date);
+      if(groupLabel!==lastGroup){
+        container.insertAdjacentHTML('beforeend', `<p class="txn-group-label">${esc(groupLabel.toUpperCase())}</p>`);
+        lastGroup=groupLabel;
+      }
+      const cat=state.categories.find(c=>c.id===e.categoryId);
+      const pm=state.paymentMethods.find(p=>p.id===e.paymentMethod);
+      container.insertAdjacentHTML('beforeend', `
+        <div class="recent-row" data-id="${e.id}">
+          <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
+          <div class="recent-info">
+            <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
+            <span class="recent-pm">${pm?esc(pm.name):'—'}</span>
+          </div>
+          <span class="recent-amt">-${formatINR(e.amount)}</span>
+          <button class="txn-delete" data-del="${e.id}">🗑️</button>
+        </div>`);
+    });
   }
-  let lastGroup=null;
-  list.forEach(e=>{
-    const groupLabel=formatGroupLabel(e.date);
-    if(groupLabel!==lastGroup){
-      container.insertAdjacentHTML('beforeend', `<p class="txn-group-label">${esc(groupLabel.toUpperCase())}</p>`);
-      lastGroup=groupLabel;
-    }
-    const cat=state.categories.find(c=>c.id===e.categoryId);
-    const pm=state.paymentMethods.find(p=>p.id===e.paymentMethod);
-    container.insertAdjacentHTML('beforeend', `
-      <div class="recent-row" data-id="${e.id}">
-        <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
-        <div class="recent-info">
-          <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
-          <span class="recent-pm">${pm?esc(pm.name):'—'}</span>
-        </div>
-        <span class="recent-amt">-${formatINR(e.amount)}</span>
-        <button class="txn-delete" data-del="${e.id}">🗑️</button>
-      </div>`);
-  });
+  // The filter sheet's "Show N expenses" button always mirrors this exact
+  // query result — no separate DB read, so it can never drift from the list.
+  document.getElementById('txn-filter-show-btn').textContent = `Show ${list.length} expense${list.length===1?'':'s'}`;
 }
 
 /* ============================== TRANSACTIONS FILTERS ============================== */
@@ -1993,17 +2097,15 @@ function renderTxnFilterPayRow(){
       </button>`);
   });
 }
-async function updateTxnFilterShowBtn(){
-  const list=await getFilteredTransactions();
-  document.getElementById('txn-filter-show-btn').textContent = `Show ${list.length} expense${list.length===1?'':'s'}`;
-}
 // Every toggle inside the sheet takes effect immediately (consistent with
 // search-as-you-type and Insights' instant period switching elsewhere in
 // the app) — there's no separate "Apply" step, so closing the sheet by any
-// route always leaves the live list already in the right state.
+// route always leaves the live list already in the right state. Both the
+// list and the "Show N expenses" button are now built from one query inside
+// renderTransactions(), guarded by a sequence check — the button can no
+// longer lag behind a rapid filter change.
 async function onTxnFilterChange(){
   await renderTransactions();
-  await updateTxnFilterShowBtn();
 }
 async function openTxnFilterSheet(){
   renderTxnFilterCatGrid();
@@ -2012,7 +2114,7 @@ async function openTxnFilterSheet(){
   document.getElementById('txn-filter-end').value = state.txnFilterEndISO || '';
   document.getElementById('txn-filter-min-amount').value = state.txnFilterMinAmount!=null ? state.txnFilterMinAmount : '';
   document.getElementById('txn-filter-max-amount').value = state.txnFilterMaxAmount!=null ? state.txnFilterMaxAmount : '';
-  await updateTxnFilterShowBtn();
+  await renderTransactions();
   document.getElementById('txn-filter-overlay').classList.add('show');
 }
 function closeTxnFilterSheet(){
@@ -2156,7 +2258,19 @@ function closeBulkDeleteConfirm(){
 // mobile, and keeps icons legible at the small sizes used everywhere
 // (recent-row, cat-chip, etc). Payment methods get a separate, smaller
 // set since they're about *how* you paid, not *what* it was for.
-const CATEGORY_ICON_CHOICES=['🍔','🍕','☕','🛒','🚗','⛽','✈️','🏠','📱','💡','🛍️','👗','💊','🏋️','🎬','🎮','📚','🎓','🐾','🎁','💼','🧾','🧸','✨'];
+const CATEGORY_ICON_CHOICES=[
+  '🍔','🍕','☕','🛒','🍜','🍣','🍰','🍪','🥗','🍷','🍺','🍫',           // food
+  '🚗','⛽','🚌','🚕','🚲','🛵','🚆','🅿️',                              // transport
+  '🏠','📱','💡','🛋️','🔧','🚿','🧹','🔌',                             // home/utilities
+  '🏥','💊',                                                            // health
+  '🏋️','⚽','🏀','🧘','🚴',                                            // fitness/sports
+  '🎬','🎮','🎵','🎤','🎨','🎲',                                       // entertainment
+  '💼','🧾','💻','🖥️','📊','🏦',                                       // finance/work
+  '✈️','🏖️','⛺','🗺️','🧳',                                            // travel
+  '🐾','👶','🐶','🐱',                                                  // family/pets
+  '🛍️','👗','👟','👜','💄',                                            // shopping
+  '📚','🎓','🎁','🧸','✨','🎉','🔋','📦','🌱','☂️'                     // misc/education
+];
 const PAYMENT_ICON_CHOICES=['💳','📲','💵','🏦','💰','🧾','🪙','💸','🏧','📱'];
 // Mirrors the app's existing 6 design-token colors (--coral/--mint/--grape/
 // --sunshine/--sky/--pink) so new categories stay on-palette.
@@ -3991,6 +4105,7 @@ async function saveExpense(){
 document.querySelectorAll('#pin-screen .num-btn[data-n]').forEach(b => b.addEventListener('click', () => handlePINDigit(b.dataset.n)));
 document.getElementById('pin-del-btn').addEventListener('click', () => { state.pinBuffer=state.pinBuffer.slice(0,-1); updatePINDots(); });
 document.getElementById('pin-cancel-btn').addEventListener('click', cancelChangePIN);
+document.getElementById('pin-biometric-btn').addEventListener('click', tryAutoBiometric);
 
 document.querySelectorAll('.fab-add').forEach(b => b.addEventListener('click', () => openAddScreen()));
 document.getElementById('add-close-btn').addEventListener('click', () => goToReturnScreen());
@@ -4136,6 +4251,21 @@ document.getElementById('import-confirm-overlay').addEventListener('click', (e) 
 document.getElementById('import-confirm-btn').addEventListener('click', confirmImport);
 
 document.getElementById('settings-changepin-btn').addEventListener('click', startChangePIN);
+document.getElementById('settings-biometric-row').addEventListener('click', async ()=>{
+  if(isBioEnabled()){
+    disableBiometric();
+    renderBiometricRow();
+    toast('Biometric unlock turned off');
+    return;
+  }
+  if(!isBioAvailable()){
+    toast('Biometric unlock is not supported on this device');
+    return;
+  }
+  const ok=await registerBiometric();
+  renderBiometricRow();
+  toast(ok ? 'Biometric unlock turned on' : 'Could not set up biometric unlock — try again');
+});
 document.getElementById('settings-bulkdelete-btn').addEventListener('click', openBulkDeleteScreen);
 document.getElementById('bulkdelete-close-btn').addEventListener('click', () => showScreen('settings-screen'));
 document.getElementById('bulkdelete-mode-tabs').addEventListener('click', (e) => {
@@ -4384,6 +4514,7 @@ document.querySelectorAll('[data-nav]').forEach(item => {
     if(nav==='home') renderHome();
     if(nav==='transactions') renderTransactions();
     if(nav==='stats') renderInsights();
+    if(nav==='settings') renderBiometricRow();
   });
 });
 
@@ -4393,8 +4524,13 @@ function init(){
     navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed', err));
   }
   const hasPin=!!Store.get('pt_pin');
-  initPINScreen(hasPin ? 'unlock' : 'setup');
-  showScreen('pin-screen');
+  if(hasPin){
+    enterUnlockScreen();
+  } else {
+    initPINScreen('setup');
+    showScreen('pin-screen');
+  }
+  renderBiometricRow();
 }
 init();
 </script>
