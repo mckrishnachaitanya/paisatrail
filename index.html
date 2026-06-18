@@ -67,6 +67,7 @@ input{outline:none;}
   box-shadow:0 0 0 4px rgba(255,194,60,.18);transform:scale(1.15);}
 .pin-dot.error{background:var(--coral);border-color:var(--coral);animation:shake .3s;}
 .numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;max-width:260px;}
+.pin-cancel-btn{margin-top:18px;font-size:13px;font-weight:700;color:#B0A7CC;}
 .num-btn{aspect-ratio:1;border-radius:50%;border:1.5px solid #4B3E7A;background:rgba(255,255,255,.04);
   color:var(--paper);font-size:21px;font-weight:700;display:flex;align-items:center;justify-content:center;
   transition:transform .12s cubic-bezier(.34,1.56,.64,1),background .12s;}
@@ -376,6 +377,7 @@ input{outline:none;}
     <button class="num-btn empty"></button><button class="num-btn" data-n="0">0</button>
     <button class="num-btn del" id="pin-del-btn">⌫</button>
   </div>
+  <button type="button" class="pin-cancel-btn hidden" id="pin-cancel-btn">Cancel</button>
 </div>
 
 <!-- ============================== HOME SCREEN ============================== -->
@@ -633,7 +635,30 @@ input{outline:none;}
         </div>
         <span class="settings-row-chevron">›</span>
       </button>
-      <p class="stub-text" style="text-align:left;margin-top:18px;">Export/import and changing your PIN land in a future build pass.</p>
+      <button type="button" class="settings-row" id="settings-export-btn" style="margin-top:8px;">
+        <span class="settings-row-icon" style="background:rgba(255,194,60,.14);">⬆️</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Export data</p>
+          <span class="settings-row-sub">Download a full backup as a JSON file</span>
+        </div>
+      </button>
+      <button type="button" class="settings-row" id="settings-import-btn" style="margin-top:8px;">
+        <span class="settings-row-icon" style="background:rgba(91,168,255,.14);">⬇️</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Import data</p>
+          <span class="settings-row-sub">Restore from a previously exported backup</span>
+        </div>
+      </button>
+      <input type="file" id="import-file-input" accept="application/json,.json" class="hidden">
+      <p class="field-label">SECURITY</p>
+      <button type="button" class="settings-row" id="settings-changepin-btn">
+        <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">🔒</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Change PIN</p>
+          <span class="settings-row-sub">Update the 6-digit PIN that protects this app</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>
     </div>
   </div>
   <div class="bottom-nav">
@@ -871,6 +896,17 @@ input{outline:none;}
   </div>
 </div>
 
+<!-- ============================== IMPORT CONFIRM ============================== -->
+<div id="import-confirm-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">⚠️</div>
+    <p class="confirm-sheet-title">Replace all data?</p>
+    <p class="confirm-sheet-sub" id="import-confirm-sub"></p>
+    <button type="button" class="danger-btn" id="import-confirm-btn">Import &amp; replace</button>
+    <button type="button" class="confirm-sheet-cancel" id="import-confirm-cancel-btn">Cancel</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- ============================== ATTACHMENT VIEWER ============================== -->
@@ -1093,6 +1129,35 @@ const DB = {
     tx.objectStore('attachments').delete(id);
     await txDone(tx);
   },
+  async getAllAttachments(){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('attachments','readonly').objectStore('attachments').getAll();
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
+  // Used only by Import — wipes and rewrites every store in one
+  // transaction, so a failure partway rolls everything back instead of
+  // leaving a half-imported mix of old and new data.
+  async replaceAllData({expenses, categories, paymentMethods, groups, attachments}){
+    const db=await openDB();
+    const tx=db.transaction(['expenses','categories','paymentMethods','groups','attachments'],'readwrite');
+    const stores={
+      expenses: tx.objectStore('expenses'),
+      categories: tx.objectStore('categories'),
+      paymentMethods: tx.objectStore('paymentMethods'),
+      groups: tx.objectStore('groups'),
+      attachments: tx.objectStore('attachments'),
+    };
+    Object.values(stores).forEach(s => s.clear());
+    (categories||[]).forEach(c => stores.categories.put(c));
+    (paymentMethods||[]).forEach(p => stores.paymentMethods.put(p));
+    (groups||[]).forEach(g => stores.groups.put(g));
+    (expenses||[]).forEach(e => stores.expenses.put(e));
+    (attachments||[]).forEach(a => stores.attachments.put(a));
+    await txDone(tx);
+  },
   async seedDefaults(){
     const cats=await this.getAllCategories();
     if(cats.length===0){
@@ -1265,10 +1330,17 @@ function initPINScreen(mode){
   state.pinMode=mode; state.pinBuffer=''; updatePINDots();
   const lbl=document.getElementById('pin-label'); lbl.className='pin-label';
   const sub=document.getElementById('pin-subtitle');
+  document.getElementById('pin-cancel-btn').classList.toggle('hidden', !mode.startsWith('change-'));
   if(mode==='setup'){
     lbl.textContent='Create a 6-digit PIN'; sub.textContent='This protects PaisaTrail on this phone';
   } else if(mode==='setup-confirm'){
     lbl.textContent='Confirm your PIN';
+  } else if(mode==='change-verify'){
+    lbl.textContent='Enter your current PIN'; sub.textContent="Verify it's you before changing it";
+  } else if(mode==='change-new'){
+    lbl.textContent='Create a new PIN'; sub.textContent='Choose something only you know';
+  } else if(mode==='change-confirm'){
+    lbl.textContent='Confirm your new PIN'; sub.textContent='';
   } else {
     lbl.textContent='Enter your PIN'; sub.textContent='Your personal expense tracker';
     const lock=parseInt(Store.get('pt_lockout')||'0');
@@ -1289,11 +1361,30 @@ function pinError(msg){
   updatePINDots(true);
   const lbl=document.getElementById('pin-label');
   lbl.textContent=msg; lbl.className='pin-label error';
-  setTimeout(()=>{ state.pinBuffer=''; updatePINDots(false); lbl.className='pin-label'; }, 900);
+  // Re-running initPINScreen for the current mode restores the actual
+  // prompt text (not just clears styling) — previously this only reset
+  // the dots/class, leaving "Wrong PIN · N left" stuck on screen even
+  // after the buffer cleared, until the next error overwrote it.
+  setTimeout(()=>{ initPINScreen(state.pinMode); }, 900);
 }
 let pinTemp='';
+// Shared by 'unlock' and 'change-verify' — both check the entered PIN
+// against the stored hash with the same 5-strikes lockout counting, and
+// only differ in what happens once it's confirmed correct.
+async function verifyAgainstStoredPIN(entered){
+  const hash=await Crypto.hashPIN(entered);
+  if(hash!==Store.get('pt_pin')){
+    const fails=(parseInt(Store.get('pt_fails')||'0'))+1;
+    Store.set('pt_fails', String(fails));
+    if(fails>=5){ Store.set('pt_lockout', String(Date.now()+30000)); Store.set('pt_fails','0'); pinError('Locked for 30s'); }
+    else pinError(`Wrong PIN · ${5-fails} left`);
+    return false;
+  }
+  Store.set('pt_fails','0');
+  return true;
+}
 async function handlePINDigit(d){
-  if(state.pinMode==='unlock'){
+  if(state.pinMode==='unlock' || state.pinMode==='change-verify'){
     const lock=parseInt(Store.get('pt_lockout')||'0');
     if(Date.now()<lock){ pinError(`Locked. Wait ${Math.ceil((lock-Date.now())/1000)}s`); return; }
   }
@@ -1311,17 +1402,39 @@ async function handlePINDigit(d){
     Store.set('pt_pin', await Crypto.hashPIN(entered));
     unlockSuccess();
   } else if(state.pinMode==='unlock'){
-    const hash=await Crypto.hashPIN(entered);
-    if(hash!==Store.get('pt_pin')){
-      const fails=(parseInt(Store.get('pt_fails')||'0'))+1;
-      Store.set('pt_fails', String(fails));
-      if(fails>=5){ Store.set('pt_lockout', String(Date.now()+30000)); Store.set('pt_fails','0'); pinError('Locked for 30s'); }
-      else pinError(`Wrong PIN · ${5-fails} left`);
-      return;
-    }
-    Store.set('pt_fails','0');
+    if(!(await verifyAgainstStoredPIN(entered))) return;
     unlockSuccess();
+  } else if(state.pinMode==='change-verify'){
+    if(!(await verifyAgainstStoredPIN(entered))) return;
+    initPINScreen('change-new');
+  } else if(state.pinMode==='change-new'){
+    pinTemp=entered; initPINScreen('change-confirm');
+  } else if(state.pinMode==='change-confirm'){
+    if(entered!==pinTemp){ pinError('PINs do not match'); state.pinMode='change-new'; return; }
+    Store.set('pt_pin', await Crypto.hashPIN(entered));
+    finishChangePIN();
   }
+}
+let pinChangeReturnScreen=null;
+// No explicit auto-lock pause needed here: the global click/touchstart
+// listeners that call resetAutoLock() already fire on every tap of the
+// numpad during this flow (same as everywhere else in the app), so the
+// idle timer keeps getting refreshed for free as long as the user is
+// actively entering digits.
+function startChangePIN(){
+  pinChangeReturnScreen=getCurrentScreen();
+  initPINScreen('change-verify');
+  showScreen('pin-screen');
+}
+function finishChangePIN(){
+  toast('PIN updated');
+  showScreen(pinChangeReturnScreen || 'settings-screen');
+  pinChangeReturnScreen=null;
+}
+function cancelChangePIN(){
+  state.pinBuffer=''; pinTemp='';
+  showScreen(pinChangeReturnScreen || 'settings-screen');
+  pinChangeReturnScreen=null;
 }
 let screenBeforeLock=null;
 async function unlockSuccess(){
@@ -2315,6 +2428,131 @@ async function confirmTagExpenses(){
   renderGroupsScreen();
 }
 
+/* ============================== EXPORT / IMPORT ============================== */
+// Vanilla base64 <-> ArrayBuffer, chunked to stay clear of the argument-count
+// limit String.fromCharCode.apply hits on very large files (no library, per
+// the "vanilla JS only" constraint — see Architecture decisions).
+function arrayBufferToBase64(buffer){
+  const bytes=new Uint8Array(buffer);
+  let binary='';
+  const chunkSize=0x8000;
+  for(let i=0;i<bytes.length;i+=chunkSize){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunkSize));
+  }
+  return btoa(binary);
+}
+function base64ToArrayBuffer(base64){
+  const binary=atob(base64);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+async function exportData(){
+  try{
+    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw] = await Promise.all([
+      DB.getAllCategories(), DB.getAllPaymentMethods(), DB.getAllGroups(),
+      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(),
+    ]);
+    const expenses=expensesRaw.filter(e => !pendingDeletes[e.id]);
+    // Attachments carry raw ArrayBuffer data, which JSON can't hold
+    // directly — base64-encoded here, decoded back on import.
+    const attachments=attachmentsRaw.map(a => ({
+      id:a.id, expenseId:a.expenseId, type:a.type, fileName:a.fileName, mimeType:a.mimeType,
+      dataBase64: arrayBufferToBase64(a.data),
+    }));
+    // PIN/lockout state lives in Store (localStorage), not IndexedDB, and is
+    // deliberately left out of the export — a backup is about expense data,
+    // not device security, and restoring an old PIN hash onto a different
+    // session would be confusing at best.
+    const payload={
+      app:'PaisaTrail', schemaVersion:1, exportedAt:new Date().toISOString(),
+      categories, paymentMethods, groups, expenses, attachments,
+    };
+    const blob=new Blob([JSON.stringify(payload)], {type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`paisatrail-backup-${todayISO()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast('Backup downloaded');
+  } catch(err){
+    toast('Export failed — please try again');
+  }
+}
+
+function readJSONFile(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{ try{ resolve(JSON.parse(reader.result)); } catch(err){ reject(err); } };
+    reader.onerror=reject;
+    reader.readAsText(file);
+  });
+}
+// Returns an error message string if the file isn't a usable backup, or
+// null if it's good to proceed to the confirm step.
+function validateImportPayload(data){
+  if(!data || typeof data!=='object') return "That file couldn't be read as a backup";
+  if(data.app!=='PaisaTrail') return "That doesn't look like a PaisaTrail backup";
+  if(!Array.isArray(data.categories) || !Array.isArray(data.paymentMethods) || !Array.isArray(data.expenses)) return "That doesn't look like a PaisaTrail backup";
+  if(data.categories.length===0) return 'This backup has no categories, so importing it would leave PaisaTrail unusable';
+  if(data.paymentMethods.length===0) return 'This backup has no payment methods, so importing it would leave PaisaTrail unusable';
+  return null;
+}
+let pendingImportPayload=null;
+async function handleImportFile(file){
+  let data;
+  try{ data=await readJSONFile(file); }
+  catch(err){ toast("That file couldn't be read as JSON"); return; }
+  const problem=validateImportPayload(data);
+  if(problem){ toast(problem); return; }
+  pendingImportPayload=data;
+  const expCount=(data.expenses||[]).length;
+  const dateLabel=data.exportedAt ? new Date(data.exportedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : 'an unknown date';
+  document.getElementById('import-confirm-sub').textContent =
+    `This backup has ${expCount} expense${expCount===1?'':'s'} from ${dateLabel}. Importing replaces everything currently in PaisaTrail — this can't be undone.`;
+  document.getElementById('import-confirm-overlay').classList.add('show');
+}
+function closeImportConfirm(){
+  document.getElementById('import-confirm-overlay').classList.remove('show');
+  pendingImportPayload=null;
+}
+async function confirmImport(){
+  const data=pendingImportPayload;
+  if(!data) return;
+  closeImportConfirm();
+  try{
+    const attachments=(data.attachments||[])
+      .filter(a => a && a.id && a.dataBase64)
+      .map(a => ({ id:a.id, expenseId:a.expenseId, type:a.type, fileName:a.fileName, mimeType:a.mimeType, data: base64ToArrayBuffer(a.dataBase64) }));
+    await DB.replaceAllData({
+      expenses: (data.expenses||[]).filter(e => e && e.id),
+      categories: (data.categories||[]).filter(c => c && c.id),
+      paymentMethods: (data.paymentMethods||[]).filter(p => p && p.id),
+      groups: (data.groups||[]).filter(g => g && g.id),
+      attachments,
+    });
+    // Reload every in-memory cache from what's actually on disk now,
+    // rather than trusting the file's arrays directly post-filtering.
+    state.categories=await DB.getAllCategories();
+    state.paymentMethods=await DB.getAllPaymentMethods();
+    state.groups=await DB.getAllGroups();
+    state.txnFilterCategoryIds=new Set();
+    state.txnFilterPaymentIds=new Set();
+    state.txnFilterStartISO=null; state.txnFilterEndISO=null;
+    state.insSelectedGroupId=null;
+    Object.values(pendingDeletes).forEach(entry => { if(entry && entry.timer) clearTimeout(entry.timer); });
+    Object.keys(pendingDeletes).forEach(k => delete pendingDeletes[k]); // stale undo timers from before the wipe no longer apply
+    await refreshAllExpenseViews();
+    toast('Import complete');
+  } catch(err){
+    toast('Import failed — the file may be corrupted');
+  }
+}
+
 /* ============================== INSIGHTS ============================== */
 function dateToISO(d){ const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); }
 function addDays(d, n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
@@ -2939,6 +3177,7 @@ async function saveExpense(){
 /* ============================== EVENT WIRING ============================== */
 document.querySelectorAll('#pin-screen .num-btn[data-n]').forEach(b => b.addEventListener('click', () => handlePINDigit(b.dataset.n)));
 document.getElementById('pin-del-btn').addEventListener('click', () => { state.pinBuffer=state.pinBuffer.slice(0,-1); updatePINDots(); });
+document.getElementById('pin-cancel-btn').addEventListener('click', cancelChangePIN);
 
 document.querySelectorAll('.fab-add').forEach(b => b.addEventListener('click', () => openAddScreen()));
 document.getElementById('add-close-btn').addEventListener('click', () => goToReturnScreen());
@@ -3032,6 +3271,25 @@ document.getElementById('home-warranties-list').addEventListener('click', (e) =>
   openEditFromId(row.dataset.id);
 });
 
+document.getElementById('settings-export-btn').addEventListener('click', exportData);
+document.getElementById('settings-import-btn').addEventListener('click', () => {
+  beginPickerSuppression();
+  document.getElementById('import-file-input').click();
+});
+document.getElementById('import-file-input').addEventListener('change', async (e) => {
+  endPickerSuppression();
+  const file=e.target.files[0]; e.target.value='';
+  if(!file) return;
+  await handleImportFile(file);
+});
+document.getElementById('import-file-input').addEventListener('cancel', endPickerSuppression);
+document.getElementById('import-confirm-cancel-btn').addEventListener('click', closeImportConfirm);
+document.getElementById('import-confirm-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='import-confirm-overlay') closeImportConfirm();
+});
+document.getElementById('import-confirm-btn').addEventListener('click', confirmImport);
+
+document.getElementById('settings-changepin-btn').addEventListener('click', startChangePIN);
 document.getElementById('settings-bulkdelete-btn').addEventListener('click', openBulkDeleteScreen);
 document.getElementById('bulkdelete-close-btn').addEventListener('click', () => showScreen('settings-screen'));
 document.getElementById('bulkdelete-mode-tabs').addEventListener('click', (e) => {
