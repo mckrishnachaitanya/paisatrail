@@ -109,6 +109,13 @@ input{outline:none;}
 .topbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
   padding:14px 20px 8px;}
 .topbar-title{font-family:var(--font-display);font-size:17px;font-weight:600;}
+/* Shared top-bar used on all four main screens — title on the left,
+   manual-lock button on the right. Home already had .home-header for this
+   flex layout; the other three screens now get the same treatment. */
+.screen-topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;}
+.topbar-lock-btn{width:36px;height:36px;border-radius:50%;background:var(--chip);
+  display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.topbar-lock-btn:active{transform:scale(.92);}
 .topbar-close{font-size:20px;color:var(--muted);width:32px;height:32px;display:flex;
   align-items:center;justify-content:center;}
 
@@ -410,6 +417,7 @@ input{outline:none;}
           <p class="greeting">Hey there 👋</p>
           <p class="month-label" id="home-month-label">—</p>
         </div>
+        <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
       </div>
 
       <div class="home-tabs" id="home-tabs">
@@ -543,7 +551,10 @@ input{outline:none;}
 <div class="screen is-hidden" id="transactions-screen">
   <div class="scroll">
     <div style="padding:0 20px 12px;">
-      <p class="topbar-title" style="margin:14px 0 12px;">Transactions</p>
+      <div class="screen-topbar">
+        <p class="topbar-title">Transactions</p>
+        <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
+      </div>
       <div class="search-bar">
         <span>🔍</span>
         <input id="txn-search" type="text" placeholder="Search expenses...">
@@ -604,7 +615,10 @@ input{outline:none;}
 <div class="screen is-hidden" id="stats-screen">
   <div class="scroll">
     <div style="padding:0 20px 12px;">
-      <p class="topbar-title" style="margin:14px 0 16px;">Insights</p>
+      <div class="screen-topbar">
+        <p class="topbar-title">Insights</p>
+        <button type="button" class="topbar-lock-btn" id="stats-lock-btn" title="Lock app">🔒</button>
+      </div>
 
       <div class="segmented-tabs" id="ins-period-type-tabs">
         <button type="button" class="segmented-tab" data-instype="week">Week</button>
@@ -661,7 +675,10 @@ input{outline:none;}
 <div class="screen is-hidden" id="settings-screen">
   <div class="scroll">
     <div style="padding:0 20px 12px;">
-      <p class="topbar-title" style="margin:14px 0 16px;">Settings</p>
+      <div class="screen-topbar">
+        <p class="topbar-title">Settings</p>
+        <button type="button" class="topbar-lock-btn" id="settings-lock-btn" title="Lock app">🔒</button>
+      </div>
       <p class="field-label" style="margin-top:0;">CUSTOMIZE</p>
       <button type="button" class="settings-row" id="settings-categories-btn" style="margin-bottom:8px;">
         <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">🏷️</span>
@@ -4251,6 +4268,12 @@ document.getElementById('import-confirm-overlay').addEventListener('click', (e) 
 document.getElementById('import-confirm-btn').addEventListener('click', confirmImport);
 
 document.getElementById('settings-changepin-btn').addEventListener('click', startChangePIN);
+
+// Manual lock buttons — one on each main screen's top-right corner.
+// Calls the same lockVault() the idle-auto-lock uses so behaviour is identical.
+['home-lock-btn','txn-lock-btn','stats-lock-btn','settings-lock-btn'].forEach(id => {
+  document.getElementById(id).addEventListener('click', lockVault);
+});
 document.getElementById('settings-biometric-row').addEventListener('click', async ()=>{
   if(isBioEnabled()){
     disableBiometric();

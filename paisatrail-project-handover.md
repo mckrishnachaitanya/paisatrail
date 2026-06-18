@@ -4,7 +4,7 @@ Personal expense tracker PWA. Re-paste this into Project knowledge at the start 
 
 ## 1. Project facts
 - Android-installable PWA, hosted on GitHub Pages. Vanilla HTML/CSS/JS only — no framework, no bundler, no build step, no external libraries. INR only.
-- **Status: V1 fully shipped. V2 in progress — Recurring Expenses, both quick wins (amount-range filter, warranty-expiry banner), Cash-Flow Forecasting, and Budgets all shipped and confirmed working on a real Android device, including the 4-tab Home bar (looks fine, no crowding). Biometric Unlock also shipped this session — not yet device-tested.** Real-device testing happens in separate conversations as Krishna uses the app day-to-day; treat it as an ongoing parallel process, not a gate before building more.
+- **Status: V1 fully shipped. V2 in progress — Recurring Expenses, both quick wins (amount-range filter, warranty-expiry banner), Cash-Flow Forecasting, Budgets, and Biometric Unlock all shipped and confirmed working on a real Android device, including the 4-tab Home bar (looks fine, no crowding).** Real-device testing happens in separate conversations as Krishna uses the app day-to-day; treat it as an ongoing parallel process, not a gate before building more.
 
 ## 2. What's built
 - **PIN:** setup/unlock, 5-fail lockout (30s), 2-min idle auto-lock, screen-restore on unlock, in-app Change PIN (reuses the unlock state machine — see §4).
@@ -73,6 +73,6 @@ Palette: paper `#FFFCF7` · ink `#241F3D` · sunshine `#FFC23C` · coral `#FF6B5
 Single repo root, no wrapper folder: `index.html` (entire app), `manifest.json`, `sw.js`, `icons/icon.svg` (placeholder).
 
 ## 8. Next up
-1. Real-device Android testing — standing checklist, not a blocker. Recurring Expenses, the amount-range filter, the warranty-soon banner, Cash-Flow Forecasting, and Budgets (including the 4-tab Home bar) are all confirmed working.
+1. Real-device Android testing — standing checklist, not a blocker. Recurring Expenses, the amount-range filter, the warranty-soon banner, Cash-Flow Forecasting, Budgets (including the 4-tab Home bar), and Biometric Unlock are all confirmed working per Krishna's initial round of testing.
 2. **V2 build order:** (1) quick wins ✅ shipped, (2) cash-flow forecasting ✅ shipped, (3) budgets ✅ shipped, (4) dark mode — **dropped, Krishna isn't a fan; not getting built.** (5) biometric unlock ✅ shipped (replaced the originally-planned step-up concept; see §2). Only the polished app icon (pure asset task) remains, available whenever Krishna wants it, no urgency.
 3. Consolidate the two segmented-control implementations if either ever needs a style change.
