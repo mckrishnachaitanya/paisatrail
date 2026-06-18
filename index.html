@@ -146,6 +146,13 @@ input{outline:none;}
 .warranty-soon-banner-icon{font-size:18px;flex-shrink:0;}
 .warranty-soon-banner-text{flex:1;font-size:13px;font-weight:700;color:var(--ink);}
 .warranty-soon-banner-chevron{font-size:18px;color:var(--muted);flex-shrink:0;}
+.budget-card{background:var(--surface);border-radius:18px;padding:14px;margin-bottom:10px;cursor:pointer;}
+.budget-card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.budget-card-icon{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.budget-card-name{flex:1;font-size:13px;font-weight:700;}
+.budget-card-amounts{font-family:var(--font-mono);font-size:11px;color:var(--muted);flex-shrink:0;}
+.budget-progress-track{height:8px;border-radius:6px;background:var(--chip);overflow:hidden;}
+.budget-progress-fill{height:100%;border-radius:6px;transition:width .3s;}
 
 .recent-row{display:flex;align-items:center;gap:11px;padding:10px;border-radius:18px;
   background:var(--surface);margin-bottom:8px;position:relative;z-index:1;
@@ -400,6 +407,7 @@ input{outline:none;}
         <button type="button" class="home-tab active" data-hometab="overview">Overview</button>
         <button type="button" class="home-tab" data-hometab="warranties">Warranties</button>
         <button type="button" class="home-tab" data-hometab="forecast">Forecast</button>
+        <button type="button" class="home-tab" data-hometab="budgets">Budgets</button>
       </div>
 
       <div id="home-panel-overview">
@@ -447,6 +455,11 @@ input{outline:none;}
           <p class="section-title">Upcoming recurring</p>
         </div>
         <div id="forecast-upcoming-list"></div>
+      </div>
+
+      <div id="home-panel-budgets" class="hidden">
+        <div id="budgets-list"></div>
+        <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="budgets-add-btn">+ Add budget</button>
       </div>
     </div>
   </div>
@@ -966,7 +979,27 @@ input{outline:none;}
   </div>
 </div>
 
-<!-- ============================== MANAGE DELETE CONFIRM (shared by Categories, Payment methods, Groups & Recurring) ============================== -->
+<!-- ============================== BUDGET EDIT SHEET ============================== -->
+<div id="budget-edit-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title" id="budget-edit-title">Add budget</p>
+      <button type="button" class="topbar-close" id="budget-edit-close-btn">✕</button>
+    </div>
+    <div id="budget-edit-new-only">
+      <p class="field-label" style="margin-top:14px;">BUDGET FOR</p>
+      <div class="cat-grid" id="budget-edit-target-grid"></div>
+    </div>
+    <p class="empty-hint hidden" id="budget-edit-target-readonly" style="text-align:left;padding:10px 0 0;"></p>
+    <p class="field-label">MONTHLY LIMIT</p>
+    <input type="number" inputmode="decimal" class="sheet-input" id="budget-edit-limit" placeholder="0" min="0" step="0.01">
+    <button type="button" class="save-btn" id="budget-edit-save-btn" style="margin-top:18px;">Save budget</button>
+    <button type="button" class="text-danger-btn hidden" id="budget-edit-delete-btn">Delete</button>
+  </div>
+</div>
+
+<!-- ============================== MANAGE DELETE CONFIRM (shared by Categories, Payment methods, Groups, Recurring & Budgets) ============================== -->
 <div id="manage-confirm-overlay" class="confirm-overlay">
   <div class="confirm-sheet">
     <div class="confirm-sheet-icon">🗑️</div>
@@ -1058,7 +1091,7 @@ const Crypto = {
 };
 
 /* ============================== DATA LAYER (IndexedDB) ============================== */
-const DB_NAME='PaisaTrailDB', DB_VERSION=3;
+const DB_NAME='PaisaTrailDB', DB_VERSION=4;
 let _dbInstance=null;
 
 function openDB(){
@@ -1078,6 +1111,7 @@ function openDB(){
       if(!db.objectStoreNames.contains('attachments')) db.createObjectStore('attachments',{keyPath:'id'});
       if(!db.objectStoreNames.contains('groups')) db.createObjectStore('groups',{keyPath:'id'});
       if(!db.objectStoreNames.contains('recurring')) db.createObjectStore('recurring',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('budgets')) db.createObjectStore('budgets',{keyPath:'id'});
     };
     req.onsuccess=(e)=>{ _dbInstance=e.target.result; resolve(_dbInstance); };
     req.onerror=(e)=>reject(e.target.error);
@@ -1222,6 +1256,26 @@ const DB = {
     tx.objectStore('recurring').delete(id);
     await txDone(tx);
   },
+  async getAllBudgets(){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('budgets','readonly').objectStore('budgets').getAll();
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
+  async putBudget(budget){
+    const db=await openDB();
+    const tx=db.transaction('budgets','readwrite');
+    tx.objectStore('budgets').put(budget);
+    await txDone(tx);
+  },
+  async deleteBudget(id){
+    const db=await openDB();
+    const tx=db.transaction('budgets','readwrite');
+    tx.objectStore('budgets').delete(id);
+    await txDone(tx);
+  },
   async saveAttachment(att){
     const db=await openDB();
     const tx=db.transaction('attachments','readwrite');
@@ -1253,9 +1307,9 @@ const DB = {
   // Used only by Import — wipes and rewrites every store in one
   // transaction, so a failure partway rolls everything back instead of
   // leaving a half-imported mix of old and new data.
-  async replaceAllData({expenses, categories, paymentMethods, groups, attachments, recurring}){
+  async replaceAllData({expenses, categories, paymentMethods, groups, attachments, recurring, budgets}){
     const db=await openDB();
-    const tx=db.transaction(['expenses','categories','paymentMethods','groups','attachments','recurring'],'readwrite');
+    const tx=db.transaction(['expenses','categories','paymentMethods','groups','attachments','recurring','budgets'],'readwrite');
     const stores={
       expenses: tx.objectStore('expenses'),
       categories: tx.objectStore('categories'),
@@ -1263,6 +1317,7 @@ const DB = {
       groups: tx.objectStore('groups'),
       attachments: tx.objectStore('attachments'),
       recurring: tx.objectStore('recurring'),
+      budgets: tx.objectStore('budgets'),
     };
     Object.values(stores).forEach(s => s.clear());
     (categories||[]).forEach(c => stores.categories.put(c));
@@ -1271,6 +1326,7 @@ const DB = {
     (expenses||[]).forEach(e => stores.expenses.put(e));
     (attachments||[]).forEach(a => stores.attachments.put(a));
     (recurring||[]).forEach(r => stores.recurring.put(r));
+    (budgets||[]).forEach(b => stores.budgets.put(b));
     await txDone(tx);
   },
   async seedDefaults(){
@@ -1365,6 +1421,8 @@ const state = {
   mgrRecurringCategoryId:null,    // selected category while adding/editing a recurring rule
   mgrRecurringPaymentId:null,     // selected payment method while adding/editing a recurring rule
   mgrRecurringFrequency:'monthly',// selected frequency — only editable when adding a new rule, read-only display once created
+  budgets:[],                     // in-memory cache of all budgets, mirrors state.recurringRules
+  mgrBudgetCategoryId:null,       // categoryId selected while adding a new budget (null = the special "Overall" target); locked/unused once editing an existing budget
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
@@ -1570,6 +1628,7 @@ async function unlockSuccess(){
   state.paymentMethods=await DB.getAllPaymentMethods();
   state.groups=await DB.getAllGroups();
   state.recurringRules=await DB.getAllRecurring();
+  state.budgets=await DB.getAllBudgets();
   await runRecurringCatchUpAll(); // before navigating, so the screen about to render already reflects anything just generated
   const target = screenBeforeLock || 'home-screen';
   showScreen(target);
@@ -1747,6 +1806,7 @@ function applyHomeTabUI(){
   document.getElementById('home-panel-overview').classList.toggle('hidden', state.homeTab!=='overview');
   document.getElementById('home-panel-warranties').classList.toggle('hidden', state.homeTab!=='warranties');
   document.getElementById('home-panel-forecast').classList.toggle('hidden', state.homeTab!=='forecast');
+  document.getElementById('home-panel-budgets').classList.toggle('hidden', state.homeTab!=='budgets');
   document.querySelectorAll('#home-tabs .home-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.hometab===state.homeTab);
   });
@@ -1755,7 +1815,7 @@ function setHomeTab(tab){
   state.homeTab=tab;
   applyHomeTabUI();
 }
-// All three panels refresh on every call regardless of which tab is active, so
+// All four panels refresh on every call regardless of which tab is active, so
 // switching tabs never shows stale data, and locking mid-tab or returning
 // from Add/Edit "just works" since state.homeTab persists on its own —
 // nothing else needs to remember or restore it separately.
@@ -1763,6 +1823,7 @@ async function renderHome(){
   await renderHomeOverviewPanel();
   await renderHomeWarrantiesPanel();
   await renderHomeForecastPanel();
+  await renderHomeBudgetsPanel();
   applyHomeTabUI();
 }
 
@@ -2249,15 +2310,22 @@ function requestDeletePaymentMethod(){
 // only one overlay is ever stacked at a time.
 async function openManageDeleteConfirm(type, id, name){
   state.mgrPendingDelete={type, id};
-  let count, label;
-  if(type==='category'){ count=await DB.countExpensesByCategory(id); label='category'; }
-  else if(type==='paymentMethod'){ count=await DB.countExpensesByPaymentMethod(id); label='payment method'; }
-  else if(type==='recurring'){ count=(await getExpensesByRecurringId(id)).length; label='recurring expense'; }
-  else { count=(await getExpensesByGroupId(id)).length; label='group'; }
   document.getElementById('manage-confirm-title').textContent = `Delete "${name}"?`;
-  document.getElementById('manage-confirm-sub').textContent = count>0
-    ? `${count} expense${count===1?'':'s'} ${count===1?'uses':'use'} this ${label} — they won't be deleted, just unlinked from it.`
-    : `No expenses use this ${label} yet.`;
+  if(type==='budget'){
+    // Budgets aren't referenced BY expenses the way categories/payment
+    // methods/groups/recurring rules are, so the usual "N expenses use
+    // this" framing doesn't apply — just a plain, honest confirmation.
+    document.getElementById('manage-confirm-sub').textContent = 'This removes the budget. Your expenses are not affected.';
+  } else {
+    let count, label;
+    if(type==='category'){ count=await DB.countExpensesByCategory(id); label='category'; }
+    else if(type==='paymentMethod'){ count=await DB.countExpensesByPaymentMethod(id); label='payment method'; }
+    else if(type==='recurring'){ count=(await getExpensesByRecurringId(id)).length; label='recurring expense'; }
+    else { count=(await getExpensesByGroupId(id)).length; label='group'; }
+    document.getElementById('manage-confirm-sub').textContent = count>0
+      ? `${count} expense${count===1?'':'s'} ${count===1?'uses':'use'} this ${label} — they won't be deleted, just unlinked from it.`
+      : `No expenses use this ${label} yet.`;
+  }
   document.getElementById('manage-confirm-overlay').classList.add('show');
 }
 function closeManageDeleteConfirm(){
@@ -2272,6 +2340,11 @@ async function confirmManageDelete(){
     await DB.deleteCategory(pending.id);
     state.categories=state.categories.filter(c=>c.id!==pending.id);
     state.txnFilterCategoryIds.delete(pending.id); // keep the Transactions filter consistent if it was filtering on this
+    // A budget set on a now-deleted category can't be acted on anymore —
+    // same "drop dependents that would otherwise become meaningless" logic
+    // already used for Transactions filters above.
+    const orphanBudget=state.budgets.find(b=>b.categoryId===pending.id);
+    if(orphanBudget){ await DB.deleteBudget(orphanBudget.id); state.budgets=state.budgets.filter(b=>b.id!==orphanBudget.id); }
     renderCategoriesScreen();
     toast('Category deleted');
   } else if(pending.type==='paymentMethod'){
@@ -2285,6 +2358,11 @@ async function confirmManageDelete(){
     state.recurringRules=state.recurringRules.filter(r=>r.id!==pending.id);
     renderRecurringScreen();
     toast('Recurring expense deleted');
+  } else if(pending.type==='budget'){
+    await DB.deleteBudget(pending.id);
+    state.budgets=state.budgets.filter(b=>b.id!==pending.id);
+    await renderHomeBudgetsPanel();
+    toast('Budget deleted');
   } else {
     await DB.deleteGroup(pending.id);
     state.groups=state.groups.filter(g=>g.id!==pending.id);
@@ -2619,9 +2697,9 @@ function base64ToArrayBuffer(base64){
 
 async function exportData(){
   try{
-    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw, recurring] = await Promise.all([
+    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw, recurring, budgets] = await Promise.all([
       DB.getAllCategories(), DB.getAllPaymentMethods(), DB.getAllGroups(),
-      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(),
+      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(), DB.getAllBudgets(),
     ]);
     const expenses=expensesRaw.filter(e => !pendingDeletes[e.id]);
     // Attachments carry raw ArrayBuffer data, which JSON can't hold
@@ -2635,8 +2713,8 @@ async function exportData(){
     // not device security, and restoring an old PIN hash onto a different
     // session would be confusing at best.
     const payload={
-      app:'PaisaTrail', schemaVersion:2, exportedAt:new Date().toISOString(),
-      categories, paymentMethods, groups, expenses, attachments, recurring,
+      app:'PaisaTrail', schemaVersion:3, exportedAt:new Date().toISOString(),
+      categories, paymentMethods, groups, expenses, attachments, recurring, budgets,
     };
     const blob=new Blob([JSON.stringify(payload)], {type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -2681,10 +2759,12 @@ async function handleImportFile(file){
   pendingImportPayload=data;
   const expCount=(data.expenses||[]).length;
   const recCount=(data.recurring||[]).length;
+  const budCount=(data.budgets||[]).length;
   const dateLabel=data.exportedAt ? new Date(data.exportedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : 'an unknown date';
   const recPhrase = recCount>0 ? ` and ${recCount} recurring rule${recCount===1?'':'s'}` : '';
+  const budPhrase = budCount>0 ? ` and ${budCount} budget${budCount===1?'':'s'}` : '';
   document.getElementById('import-confirm-sub').textContent =
-    `This backup has ${expCount} expense${expCount===1?'':'s'}${recPhrase} from ${dateLabel}. Importing replaces everything currently in PaisaTrail — this can't be undone.`;
+    `This backup has ${expCount} expense${expCount===1?'':'s'}${recPhrase}${budPhrase} from ${dateLabel}. Importing replaces everything currently in PaisaTrail — this can't be undone.`;
   document.getElementById('import-confirm-overlay').classList.add('show');
 }
 function closeImportConfirm(){
@@ -2706,6 +2786,7 @@ async function confirmImport(){
       groups: (data.groups||[]).filter(g => g && g.id),
       attachments,
       recurring: (data.recurring||[]).filter(r => r && r.id),
+      budgets: (data.budgets||[]).filter(b => b && b.id),
     });
     // Reload every in-memory cache from what's actually on disk now,
     // rather than trusting the file's arrays directly post-filtering.
@@ -2713,6 +2794,7 @@ async function confirmImport(){
     state.paymentMethods=await DB.getAllPaymentMethods();
     state.groups=await DB.getAllGroups();
     state.recurringRules=await DB.getAllRecurring();
+    state.budgets=await DB.getAllBudgets();
     state.txnFilterCategoryIds=new Set();
     state.txnFilterPaymentIds=new Set();
     state.txnFilterStartISO=null; state.txnFilterEndISO=null;
@@ -3119,6 +3201,144 @@ async function renderHomeForecastPanel(){
         </div>`);
     });
   }
+}
+
+/* ============================== BUDGETS ============================== */
+async function getMonthToDateExpenses(){
+  const now=new Date();
+  const monthStartISO=dateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
+  const today=todayISO();
+  return (await DB.getExpensesByDateRange(monthStartISO, today)).filter(e => !pendingDeletes[e.id]);
+}
+// Unlike Forecast's "estimated other spending," budgets intentionally
+// include recurring-generated expenses in the spent total — a recurring
+// Rent charge in the Housing category is real money spent in Housing,
+// regardless of how the expense was created. There's no double-counting
+// risk here the way there was in the forecast engine.
+function budgetSpentAmount(budget, monthExpenses){
+  if(!budget.categoryId) return monthExpenses.reduce((s,e)=>s+Number(e.amount),0); // Overall
+  return monthExpenses.filter(e=>e.categoryId===budget.categoryId).reduce((s,e)=>s+Number(e.amount),0);
+}
+// Targets you can still set a NEW budget for — every category without one
+// already, plus the special "Overall" target if it isn't taken. Used both
+// to populate the add-sheet's picker and to decide whether "+ Add budget"
+// should even be shown.
+function getAvailableBudgetTargets(){
+  const usedCategoryIds=new Set(state.budgets.filter(b=>b.categoryId).map(b=>b.categoryId));
+  const hasOverall=state.budgets.some(b=>!b.categoryId);
+  const targets=[];
+  if(!hasOverall) targets.push({id:null, name:'Overall', icon:'💰', color:'#8657E0'});
+  state.categories.forEach(cat=>{ if(!usedCategoryIds.has(cat.id)) targets.push({id:cat.id, name:cat.name, icon:cat.icon, color:cat.color}); });
+  return targets;
+}
+function budgetDisplayInfo(budget){
+  const isOverall=!budget.categoryId;
+  const cat=isOverall ? null : state.categories.find(c=>c.id===budget.categoryId);
+  return {
+    isOverall,
+    icon: isOverall ? '💰' : (cat ? cat.icon : '❔'),
+    color: isOverall ? '#8657E0' : (cat ? cat.color : '#9088A8'),
+    name: isOverall ? 'Overall' : (cat ? cat.name : 'Deleted category'),
+  };
+}
+function updateBudgetsAddBtn(){
+  document.getElementById('budgets-add-btn').classList.toggle('hidden', getAvailableBudgetTargets().length===0);
+}
+async function renderHomeBudgetsPanel(){
+  const list=document.getElementById('budgets-list'); list.innerHTML='';
+  updateBudgetsAddBtn();
+  if(state.budgets.length===0){
+    list.innerHTML='<p class="empty-hint">No budgets set yet — tap below to set a monthly limit for a category, or an overall total.</p>';
+    return;
+  }
+  const monthExpenses=await getMonthToDateExpenses();
+  const rows=state.budgets.map(b=>{
+    const spent=budgetSpentAmount(b, monthExpenses);
+    const pct=b.monthlyLimit>0 ? spent/b.monthlyLimit : 0;
+    return { budget:b, spent, pct, info:budgetDisplayInfo(b) };
+  });
+  // The overall budget is always pinned first regardless of its own
+  // percentage; the rest are sorted by how close each is to its limit, so
+  // anything closest to (or past) 100% surfaces at the top.
+  const overallRow=rows.find(r=>r.info.isOverall);
+  const catRows=rows.filter(r=>!r.info.isOverall).sort((a,b)=>b.pct-a.pct);
+  const ordered=overallRow ? [overallRow, ...catRows] : catRows;
+
+  ordered.forEach(r=>{
+    const pctDisplay=Math.round(r.pct*100);
+    const barColor = r.pct>=1 ? 'var(--coral)' : r.pct>=0.8 ? 'var(--sunshine)' : 'var(--mint)';
+    const widthPct=Math.min(100, pctDisplay);
+    list.insertAdjacentHTML('beforeend', `
+      <div class="budget-card" data-budgetid="${r.budget.id}">
+        <div class="budget-card-head">
+          <span class="budget-card-icon" style="background:${r.info.color}22;">${r.info.icon}</span>
+          <span class="budget-card-name">${esc(r.info.name)}</span>
+          <span class="budget-card-amounts">${formatINR(r.spent)} / ${formatINR(r.budget.monthlyLimit)}</span>
+        </div>
+        <div class="budget-progress-track"><div class="budget-progress-fill" style="width:${widthPct}%;background:${barColor};"></div></div>
+      </div>`);
+  });
+}
+function renderBudgetEditTargetGrid(){
+  const grid=document.getElementById('budget-edit-target-grid'); grid.innerHTML='';
+  const targets=getAvailableBudgetTargets();
+  grid.innerHTML=targets.map(t=>{
+    const selected=state.mgrBudgetCategoryId===t.id;
+    const bg = selected ? t.color+'26' : 'var(--surface)';
+    const border = selected ? t.color : 'transparent';
+    return `<button type="button" class="cat-chip" data-budgettarget="${t.id===null?'overall':t.id}" style="background:${bg};border-color:${border}">
+      <span class="cat-emoji">${t.icon}</span><span class="cat-name">${esc(t.name)}</span>
+    </button>`;
+  }).join('');
+}
+function openBudgetEdit(id){
+  state.mgrEditingType='budget';
+  state.mgrEditingId=id;
+  const existing=id ? state.budgets.find(b=>b.id===id) : null;
+  document.getElementById('budget-edit-title').textContent = existing ? 'Edit budget' : 'Add budget';
+  document.getElementById('budget-edit-limit').value = existing ? existing.monthlyLimit : '';
+  document.getElementById('budget-edit-new-only').classList.toggle('hidden', !!existing);
+  const readonly=document.getElementById('budget-edit-target-readonly');
+  readonly.classList.toggle('hidden', !existing);
+  if(existing){
+    const info=budgetDisplayInfo(existing);
+    readonly.textContent=`Budget for: ${info.icon} ${info.name}`;
+  } else {
+    const targets=getAvailableBudgetTargets();
+    state.mgrBudgetCategoryId = targets.length ? targets[0].id : null;
+    renderBudgetEditTargetGrid();
+  }
+  document.getElementById('budget-edit-delete-btn').classList.toggle('hidden', !existing);
+  document.getElementById('budget-edit-overlay').classList.add('show');
+}
+function closeBudgetEdit(){
+  document.getElementById('budget-edit-overlay').classList.remove('show');
+}
+async function saveBudgetEdit(){
+  const limit=parseFloat(document.getElementById('budget-edit-limit').value);
+  if(!limit || limit<=0){ toast('Enter a valid monthly limit'); return; }
+  const existing=state.mgrEditingId ? state.budgets.find(b=>b.id===state.mgrEditingId) : null;
+  if(existing){
+    existing.monthlyLimit=limit;
+    await DB.putBudget(existing);
+    closeBudgetEdit();
+    toast('Budget updated');
+  } else {
+    const budget={ id:genId(), categoryId:state.mgrBudgetCategoryId, monthlyLimit:limit, createdAt:Date.now() };
+    await DB.putBudget(budget);
+    state.budgets.push(budget);
+    closeBudgetEdit();
+    toast('Budget added');
+  }
+  await renderHomeBudgetsPanel();
+}
+function requestDeleteBudget(){
+  const id=state.mgrEditingId;
+  const budget=state.budgets.find(b=>b.id===id);
+  if(!budget) return;
+  const info=budgetDisplayInfo(budget);
+  closeBudgetEdit();
+  openManageDeleteConfirm('budget', id, info.name);
 }
 
 /* ============================== INSIGHTS ============================== */
@@ -3875,6 +4095,22 @@ document.getElementById('forecast-window-tabs').addEventListener('click', (e) =>
 document.getElementById('forecast-lookback-row').addEventListener('click', (e) => {
   const btn=e.target.closest('[data-lookback]'); if(!btn) return;
   setForecastLookback(Number(btn.dataset.lookback));
+});
+document.getElementById('budgets-add-btn').addEventListener('click', () => openBudgetEdit(null));
+document.getElementById('budgets-list').addEventListener('click', (e) => {
+  const row=e.target.closest('[data-budgetid]'); if(!row) return;
+  openBudgetEdit(row.dataset.budgetid);
+});
+document.getElementById('budget-edit-close-btn').addEventListener('click', closeBudgetEdit);
+document.getElementById('budget-edit-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='budget-edit-overlay') closeBudgetEdit();
+});
+document.getElementById('budget-edit-save-btn').addEventListener('click', saveBudgetEdit);
+document.getElementById('budget-edit-delete-btn').addEventListener('click', requestDeleteBudget);
+document.getElementById('budget-edit-target-grid').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-budgettarget]'); if(!btn) return;
+  state.mgrBudgetCategoryId = btn.dataset.budgettarget==='overall' ? null : btn.dataset.budgettarget;
+  renderBudgetEditTargetGrid();
 });
 document.getElementById('home-warranties-list').addEventListener('click', (e) => {
   const row=e.target.closest('.recent-row'); if(!row) return;
