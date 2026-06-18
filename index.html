@@ -1253,15 +1253,16 @@ const DB = {
   // Used only by Import — wipes and rewrites every store in one
   // transaction, so a failure partway rolls everything back instead of
   // leaving a half-imported mix of old and new data.
-  async replaceAllData({expenses, categories, paymentMethods, groups, attachments}){
+  async replaceAllData({expenses, categories, paymentMethods, groups, attachments, recurring}){
     const db=await openDB();
-    const tx=db.transaction(['expenses','categories','paymentMethods','groups','attachments'],'readwrite');
+    const tx=db.transaction(['expenses','categories','paymentMethods','groups','attachments','recurring'],'readwrite');
     const stores={
       expenses: tx.objectStore('expenses'),
       categories: tx.objectStore('categories'),
       paymentMethods: tx.objectStore('paymentMethods'),
       groups: tx.objectStore('groups'),
       attachments: tx.objectStore('attachments'),
+      recurring: tx.objectStore('recurring'),
     };
     Object.values(stores).forEach(s => s.clear());
     (categories||[]).forEach(c => stores.categories.put(c));
@@ -1269,6 +1270,7 @@ const DB = {
     (groups||[]).forEach(g => stores.groups.put(g));
     (expenses||[]).forEach(e => stores.expenses.put(e));
     (attachments||[]).forEach(a => stores.attachments.put(a));
+    (recurring||[]).forEach(r => stores.recurring.put(r));
     await txDone(tx);
   },
   async seedDefaults(){
@@ -2617,9 +2619,9 @@ function base64ToArrayBuffer(base64){
 
 async function exportData(){
   try{
-    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw] = await Promise.all([
+    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw, recurring] = await Promise.all([
       DB.getAllCategories(), DB.getAllPaymentMethods(), DB.getAllGroups(),
-      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(),
+      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(),
     ]);
     const expenses=expensesRaw.filter(e => !pendingDeletes[e.id]);
     // Attachments carry raw ArrayBuffer data, which JSON can't hold
@@ -2633,8 +2635,8 @@ async function exportData(){
     // not device security, and restoring an old PIN hash onto a different
     // session would be confusing at best.
     const payload={
-      app:'PaisaTrail', schemaVersion:1, exportedAt:new Date().toISOString(),
-      categories, paymentMethods, groups, expenses, attachments,
+      app:'PaisaTrail', schemaVersion:2, exportedAt:new Date().toISOString(),
+      categories, paymentMethods, groups, expenses, attachments, recurring,
     };
     const blob=new Blob([JSON.stringify(payload)], {type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -2678,9 +2680,11 @@ async function handleImportFile(file){
   if(problem){ toast(problem); return; }
   pendingImportPayload=data;
   const expCount=(data.expenses||[]).length;
+  const recCount=(data.recurring||[]).length;
   const dateLabel=data.exportedAt ? new Date(data.exportedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : 'an unknown date';
+  const recPhrase = recCount>0 ? ` and ${recCount} recurring rule${recCount===1?'':'s'}` : '';
   document.getElementById('import-confirm-sub').textContent =
-    `This backup has ${expCount} expense${expCount===1?'':'s'} from ${dateLabel}. Importing replaces everything currently in PaisaTrail — this can't be undone.`;
+    `This backup has ${expCount} expense${expCount===1?'':'s'}${recPhrase} from ${dateLabel}. Importing replaces everything currently in PaisaTrail — this can't be undone.`;
   document.getElementById('import-confirm-overlay').classList.add('show');
 }
 function closeImportConfirm(){
@@ -2701,12 +2705,14 @@ async function confirmImport(){
       paymentMethods: (data.paymentMethods||[]).filter(p => p && p.id),
       groups: (data.groups||[]).filter(g => g && g.id),
       attachments,
+      recurring: (data.recurring||[]).filter(r => r && r.id),
     });
     // Reload every in-memory cache from what's actually on disk now,
     // rather than trusting the file's arrays directly post-filtering.
     state.categories=await DB.getAllCategories();
     state.paymentMethods=await DB.getAllPaymentMethods();
     state.groups=await DB.getAllGroups();
+    state.recurringRules=await DB.getAllRecurring();
     state.txnFilterCategoryIds=new Set();
     state.txnFilterPaymentIds=new Set();
     state.txnFilterStartISO=null; state.txnFilterEndISO=null;
@@ -3030,11 +3036,20 @@ function projectRecurringTotal(windowEndISO){
 // confident-looking ₹0 that would just be wrong.
 const FORECAST_ROLLING_WINDOW_DAYS=30; // length of the "Next 30 days" forward view itself — not user-configurable, it's what defines that option
 const FORECAST_LOOKBACK_OPTIONS=[30,90,180]; // user-configurable: how far back to average for the "estimated other" figure
+// A single large one-off purchase shouldn't get treated with the same
+// confidence as real spending history — without a minimum sample, one
+// ₹25,000 gadget bought today would get projected forward as if it were a
+// recurring daily habit. Requiring both a minimum count AND a minimum
+// spread of distinct days catches the common case of "a few expenses
+// logged on the same day" too, not just a single isolated purchase.
+const FORECAST_MIN_EXPENSE_COUNT=5;
+const FORECAST_MIN_DISTINCT_DAYS=7;
 async function estimateDailyOtherSpend(lookbackDays){
   const today=todayISO();
   const lookbackStartISO=dateToISO(addDays(new Date(today+'T00:00:00'), -lookbackDays));
   const expenses=(await DB.getExpensesByDateRange(lookbackStartISO, today)).filter(e => !pendingDeletes[e.id] && !e.recurringId);
-  if(expenses.length===0) return null;
+  const distinctDays=new Set(expenses.map(e=>e.date)).size;
+  if(expenses.length<FORECAST_MIN_EXPENSE_COUNT || distinctDays<FORECAST_MIN_DISTINCT_DAYS) return null;
   const total=expenses.reduce((s,e)=>s+Number(e.amount),0);
   return total/lookbackDays;
 }
