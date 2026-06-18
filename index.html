@@ -141,6 +141,11 @@ input{outline:none;}
   border-radius:20px;white-space:nowrap;flex-shrink:0;}
 .warranty-status.active{background:rgba(46,196,182,.16);color:var(--mint);}
 .warranty-status.expired{background:rgba(255,107,91,.16);color:var(--coral);}
+.warranty-soon-banner{display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:16px;
+  background:rgba(255,194,60,.18);margin-bottom:14px;cursor:pointer;}
+.warranty-soon-banner-icon{font-size:18px;flex-shrink:0;}
+.warranty-soon-banner-text{flex:1;font-size:13px;font-weight:700;color:var(--ink);}
+.warranty-soon-banner-chevron{font-size:18px;color:var(--muted);flex-shrink:0;}
 
 .recent-row{display:flex;align-items:center;gap:11px;padding:10px;border-radius:18px;
   background:var(--surface);margin-bottom:8px;position:relative;z-index:1;
@@ -397,6 +402,7 @@ input{outline:none;}
       </div>
 
       <div id="home-panel-overview">
+        <div id="home-warranty-banner" class="warranty-soon-banner hidden"></div>
         <div class="spend-card">
           <p class="spend-label">Spent this month</p>
           <p class="spend-amount" id="home-total">₹0</p>
@@ -479,6 +485,9 @@ input{outline:none;}
       <p class="field-label">GROUP</p>
       <div id="add-group-area"></div>
 
+      <p class="field-label">RECURRING</p>
+      <div id="add-recurring-area"></div>
+
       <p class="field-label">ATTACHMENTS</p>
       <div id="add-attachment-area"></div>
     </div>
@@ -532,6 +541,17 @@ input{outline:none;}
       <div>
         <p class="field-label" style="margin:0 0 4px;">TO</p>
         <input type="date" class="date-input" id="txn-filter-end">
+      </div>
+    </div>
+    <p class="field-label">AMOUNT RANGE</p>
+    <div class="ins-custom-range" style="margin-top:0;">
+      <div>
+        <p class="field-label" style="margin:0 0 4px;">MIN</p>
+        <input type="number" inputmode="decimal" class="sheet-input" id="txn-filter-min-amount" placeholder="0" min="0" step="0.01">
+      </div>
+      <div>
+        <p class="field-label" style="margin:0 0 4px;">MAX</p>
+        <input type="number" inputmode="decimal" class="sheet-input" id="txn-filter-max-amount" placeholder="Any" min="0" step="0.01">
       </div>
     </div>
     <button type="button" class="save-btn" id="txn-filter-show-btn" style="margin-top:18px;">Show expenses</button>
@@ -623,6 +643,14 @@ input{outline:none;}
         <div class="settings-row-info">
           <p class="settings-row-title">Manage groups</p>
           <span class="settings-row-sub">Rename, merge, or tag past expenses to a group</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>
+      <button type="button" class="settings-row" id="settings-recurring-btn">
+        <span class="settings-row-icon" style="background:rgba(255,143,179,.14);">🔁</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Recurring expenses</p>
+          <span class="settings-row-sub">Rent, subscriptions, EMIs — logged automatically</span>
         </div>
         <span class="settings-row-chevron">›</span>
       </button>
@@ -792,6 +820,20 @@ input{outline:none;}
   </div>
 </div>
 
+<!-- ============================== RECURRING EXPENSES ============================== -->
+<div class="screen is-hidden" id="recurring-screen">
+  <div class="topbar">
+    <p class="topbar-title">Recurring expenses</p>
+    <button class="topbar-close" id="recurring-close-btn">✕</button>
+  </div>
+  <div class="scroll">
+    <div style="padding:0 20px 28px;">
+      <div id="recurring-list"></div>
+      <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="recurring-screen-add-btn">+ Add recurring expense</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============================== BULK DELETE CONFIRM ============================== -->
 <div id="bulkdelete-confirm-overlay" class="confirm-overlay">
   <div class="confirm-sheet">
@@ -874,7 +916,38 @@ input{outline:none;}
   </div>
 </div>
 
-<!-- ============================== MANAGE DELETE CONFIRM (shared by Categories, Payment methods & Groups) ============================== -->
+<!-- ============================== RECURRING EDIT SHEET ============================== -->
+<div id="recurring-edit-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title" id="recurring-edit-title">Add recurring expense</p>
+      <button type="button" class="topbar-close" id="recurring-edit-close-btn">✕</button>
+    </div>
+    <p class="field-label" style="margin-top:14px;">NAME</p>
+    <input type="text" class="sheet-input" id="recurring-edit-name" placeholder="e.g. Netflix" maxlength="40">
+    <p class="field-label">AMOUNT</p>
+    <input type="number" inputmode="decimal" class="sheet-input" id="recurring-edit-amount" placeholder="0" min="0" step="0.01">
+    <p class="field-label">CATEGORY</p>
+    <div class="cat-grid" id="recurring-edit-cat-grid"></div>
+    <p class="field-label">PAID VIA</p>
+    <div class="pay-row" id="recurring-edit-pay-row"></div>
+    <div id="recurring-edit-new-only">
+      <p class="field-label">REPEATS</p>
+      <div class="pay-row" id="recurring-edit-freq-row"></div>
+      <p class="field-label">STARTS</p>
+      <input type="date" class="date-input" id="recurring-edit-start">
+    </div>
+    <p class="empty-hint hidden" id="recurring-edit-cadence-readonly" style="text-align:left;padding:10px 0 0;"></p>
+    <p class="field-label">ENDS (OPTIONAL)</p>
+    <input type="date" class="date-input" id="recurring-edit-end">
+    <button type="button" class="save-btn" id="recurring-edit-save-btn" style="margin-top:18px;">Save recurring expense</button>
+    <button type="button" class="text-danger-btn hidden" id="recurring-edit-pause-btn" style="color:var(--grape);">Pause</button>
+    <button type="button" class="text-danger-btn hidden" id="recurring-edit-delete-btn">Delete</button>
+  </div>
+</div>
+
+<!-- ============================== MANAGE DELETE CONFIRM (shared by Categories, Payment methods, Groups & Recurring) ============================== -->
 <div id="manage-confirm-overlay" class="confirm-overlay">
   <div class="confirm-sheet">
     <div class="confirm-sheet-icon">🗑️</div>
@@ -966,7 +1039,7 @@ const Crypto = {
 };
 
 /* ============================== DATA LAYER (IndexedDB) ============================== */
-const DB_NAME='PaisaTrailDB', DB_VERSION=2;
+const DB_NAME='PaisaTrailDB', DB_VERSION=3;
 let _dbInstance=null;
 
 function openDB(){
@@ -985,6 +1058,7 @@ function openDB(){
       if(!db.objectStoreNames.contains('paymentMethods')) db.createObjectStore('paymentMethods',{keyPath:'id'});
       if(!db.objectStoreNames.contains('attachments')) db.createObjectStore('attachments',{keyPath:'id'});
       if(!db.objectStoreNames.contains('groups')) db.createObjectStore('groups',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('recurring')) db.createObjectStore('recurring',{keyPath:'id'});
     };
     req.onsuccess=(e)=>{ _dbInstance=e.target.result; resolve(_dbInstance); };
     req.onerror=(e)=>reject(e.target.error);
@@ -1109,6 +1183,26 @@ const DB = {
     tx.objectStore('groups').put(group);
     await txDone(tx);
   },
+  async getAllRecurring(){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('recurring','readonly').objectStore('recurring').getAll();
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
+  async putRecurring(rule){
+    const db=await openDB();
+    const tx=db.transaction('recurring','readwrite');
+    tx.objectStore('recurring').put(rule);
+    await txDone(tx);
+  },
+  async deleteRecurring(id){
+    const db=await openDB();
+    const tx=db.transaction('recurring','readwrite');
+    tx.objectStore('recurring').delete(id);
+    await txDone(tx);
+  },
   async saveAttachment(att){
     const db=await openDB();
     const tx=db.transaction('attachments','readwrite');
@@ -1208,6 +1302,9 @@ const state = {
   groupMode:null,        // 'existing'|'new'|null — which group-picker mode is active while groupEnabled
   selectedGroupId:null,  // chosen existing group's id, when groupMode==='existing'
   newGroupName:'',       // freeform text typed so far, when groupMode==='new' — only created in DB on Save
+  recurringLinkedId:null, // if the expense being edited already came from a recurring rule, its id — locks the section to read-only
+  recurringEnabled:false, // is the "Make this recurring" toggle on (only meaningful when recurringLinkedId is null)
+  recurringFrequency:'monthly', // 'weekly'|'monthly'|'yearly' chosen while recurringEnabled
   returnScreen:'home-screen', // where to go back to after Add/Edit closes or saves
   homeTab:'overview', // 'overview' or 'warranties' — which Home tab is active; persists across nav, lock/unlock, and Add/Edit since it's just app state, never reset
   bdMode:'age',          // 'age' or 'manual' — which Bulk Delete sub-mode is active
@@ -1239,11 +1336,17 @@ const state = {
   txnFilterPaymentIds:new Set(),  // payment method ids filtered IN on Transactions; empty = no restriction
   txnFilterStartISO:null,         // Transactions filter lower date bound (inclusive), or null = unbounded
   txnFilterEndISO:null,           // Transactions filter upper date bound (inclusive), or null = unbounded
+  txnFilterMinAmount:null,        // Transactions filter lower amount bound (inclusive), or null = unbounded
+  txnFilterMaxAmount:null,        // Transactions filter upper amount bound (inclusive), or null = unbounded
+  recurringRules:[],              // in-memory cache of all recurring rules, mirrors state.groups
+  mgrRecurringCategoryId:null,    // selected category while adding/editing a recurring rule
+  mgrRecurringPaymentId:null,     // selected payment method while adding/editing a recurring rule
+  mgrRecurringFrequency:'monthly',// selected frequency — only editable when adding a new rule, read-only display once created
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
 /* ============================== SCREEN SYSTEM ============================== */
-const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen'];
+const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen','recurring-screen'];
 function showScreen(id){
   SCREENS.forEach(s => document.getElementById(s).classList.toggle('is-hidden', s!==id));
 }
@@ -1443,6 +1546,8 @@ async function unlockSuccess(){
   state.categories=await DB.getAllCategories();
   state.paymentMethods=await DB.getAllPaymentMethods();
   state.groups=await DB.getAllGroups();
+  state.recurringRules=await DB.getAllRecurring();
+  await runRecurringCatchUpAll(); // before navigating, so the screen about to render already reflects anything just generated
   const target = screenBeforeLock || 'home-screen';
   showScreen(target);
   if(target==='home-screen') renderHome(); // add-screen etc. keep their existing in-progress DOM as-is
@@ -1503,7 +1608,32 @@ async function getWarrantyExpenses(){
   const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
   return all.filter(e => e.warrantyExpiry);
 }
+const WARRANTY_SOON_DAYS=30; // window for the Home banner — only nudges about what's not expired yet
+async function getWarrantiesExpiringSoon(){
+  const items=await getWarrantyExpenses();
+  const today=todayISO();
+  const cutoff=dateToISO(new Date(new Date(today+'T00:00:00').getTime() + WARRANTY_SOON_DAYS*86400000));
+  return items.filter(e => e.warrantyExpiry>=today && e.warrantyExpiry<=cutoff)
+    .sort((a,b)=>a.warrantyExpiry.localeCompare(b.warrantyExpiry));
+}
+async function renderWarrantyBanner(){
+  const banner=document.getElementById('home-warranty-banner');
+  const soon=await getWarrantiesExpiringSoon();
+  if(soon.length===0){ banner.classList.add('hidden'); banner.innerHTML=''; return; }
+  let text;
+  if(soon.length===1){
+    const e=soon[0];
+    const cat=state.categories.find(c=>c.id===e.categoryId);
+    const name=e.note || (cat?cat.name:'Item');
+    text=`${name} warranty — ${formatWarrantyRemaining(e.warrantyExpiry).label}`;
+  } else {
+    text=`${soon.length} warranties expiring soon`;
+  }
+  banner.innerHTML=`<span class="warranty-soon-banner-icon">🛡️</span><span class="warranty-soon-banner-text">${esc(text)}</span><span class="warranty-soon-banner-chevron">›</span>`;
+  banner.classList.remove('hidden');
+}
 async function renderHomeOverviewPanel(){
+  await renderWarrantyBanner();
   const today=new Date();
   const monthStart=new Date(today.getFullYear(), today.getMonth(), 1);
   const startISO=(()=>{ const tz=monthStart.getTimezoneOffset()*60000; return new Date(monthStart-tz).toISOString().slice(0,10); })();
@@ -1698,6 +1828,8 @@ async function getFilteredTransactions(){
   if(state.txnFilterPaymentIds.size>0) list=list.filter(e => state.txnFilterPaymentIds.has(e.paymentMethod));
   if(state.txnFilterStartISO) list=list.filter(e => e.date >= state.txnFilterStartISO);
   if(state.txnFilterEndISO) list=list.filter(e => e.date <= state.txnFilterEndISO);
+  if(state.txnFilterMinAmount!=null) list=list.filter(e => Number(e.amount) >= state.txnFilterMinAmount);
+  if(state.txnFilterMaxAmount!=null) list=list.filter(e => Number(e.amount) <= state.txnFilterMaxAmount);
   if(search){
     list=list.filter(e=>{
       const cat=state.categories.find(c=>c.id===e.categoryId);
@@ -1710,10 +1842,10 @@ async function getFilteredTransactions(){
   return list;
 }
 function hasActiveTxnFilters(){
-  return state.txnFilterCategoryIds.size>0 || state.txnFilterPaymentIds.size>0 || !!state.txnFilterStartISO || !!state.txnFilterEndISO;
+  return state.txnFilterCategoryIds.size>0 || state.txnFilterPaymentIds.size>0 || !!state.txnFilterStartISO || !!state.txnFilterEndISO || state.txnFilterMinAmount!=null || state.txnFilterMaxAmount!=null;
 }
 function updateTxnFilterBtnState(){
-  const count = (state.txnFilterCategoryIds.size>0?1:0) + (state.txnFilterPaymentIds.size>0?1:0) + ((state.txnFilterStartISO||state.txnFilterEndISO)?1:0);
+  const count = (state.txnFilterCategoryIds.size>0?1:0) + (state.txnFilterPaymentIds.size>0?1:0) + ((state.txnFilterStartISO||state.txnFilterEndISO)?1:0) + ((state.txnFilterMinAmount!=null||state.txnFilterMaxAmount!=null)?1:0);
   const btn=document.getElementById('txn-filter-btn');
   btn.textContent = count>0 ? `Filter • ${count}` : 'Filter';
   btn.classList.toggle('active', count>0);
@@ -1792,6 +1924,8 @@ async function openTxnFilterSheet(){
   renderTxnFilterPayRow();
   document.getElementById('txn-filter-start').value = state.txnFilterStartISO || '';
   document.getElementById('txn-filter-end').value = state.txnFilterEndISO || '';
+  document.getElementById('txn-filter-min-amount').value = state.txnFilterMinAmount!=null ? state.txnFilterMinAmount : '';
+  document.getElementById('txn-filter-max-amount').value = state.txnFilterMaxAmount!=null ? state.txnFilterMaxAmount : '';
   await updateTxnFilterShowBtn();
   document.getElementById('txn-filter-overlay').classList.add('show');
 }
@@ -1803,8 +1937,12 @@ async function clearTxnFilters(){
   state.txnFilterPaymentIds=new Set();
   state.txnFilterStartISO=null;
   state.txnFilterEndISO=null;
+  state.txnFilterMinAmount=null;
+  state.txnFilterMaxAmount=null;
   document.getElementById('txn-filter-start').value='';
   document.getElementById('txn-filter-end').value='';
+  document.getElementById('txn-filter-min-amount').value='';
+  document.getElementById('txn-filter-max-amount').value='';
   renderTxnFilterCatGrid();
   renderTxnFilterPayRow();
   await onTxnFilterChange();
@@ -2089,6 +2227,7 @@ async function openManageDeleteConfirm(type, id, name){
   let count, label;
   if(type==='category'){ count=await DB.countExpensesByCategory(id); label='category'; }
   else if(type==='paymentMethod'){ count=await DB.countExpensesByPaymentMethod(id); label='payment method'; }
+  else if(type==='recurring'){ count=(await getExpensesByRecurringId(id)).length; label='recurring expense'; }
   else { count=(await getExpensesByGroupId(id)).length; label='group'; }
   document.getElementById('manage-confirm-title').textContent = `Delete "${name}"?`;
   document.getElementById('manage-confirm-sub').textContent = count>0
@@ -2116,6 +2255,11 @@ async function confirmManageDelete(){
     state.txnFilterPaymentIds.delete(pending.id);
     renderPaymentMethodsScreen();
     toast('Payment method deleted');
+  } else if(pending.type==='recurring'){
+    await DB.deleteRecurring(pending.id);
+    state.recurringRules=state.recurringRules.filter(r=>r.id!==pending.id);
+    renderRecurringScreen();
+    toast('Recurring expense deleted');
   } else {
     await DB.deleteGroup(pending.id);
     state.groups=state.groups.filter(g=>g.id!==pending.id);
@@ -2543,6 +2687,7 @@ async function confirmImport(){
     state.txnFilterCategoryIds=new Set();
     state.txnFilterPaymentIds=new Set();
     state.txnFilterStartISO=null; state.txnFilterEndISO=null;
+    state.txnFilterMinAmount=null; state.txnFilterMaxAmount=null;
     state.insSelectedGroupId=null;
     Object.values(pendingDeletes).forEach(entry => { if(entry && entry.timer) clearTimeout(entry.timer); });
     Object.keys(pendingDeletes).forEach(k => delete pendingDeletes[k]); // stale undo timers from before the wipe no longer apply
@@ -2551,6 +2696,284 @@ async function confirmImport(){
   } catch(err){
     toast('Import failed — the file may be corrupted');
   }
+}
+
+/* ============================== RECURRING EXPENSES ============================== */
+const RECURRING_FREQUENCIES=[{v:'weekly',label:'Weekly'},{v:'monthly',label:'Monthly'},{v:'yearly',label:'Yearly'}];
+const RECURRING_CATCHUP_CAP=24; // max occurrences backfilled per rule per pass, so an install reopened after a long gap doesn't flood the list
+function recurringFrequencyLabel(freq){
+  return (RECURRING_FREQUENCIES.find(f=>f.v===freq)||{}).label || freq;
+}
+// The day-of-month/day-of-year a rule is "supposed" to land on always comes
+// fresh from rule.startDate, never from whatever the previous (possibly
+// already-clamped) occurrence landed on — otherwise a rule due "on the
+// 31st" that gets clamped to Feb 28 would stay anchored at 28 forever
+// afterward instead of correctly landing on Mar 31 the following month.
+function clampToValidDate(year, month, day){
+  const lastDayOfMonth=new Date(year, month+1, 0).getDate(); // day 0 of next month = last day of this month
+  return dateToISO(new Date(year, month, Math.min(day, lastDayOfMonth)));
+}
+function advanceRecurringDate(rule, fromISO){
+  const from=new Date(fromISO+'T00:00:00');
+  if(rule.frequency==='weekly'){
+    from.setDate(from.getDate()+7);
+    return dateToISO(from);
+  }
+  const startDay=new Date(rule.startDate+'T00:00:00');
+  if(rule.frequency==='yearly'){
+    return clampToValidDate(from.getFullYear()+1, startDay.getMonth(), startDay.getDate());
+  }
+  // monthly (default)
+  let targetMonth=from.getMonth()+1, targetYear=from.getFullYear();
+  if(targetMonth>11){ targetMonth=0; targetYear++; }
+  return clampToValidDate(targetYear, targetMonth, startDay.getDate());
+}
+// Generates every occurrence of one rule that's come due, advancing
+// nextDueISO each time and persisting once at the end (not on every
+// iteration) since most calls generate nothing and shouldn't write at all.
+async function catchUpSingleRule(rule){
+  const generated=[];
+  const today=todayISO();
+  let count=0;
+  while(rule.active && rule.nextDueISO<=today && count<RECURRING_CATCHUP_CAP){
+    const expense={
+      id:genId(), amount:rule.amount, categoryId:rule.categoryId, paymentMethod:rule.paymentMethod,
+      date:rule.nextDueISO, note:rule.name, attachmentIds:[], recurringId:rule.id, groupId:null,
+      warrantyExpiry:null, warrantyDurationMonths:null, createdAt:Date.now(),
+    };
+    await DB.addExpense(expense);
+    generated.push({name:rule.name});
+    rule.nextDueISO=advanceRecurringDate(rule, rule.nextDueISO);
+    if(rule.endDate && rule.nextDueISO>rule.endDate) rule.active=false;
+    count++;
+  }
+  if(count>0) await DB.putRecurring(rule);
+  return generated;
+}
+// Naming a single fired occurrence is clear ("Netflix added automatically").
+// Naming exactly two is only clear if they're two *different* rules ("Netflix
+// and Rent..." reads fine; "Rent and Rent..." from one rule catching up two
+// months at once does not) — anything beyond that, or any repeat, falls back
+// to a plain count so the message never looks broken.
+function buildCatchUpToastMessage(generated){
+  const total=generated.length;
+  const uniqueNames=[...new Set(generated.map(g=>g.name))];
+  if(total===1) return `${generated[0].name} added automatically`;
+  if(total===2 && uniqueNames.length===2) return `${uniqueNames[0]} and ${uniqueNames[1]} added automatically`;
+  return `${total} recurring expenses added automatically`;
+}
+// Runs on every unlock (see unlockSuccess) so a multi-day-idle phone catches
+// up the moment it's opened, not on some background schedule this offline
+// PWA has no reliable way to run anyway.
+async function runRecurringCatchUpAll(){
+  let allGenerated=[];
+  for(const rule of state.recurringRules){
+    if(!rule.active) continue;
+    allGenerated=allGenerated.concat(await catchUpSingleRule(rule));
+  }
+  if(allGenerated.length>0){
+    await refreshAllExpenseViews();
+    toast(buildCatchUpToastMessage(allGenerated));
+  }
+}
+async function getExpensesByRecurringId(id){
+  return (await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id] && e.recurringId===id);
+}
+
+function renderRecurringArea(){
+  const area=document.getElementById('add-recurring-area');
+  if(state.recurringLinkedId){
+    area.innerHTML=`
+      <div class="warranty-card">
+        <div class="warranty-card-head">
+          <span class="warranty-card-icon">🔁</span>
+          <span class="warranty-card-title">Generated by a recurring rule</span>
+        </div>
+        <p class="empty-hint" style="padding:4px 0 0;text-align:left;">Manage it from Settings → Recurring expenses.</p>
+      </div>`;
+    return;
+  }
+  if(!state.recurringEnabled){
+    area.innerHTML=`<button type="button" class="warranty-toggle-btn" id="recurring-add-toggle-btn"><span>🔁</span><span>Make this recurring</span></button>`;
+    document.getElementById('recurring-add-toggle-btn').onclick=()=>{
+      state.recurringEnabled=true;
+      renderRecurringArea();
+    };
+    return;
+  }
+  const chipsHTML=RECURRING_FREQUENCIES.map(f=>{
+    const selected=state.recurringFrequency===f.v;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    return `<button type="button" class="pay-chip" data-freq="${f.v}" style="background:${bg};color:${color}">${f.label}</button>`;
+  }).join('');
+  area.innerHTML=`
+    <div class="warranty-card">
+      <div class="warranty-card-head">
+        <span class="warranty-card-icon">🔁</span>
+        <span class="warranty-card-title">Repeats</span>
+        <button type="button" class="attach-icon-btn" id="recurring-remove-toggle-btn">✕</button>
+      </div>
+      <div class="pay-row">${chipsHTML}</div>
+    </div>`;
+  document.getElementById('recurring-remove-toggle-btn').onclick=()=>{
+    state.recurringEnabled=false;
+    renderRecurringArea();
+  };
+  document.querySelectorAll('#add-recurring-area [data-freq]').forEach(btn=>{
+    btn.onclick=()=>{
+      state.recurringFrequency=btn.dataset.freq;
+      renderRecurringArea();
+    };
+  });
+}
+
+/* ---- Settings: Recurring expenses manager (list + add/edit sheet) ---- */
+function openRecurringScreen(){
+  state.returnScreen='settings-screen';
+  renderRecurringScreen();
+  showScreen('recurring-screen');
+}
+function renderRecurringScreen(){
+  const list=document.getElementById('recurring-list'); list.innerHTML='';
+  if(state.recurringRules.length===0){
+    list.innerHTML='<p class="empty-hint">No recurring expenses yet — add one here, or toggle "Make this recurring" when adding a new expense.</p>';
+    return;
+  }
+  state.recurringRules.forEach(r=>{
+    const cat=state.categories.find(c=>c.id===r.categoryId);
+    const dateLabel=new Date(r.nextDueISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+    const subLine = r.active
+      ? `${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Next ${dateLabel}`
+      : `${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Paused`;
+    list.insertAdjacentHTML('beforeend', `
+      <button type="button" class="settings-row" data-recurringid="${r.id}" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:${cat?cat.color:'#9088A8'}22;">${cat?cat.icon:'🔁'}</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">${esc(r.name)}</p>
+          <span class="settings-row-sub">${esc(subLine)}</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>`);
+  });
+}
+function renderRecurringEditCatGrid(){
+  const grid=document.getElementById('recurring-edit-cat-grid'); grid.innerHTML='';
+  state.categories.forEach(cat=>{
+    const selected=state.mgrRecurringCategoryId===cat.id;
+    const bg = selected ? cat.color+'26' : 'var(--surface)';
+    const border = selected ? cat.color : 'transparent';
+    grid.insertAdjacentHTML('beforeend', `
+      <button type="button" class="cat-chip" data-cat="${cat.id}" style="background:${bg};border-color:${border}">
+        <span class="cat-emoji">${cat.icon}</span><span class="cat-name">${esc(cat.name)}</span>
+      </button>`);
+  });
+}
+function renderRecurringEditPayRow(){
+  const row=document.getElementById('recurring-edit-pay-row'); row.innerHTML='';
+  state.paymentMethods.forEach(pm=>{
+    const selected=state.mgrRecurringPaymentId===pm.id;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    row.insertAdjacentHTML('beforeend', `
+      <button type="button" class="pay-chip" data-pay="${pm.id}" style="background:${bg};color:${color}">
+        <span>${pm.icon}</span>${esc(pm.name)}
+      </button>`);
+  });
+}
+function renderRecurringEditFreqRow(){
+  const row=document.getElementById('recurring-edit-freq-row'); row.innerHTML='';
+  RECURRING_FREQUENCIES.forEach(f=>{
+    const selected=state.mgrRecurringFrequency===f.v;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    row.insertAdjacentHTML('beforeend', `<button type="button" class="pay-chip" data-freq="${f.v}" style="background:${bg};color:${color}">${f.label}</button>`);
+  });
+}
+function openRecurringEdit(id){
+  state.mgrEditingType='recurring';
+  state.mgrEditingId=id;
+  const existing=id ? state.recurringRules.find(r=>r.id===id) : null;
+  document.getElementById('recurring-edit-title').textContent = existing ? 'Edit recurring expense' : 'Add recurring expense';
+  document.getElementById('recurring-edit-name').value = existing ? existing.name : '';
+  document.getElementById('recurring-edit-amount').value = existing ? existing.amount : '';
+  document.getElementById('recurring-edit-end').value = existing ? (existing.endDate || '') : '';
+  state.mgrRecurringCategoryId = existing ? existing.categoryId : (state.categories[0] ? state.categories[0].id : null);
+  state.mgrRecurringPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
+  state.mgrRecurringFrequency = existing ? existing.frequency : 'monthly';
+  renderRecurringEditCatGrid();
+  renderRecurringEditPayRow();
+
+  // Frequency and start date only make sense to set once, at creation —
+  // changing either after occurrences already exist would scramble the
+  // advance-from-startDate clamping logic, so they're shown read-only here.
+  document.getElementById('recurring-edit-new-only').classList.toggle('hidden', !!existing);
+  const readonly=document.getElementById('recurring-edit-cadence-readonly');
+  readonly.classList.toggle('hidden', !existing);
+  if(existing){
+    const startLabel=new Date(existing.startDate+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    readonly.textContent=`Repeats ${recurringFrequencyLabel(existing.frequency).toLowerCase()}, started ${startLabel}`;
+  } else {
+    renderRecurringEditFreqRow();
+    document.getElementById('recurring-edit-start').value=todayISO();
+  }
+  document.getElementById('recurring-edit-pause-btn').classList.toggle('hidden', !existing);
+  if(existing) document.getElementById('recurring-edit-pause-btn').textContent = existing.active ? 'Pause' : 'Resume';
+  document.getElementById('recurring-edit-delete-btn').classList.toggle('hidden', !existing);
+  document.getElementById('recurring-edit-overlay').classList.add('show');
+}
+function closeRecurringEdit(){
+  document.getElementById('recurring-edit-overlay').classList.remove('show');
+}
+async function saveRecurringEdit(){
+  const name=document.getElementById('recurring-edit-name').value.trim();
+  const amount=parseFloat(document.getElementById('recurring-edit-amount').value);
+  if(!name){ toast('Give it a name first'); return; }
+  if(!amount || amount<=0){ toast('Enter a valid amount'); return; }
+  if(!state.mgrRecurringCategoryId){ toast('Pick a category'); return; }
+  if(!state.mgrRecurringPaymentId){ toast('Pick a payment method'); return; }
+  const endDate=document.getElementById('recurring-edit-end').value || null;
+  const existing=state.mgrEditingId ? state.recurringRules.find(r=>r.id===state.mgrEditingId) : null;
+
+  if(existing){
+    existing.name=name; existing.amount=amount;
+    existing.categoryId=state.mgrRecurringCategoryId; existing.paymentMethod=state.mgrRecurringPaymentId;
+    existing.endDate=endDate;
+    if(existing.endDate && existing.nextDueISO>existing.endDate) existing.active=false;
+    await DB.putRecurring(existing);
+    closeRecurringEdit();
+    renderRecurringScreen();
+    toast('Recurring expense updated');
+  } else {
+    const startDate=document.getElementById('recurring-edit-start').value || todayISO();
+    const rule={
+      id:genId(), name, amount, categoryId:state.mgrRecurringCategoryId, paymentMethod:state.mgrRecurringPaymentId,
+      frequency:state.mgrRecurringFrequency, startDate, endDate, nextDueISO:startDate, active:true, createdAt:Date.now(),
+    };
+    await DB.putRecurring(rule);
+    state.recurringRules.push(rule);
+    await catchUpSingleRule(rule); // backfills immediately if startDate is today or in the past
+    closeRecurringEdit();
+    renderRecurringScreen();
+    toast('Recurring expense added');
+  }
+  await refreshAllExpenseViews();
+}
+async function toggleRecurringPause(){
+  const rule=state.recurringRules.find(r=>r.id===state.mgrEditingId);
+  if(!rule) return;
+  rule.active=!rule.active;
+  await DB.putRecurring(rule);
+  closeRecurringEdit();
+  renderRecurringScreen();
+  toast(rule.active ? 'Resumed' : 'Paused');
+}
+function requestDeleteRecurring(){
+  const id=state.mgrEditingId;
+  const rule=state.recurringRules.find(r=>r.id===id);
+  if(!rule) return;
+  closeRecurringEdit();
+  openManageDeleteConfirm('recurring', id, rule.name);
 }
 
 /* ============================== INSIGHTS ============================== */
@@ -3088,6 +3511,9 @@ function openAddScreen(existing){
   state.groupMode = existing && existing.groupId ? 'existing' : null;
   state.selectedGroupId = existing ? (existing.groupId || null) : null;
   state.newGroupName = '';
+  state.recurringLinkedId = existing ? (existing.recurringId || null) : null;
+  state.recurringEnabled = false;
+  state.recurringFrequency = 'monthly';
 
   document.getElementById('add-screen-title').textContent = existing ? 'Edit expense' : 'Add expense';
   document.getElementById('add-save-btn').textContent = existing ? 'Save changes' : 'Save expense';
@@ -3100,6 +3526,7 @@ function openAddScreen(existing){
   renderPaymentChips();
   renderWarrantyArea();
   renderGroupArea();
+  renderRecurringArea();
   renderAttachmentArea();
   showScreen('add-screen');
 }
@@ -3160,10 +3587,31 @@ async function saveExpense(){
     }
   }
 
+  // Mirrors the Groups lazy-creation pattern: a rule is only written to
+  // IndexedDB once Save is actually pressed, never just from ticking the
+  // toggle, so an abandoned edit never leaves an orphan rule behind. An
+  // expense already linked to a rule (recurringLinkedId) keeps that link
+  // untouched here — the toggle is locked/read-only for those, see
+  // renderRecurringArea.
+  let recurringId=state.recurringLinkedId || null;
+  if(!recurringId && state.recurringEnabled){
+    const cat=state.categories.find(c=>c.id===state.selectedCategoryId);
+    const rule={
+      id:genId(), name: note || (cat?cat.name:'Recurring expense'),
+      amount, categoryId:state.selectedCategoryId, paymentMethod:state.selectedPaymentId,
+      frequency:state.recurringFrequency, startDate:date, endDate:null,
+      nextDueISO: advanceRecurringDate({frequency:state.recurringFrequency, startDate:date}, date),
+      active:true, createdAt:Date.now(),
+    };
+    await DB.putRecurring(rule);
+    state.recurringRules.push(rule);
+    recurringId=rule.id;
+  }
+
   const expense={
     id, amount, categoryId: state.selectedCategoryId,
     paymentMethod: state.selectedPaymentId, // stores the payment method's id, despite the field name
-    date, note, attachmentIds, recurringId:null, groupId,
+    date, note, attachmentIds, recurringId, groupId,
     warrantyExpiry: state.warrantyEnabled ? state.warrantyExpiry : null,
     warrantyDurationMonths: state.warrantyEnabled ? state.warrantyDurationMonths : null,
     createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
@@ -3261,11 +3709,20 @@ document.getElementById('txn-filter-end').addEventListener('change', (e) => {
   state.txnFilterEndISO = e.target.value || null;
   onTxnFilterChange();
 });
+document.getElementById('txn-filter-min-amount').addEventListener('change', (e) => {
+  state.txnFilterMinAmount = e.target.value!=='' ? parseFloat(e.target.value) : null;
+  onTxnFilterChange();
+});
+document.getElementById('txn-filter-max-amount').addEventListener('change', (e) => {
+  state.txnFilterMaxAmount = e.target.value!=='' ? parseFloat(e.target.value) : null;
+  onTxnFilterChange();
+});
 
 document.getElementById('home-tabs').addEventListener('click', (e) => {
   const btn=e.target.closest('.home-tab'); if(!btn) return;
   setHomeTab(btn.dataset.hometab);
 });
+document.getElementById('home-warranty-banner').addEventListener('click', () => setHomeTab('warranties'));
 document.getElementById('home-warranties-list').addEventListener('click', (e) => {
   const row=e.target.closest('.recent-row'); if(!row) return;
   openEditFromId(row.dataset.id);
@@ -3424,6 +3881,36 @@ document.getElementById('group-merge-list').addEventListener('click', (e) => {
 });
 document.getElementById('group-merge-back-btn').addEventListener('click', backFromGroupMergeConfirm);
 document.getElementById('group-merge-confirm-btn').addEventListener('click', confirmGroupMerge);
+
+document.getElementById('settings-recurring-btn').addEventListener('click', openRecurringScreen);
+document.getElementById('recurring-close-btn').addEventListener('click', () => showScreen('settings-screen'));
+document.getElementById('recurring-list').addEventListener('click', (e) => {
+  const row=e.target.closest('[data-recurringid]'); if(!row) return;
+  openRecurringEdit(row.dataset.recurringid);
+});
+document.getElementById('recurring-screen-add-btn').addEventListener('click', () => openRecurringEdit(null));
+document.getElementById('recurring-edit-close-btn').addEventListener('click', closeRecurringEdit);
+document.getElementById('recurring-edit-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='recurring-edit-overlay') closeRecurringEdit();
+});
+document.getElementById('recurring-edit-save-btn').addEventListener('click', saveRecurringEdit);
+document.getElementById('recurring-edit-pause-btn').addEventListener('click', toggleRecurringPause);
+document.getElementById('recurring-edit-delete-btn').addEventListener('click', requestDeleteRecurring);
+document.getElementById('recurring-edit-cat-grid').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-cat]'); if(!btn) return;
+  state.mgrRecurringCategoryId=btn.dataset.cat;
+  renderRecurringEditCatGrid();
+});
+document.getElementById('recurring-edit-pay-row').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-pay]'); if(!btn) return;
+  state.mgrRecurringPaymentId=btn.dataset.pay;
+  renderRecurringEditPayRow();
+});
+document.getElementById('recurring-edit-freq-row').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-freq]'); if(!btn) return;
+  state.mgrRecurringFrequency=btn.dataset.freq;
+  renderRecurringEditFreqRow();
+});
 
 document.getElementById('tagexpenses-close-btn').addEventListener('click', () => { showScreen('groups-screen'); renderGroupsScreen(); });
 document.getElementById('tag-group-area').addEventListener('click', (e) => {
