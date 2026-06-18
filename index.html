@@ -436,6 +436,9 @@ input{outline:none;}
       <p class="field-label">WARRANTY</p>
       <div id="add-warranty-area"></div>
 
+      <p class="field-label">GROUP</p>
+      <div id="add-group-area"></div>
+
       <p class="field-label">ATTACHMENTS</p>
       <div id="add-attachment-area"></div>
     </div>
@@ -500,6 +503,7 @@ input{outline:none;}
         <button type="button" class="segmented-tab active" data-insview="categories">Categories</button>
         <button type="button" class="segmented-tab" data-insview="compare">Compare</button>
         <button type="button" class="segmented-tab" data-insview="payment">Payment</button>
+        <button type="button" class="segmented-tab" data-insview="groups">Groups</button>
       </div>
 
       <div id="ins-categories-panel" style="margin-top:16px;"></div>
@@ -510,6 +514,8 @@ input{outline:none;}
       </div>
 
       <div id="ins-payment-panel" class="hidden" style="margin-top:16px;"></div>
+
+      <div id="ins-groups-panel" class="hidden" style="margin-top:16px;"></div>
     </div>
   </div>
   <div class="bottom-nav">
@@ -653,7 +659,7 @@ const Crypto = {
 };
 
 /* ============================== DATA LAYER (IndexedDB) ============================== */
-const DB_NAME='PaisaTrailDB', DB_VERSION=1;
+const DB_NAME='PaisaTrailDB', DB_VERSION=2;
 let _dbInstance=null;
 
 function openDB(){
@@ -671,6 +677,7 @@ function openDB(){
       if(!db.objectStoreNames.contains('categories')) db.createObjectStore('categories',{keyPath:'id'});
       if(!db.objectStoreNames.contains('paymentMethods')) db.createObjectStore('paymentMethods',{keyPath:'id'});
       if(!db.objectStoreNames.contains('attachments')) db.createObjectStore('attachments',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('groups')) db.createObjectStore('groups',{keyPath:'id'});
     };
     req.onsuccess=(e)=>{ _dbInstance=e.target.result; resolve(_dbInstance); };
     req.onerror=(e)=>reject(e.target.error);
@@ -743,6 +750,20 @@ const DB = {
     tx.objectStore('paymentMethods').put(pm);
     await txDone(tx);
   },
+  async getAllGroups(){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('groups','readonly').objectStore('groups').getAll();
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
+  async putGroup(group){
+    const db=await openDB();
+    const tx=db.transaction('groups','readwrite');
+    tx.objectStore('groups').put(group);
+    await txDone(tx);
+  },
   async saveAttachment(att){
     const db=await openDB();
     const tx=db.transaction('attachments','readwrite');
@@ -797,6 +818,7 @@ const state = {
   pinBuffer:'',
   categories:[],
   paymentMethods:[],
+  groups:[],
   selectedCategoryId:null,
   selectedPaymentId:null,
   pendingAttachments:[], // [{fileName, mimeType, type, arrayBuffer}] — newly picked this session, not yet saved
@@ -808,6 +830,10 @@ const state = {
   warrantyEnabled:false,        // is the "under warranty" toggle on for the expense being added/edited
   warrantyDurationMonths:null,  // 6/12/24 if a shortcut chip is selected, null if the date was hand-edited
   warrantyExpiry:null,          // ISO date string, or null
+  groupEnabled:false,    // is the "Add to a group" toggle on for the expense being added/edited
+  groupMode:null,        // 'existing'|'new'|null — which group-picker mode is active while groupEnabled
+  selectedGroupId:null,  // chosen existing group's id, when groupMode==='existing'
+  newGroupName:'',       // freeform text typed so far, when groupMode==='new' — only created in DB on Save
   returnScreen:'home-screen', // where to go back to after Add/Edit closes or saves
   homeTab:'overview', // 'overview' or 'warranties' — which Home tab is active; persists across nav, lock/unlock, and Add/Edit since it's just app state, never reset
   bdMode:'age',          // 'age' or 'manual' — which Bulk Delete sub-mode is active
@@ -817,8 +843,9 @@ const state = {
   insPeriodType:'month',     // 'week'|'month'|'year'|'custom' — persists across navigation, like state.homeTab
   insStartISO:monthBounds(todayISO()).startISO, // current period's bounds (inclusive) — only recomputed when the user steps/changes type, never reset on nav
   insEndISO:monthBounds(todayISO()).endISO,
-  insView:'categories',      // 'categories'|'compare'|'payment' — which Insights sub-view is showing; persists across navigation
+  insView:'categories',      // 'categories'|'compare'|'payment'|'groups' — which Insights sub-view is showing; persists across navigation
   insCompareCategoryId:null, // selected category for Compare — lazily defaults to the first category the first time Compare is viewed, then persists
+  insSelectedGroupId:null,   // selected group for the Groups view — persists once chosen, no lazy default (there may be no groups yet)
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
@@ -974,6 +1001,7 @@ async function unlockSuccess(){
   await DB.seedDefaults();
   state.categories=await DB.getAllCategories();
   state.paymentMethods=await DB.getAllPaymentMethods();
+  state.groups=await DB.getAllGroups();
   const target = screenBeforeLock || 'home-screen';
   showScreen(target);
   if(target==='home-screen') renderHome(); // add-screen etc. keep their existing in-progress DOM as-is
@@ -1448,9 +1476,11 @@ function applyInsightsPeriodTypeUI(){
   document.querySelectorAll('#ins-period-type-tabs .segmented-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.instype===state.insPeriodType);
   });
+  const isGroups = state.insView==='groups';
+  document.getElementById('ins-period-type-tabs').classList.toggle('hidden', isGroups);
   const isCustom = state.insPeriodType==='custom';
-  document.getElementById('ins-period-stepper').classList.toggle('hidden', isCustom);
-  document.getElementById('ins-custom-range').classList.toggle('hidden', !isCustom);
+  document.getElementById('ins-period-stepper').classList.toggle('hidden', isGroups || isCustom);
+  document.getElementById('ins-custom-range').classList.toggle('hidden', isGroups || !isCustom);
 }
 function setInsightsPeriodType(type){
   state.insPeriodType=type;
@@ -1475,6 +1505,8 @@ function setInsightsView(view){
   document.getElementById('ins-categories-panel').classList.toggle('hidden', view!=='categories');
   document.getElementById('ins-compare-panel').classList.toggle('hidden', view!=='compare');
   document.getElementById('ins-payment-panel').classList.toggle('hidden', view!=='payment');
+  document.getElementById('ins-groups-panel').classList.toggle('hidden', view!=='groups');
+  applyInsightsPeriodTypeUI();
   renderInsights();
 }
 
@@ -1595,12 +1627,60 @@ async function renderInsightsCompareResult(){
     </div>
     <p class="ins-delta ${delta.cls}" style="text-align:center;font-size:13px;margin-top:10px;">${delta.label} ${esc(previousPeriodPhrase(state.insPeriodType))}</p>`;
 }
+async function renderInsightsGroupsPanel(){
+  const container=document.getElementById('ins-groups-panel');
+  if(state.groups.length===0){
+    container.innerHTML='<p class="empty-hint">No groups yet — add one from the Add/Edit screen\'s Group field.</p>';
+    return;
+  }
+  const chipsHTML=state.groups.map(g=>{
+    const selected=state.insSelectedGroupId===g.id;
+    const bg=selected?'var(--grape)':'var(--surface)';
+    const color=selected?'white':'var(--ink)';
+    return `<button type="button" class="pay-chip" data-ins-group="${g.id}" style="background:${bg};color:${color}">${esc(g.name)}</button>`;
+  }).join('');
+
+  let resultHTML='<p class="empty-hint">Pick a group above.</p>';
+  if(state.insSelectedGroupId){
+    const group=state.groups.find(g=>g.id===state.insSelectedGroupId);
+    const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31'))
+      .filter(e => !pendingDeletes[e.id] && e.groupId===state.insSelectedGroupId)
+      .sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
+    if(all.length===0){
+      resultHTML=`<p class="empty-hint">No expenses tagged to ${esc(group?group.name:'this group')} yet.</p>`;
+    } else {
+      const total=all.reduce((s,e)=>s+Number(e.amount),0);
+      const rowsHTML=all.map(e=>{
+        const cat=state.categories.find(c=>c.id===e.categoryId);
+        const dateLabel=new Date(e.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+        return `
+          <div class="recent-row">
+            <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
+            <div class="recent-info">
+              <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
+              <span class="recent-pm">${dateLabel}</span>
+            </div>
+            <span class="recent-amt">-${formatINR(e.amount)}</span>
+          </div>`;
+      }).join('');
+      resultHTML = `<p class="spend-count" style="margin:0 0 12px;color:var(--muted);">${formatINR(total)} total · ${all.length} expense${all.length===1?'':'s'}</p>${rowsHTML}`;
+    }
+  }
+  container.innerHTML = `<div class="pay-row" id="ins-groups-chip-row">${chipsHTML}</div><div style="margin-top:14px;">${resultHTML}</div>`;
+  document.querySelectorAll('#ins-groups-chip-row [data-ins-group]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.insSelectedGroupId=btn.dataset.insGroup;
+      renderInsightsGroupsPanel();
+    });
+  });
+}
 async function renderInsights(){
   document.getElementById('ins-period-label').textContent = formatPeriodLabel(state.insPeriodType, state.insStartISO, state.insEndISO);
   document.getElementById('ins-next-btn').disabled = state.insPeriodType!=='custom' && state.insEndISO>=todayISO();
   if(state.insView==='categories') await renderInsightsCategoriesPanel();
   else if(state.insView==='compare'){ renderInsightsCompareCatGrid(); await renderInsightsCompareResult(); }
   else if(state.insView==='payment') await renderInsightsPaymentPanel();
+  else if(state.insView==='groups') await renderInsightsGroupsPanel();
 }
 
 /* ============================== ADD EXPENSE ============================== */
@@ -1692,6 +1772,54 @@ function renderWarrantyArea(){
     state.warrantyExpiry=e.target.value || null;
     state.warrantyDurationMonths=null; // hand-edited date = custom, no shortcut chip stays selected
     renderWarrantyArea();
+  });
+}
+function renderGroupArea(){
+  const area=document.getElementById('add-group-area');
+  if(!state.groupEnabled){
+    area.innerHTML=`<button type="button" class="warranty-toggle-btn" id="group-add-btn"><span>🏷️</span><span>Add to a group</span></button>`;
+    document.getElementById('group-add-btn').onclick=()=>{
+      state.groupEnabled=true;
+      renderGroupArea();
+    };
+    return;
+  }
+  const chipsHTML=state.groups.map(g=>{
+    const selected=state.groupMode==='existing' && state.selectedGroupId===g.id;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    return `<button type="button" class="pay-chip" data-group-id="${g.id}" style="background:${bg};color:${color}">${esc(g.name)}</button>`;
+  }).join('');
+  const newSelected = state.groupMode==='new';
+  const newChipHTML = `<button type="button" class="pay-chip" data-group-id="new" style="background:${newSelected?'var(--grape)':'var(--surface)'};color:${newSelected?'white':'var(--ink)'}">+ New</button>`;
+  area.innerHTML=`
+    <div class="warranty-card">
+      <div class="warranty-card-head">
+        <span class="warranty-card-icon">🏷️</span>
+        <span class="warranty-card-title">Group</span>
+        <button type="button" class="attach-icon-btn" id="group-remove-btn">✕</button>
+      </div>
+      <div class="pay-row">${chipsHTML}${newChipHTML}</div>
+      <input id="group-new-input" type="text" class="date-input ${newSelected?'':'hidden'}" placeholder="Group name (e.g. Goa Trip)" maxlength="40" value="${esc(state.newGroupName)}">
+    </div>`;
+  document.getElementById('group-remove-btn').onclick=()=>{
+    state.groupEnabled=false; state.groupMode=null; state.selectedGroupId=null; state.newGroupName='';
+    renderGroupArea();
+  };
+  document.querySelectorAll('#add-group-area [data-group-id]').forEach(btn=>{
+    btn.onclick=()=>{
+      if(btn.dataset.groupId==='new'){
+        state.groupMode='new'; state.selectedGroupId=null;
+        renderGroupArea();
+        document.getElementById('group-new-input').focus();
+      } else {
+        state.groupMode='existing'; state.selectedGroupId=btn.dataset.groupId; state.newGroupName='';
+        renderGroupArea();
+      }
+    };
+  });
+  document.getElementById('group-new-input').addEventListener('input', (e)=>{
+    state.newGroupName=e.target.value; // not saved to DB until saveExpense() runs — avoids creating orphan groups from abandoned edits
   });
 }
 function detectFileType(mimeType, name){
@@ -1808,6 +1936,10 @@ function openAddScreen(existing){
   state.warrantyEnabled = existing ? !!existing.warrantyExpiry : false;
   state.warrantyDurationMonths = existing ? (existing.warrantyDurationMonths || null) : null;
   state.warrantyExpiry = existing ? (existing.warrantyExpiry || null) : null;
+  state.groupEnabled = existing ? !!existing.groupId : false;
+  state.groupMode = existing && existing.groupId ? 'existing' : null;
+  state.selectedGroupId = existing ? (existing.groupId || null) : null;
+  state.newGroupName = '';
 
   document.getElementById('add-screen-title').textContent = existing ? 'Edit expense' : 'Add expense';
   document.getElementById('add-save-btn').textContent = existing ? 'Save changes' : 'Save expense';
@@ -1819,6 +1951,7 @@ function openAddScreen(existing){
   updateNotePlaceholder();
   renderPaymentChips();
   renderWarrantyArea();
+  renderGroupArea();
   renderAttachmentArea();
   showScreen('add-screen');
 }
@@ -1854,10 +1987,35 @@ async function saveExpense(){
   }
   const attachmentIds=[...keptIds, ...newIds];
 
+  // Groups are created lazily, right here, rather than the moment the user
+  // types a name — so abandoning an edit mid-type never leaves an orphan
+  // group behind. A case-insensitive match against existing groups avoids
+  // accidental near-duplicates (no group management UI exists yet to clean
+  // those up).
+  let groupId=null;
+  if(state.groupEnabled){
+    if(state.groupMode==='existing'){
+      groupId=state.selectedGroupId;
+    } else if(state.groupMode==='new'){
+      const name=(state.newGroupName||'').trim();
+      if(name){
+        const existingMatch=state.groups.find(g => g.name.toLowerCase()===name.toLowerCase());
+        if(existingMatch){
+          groupId=existingMatch.id;
+        } else {
+          const newGroup={ id:genId(), name };
+          await DB.putGroup(newGroup);
+          state.groups.push(newGroup);
+          groupId=newGroup.id;
+        }
+      }
+    }
+  }
+
   const expense={
     id, amount, categoryId: state.selectedCategoryId,
     paymentMethod: state.selectedPaymentId, // stores the payment method's id, despite the field name
-    date, note, attachmentIds, recurringId:null,
+    date, note, attachmentIds, recurringId:null, groupId,
     warrantyExpiry: state.warrantyEnabled ? state.warrantyExpiry : null,
     warrantyDurationMonths: state.warrantyEnabled ? state.warrantyDurationMonths : null,
     createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
