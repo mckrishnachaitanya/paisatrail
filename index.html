@@ -165,6 +165,9 @@ input{outline:none;}
 
 /* ============================== TRANSACTIONS ============================== */
 .search-bar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-radius:14px;background:var(--surface);}
+.txn-filter-btn{flex-shrink:0;padding:7px 12px;border-radius:12px;background:var(--chip);
+  font-size:11px;font-weight:700;color:var(--ink);white-space:nowrap;}
+.txn-filter-btn.active{background:var(--grape);color:#fff;}
 .search-bar input{flex:1;border:none;background:transparent;font-size:14px;color:var(--ink);}
 .txn-group-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.03em;margin:14px 0 8px;}
 .txn-delete{font-size:15px;color:var(--muted);width:26px;height:26px;flex-shrink:0;display:flex;
@@ -284,6 +287,41 @@ input{outline:none;}
 .confirm-sheet-sub{font-size:12px;color:var(--muted);margin-bottom:14px;}
 .confirm-sheet-cancel{width:100%;padding:13px;border-radius:16px;border:1.5px solid var(--border);
   background:transparent;font-size:14px;font-weight:700;color:var(--ink);margin-top:8px;}
+
+/* ============================== MANAGE CATEGORIES & PAYMENT METHODS ============================== */
+/* List rows reuse .settings-row's shape — only the icon-circle background is
+   overridden per row (category color, or a neutral chip tint for payment
+   methods, which have no color field) since .settings-row-icon's default
+   tint is fixed to coral. */
+.manage-default-tag{font-size:9px;font-weight:700;color:var(--muted);background:var(--chip);
+  padding:2px 7px;border-radius:10px;margin-left:6px;}
+
+/* Bottom-anchored sheet for adding/editing a category or payment method —
+   deliberately distinct from .confirm-sheet (centered, short, used for
+   yes/no confirmations) since this holds a name field plus an icon grid
+   and needs more room, with its own scroll area on short screens. */
+.edit-sheet-overlay{position:fixed;inset:0;z-index:900;background:rgba(36,31,61,.55);
+  backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;}
+.edit-sheet-overlay.show{opacity:1;pointer-events:auto;}
+.edit-sheet{width:100%;max-width:480px;max-height:86vh;background:var(--paper);
+  border-radius:26px 26px 0 0;padding:10px 22px calc(20px + env(safe-area-inset-bottom,0px));
+  display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.edit-sheet-grip{width:36px;height:4px;border-radius:4px;background:var(--border);
+  margin:0 auto 14px;flex-shrink:0;}
+.edit-sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+.edit-sheet-title{font-family:var(--font-display);font-size:17px;font-weight:600;}
+.sheet-input{width:100%;padding:11px 14px;border-radius:14px;background:var(--surface);
+  border:none;font-size:14px;color:var(--ink);}
+.icon-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;}
+.icon-chip{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:18px;
+  border-radius:14px;border:2px solid transparent;background:var(--surface);}
+.icon-chip.selected{border-color:var(--grape);background:var(--chip);}
+.color-row{display:flex;gap:12px;flex-wrap:wrap;padding:4px 0;}
+.color-swatch{width:32px;height:32px;border-radius:50%;border:none;flex-shrink:0;}
+.color-swatch.selected{box-shadow:0 0 0 3px var(--paper),0 0 0 5px var(--ink);}
+.text-danger-btn{width:100%;text-align:center;padding:12px;font-size:13px;font-weight:700;
+  color:var(--coral);margin-top:6px;}
 
 /* ============================== INSIGHTS ============================== */
 .ins-period-stepper{display:flex;align-items:center;justify-content:space-between;margin-top:14px;}
@@ -457,6 +495,7 @@ input{outline:none;}
       <div class="search-bar">
         <span>🔍</span>
         <input id="txn-search" type="text" placeholder="Search expenses...">
+        <button type="button" class="txn-filter-btn" id="txn-filter-btn">Filter</button>
       </div>
       <div id="txn-list" style="margin-top:14px;"></div>
     </div>
@@ -467,6 +506,34 @@ input{outline:none;}
     <button class="fab-add">＋</button>
     <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Insights</span></div>
     <div class="nav-item" data-nav="settings"><span>⚙️</span><span class="nav-label">Settings</span></div>
+  </div>
+</div>
+
+<!-- ============================== TRANSACTIONS FILTERS ============================== -->
+<div id="txn-filter-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title">Filters</p>
+      <button type="button" class="topbar-close" id="txn-filter-close-btn">✕</button>
+    </div>
+    <p class="field-label" style="margin-top:14px;">CATEGORY</p>
+    <div class="cat-grid" id="txn-filter-cat-grid"></div>
+    <p class="field-label">PAYMENT METHOD</p>
+    <div class="pay-row" id="txn-filter-pay-row"></div>
+    <p class="field-label">DATE RANGE</p>
+    <div class="ins-custom-range" style="margin-top:0;">
+      <div>
+        <p class="field-label" style="margin:0 0 4px;">FROM</p>
+        <input type="date" class="date-input" id="txn-filter-start">
+      </div>
+      <div>
+        <p class="field-label" style="margin:0 0 4px;">TO</p>
+        <input type="date" class="date-input" id="txn-filter-end">
+      </div>
+    </div>
+    <button type="button" class="save-btn" id="txn-filter-show-btn" style="margin-top:18px;">Show expenses</button>
+    <button type="button" class="text-danger-btn" id="txn-filter-clear-btn" style="color:var(--muted);">Clear all filters</button>
   </div>
 </div>
 
@@ -532,7 +599,32 @@ input{outline:none;}
   <div class="scroll">
     <div style="padding:0 20px 12px;">
       <p class="topbar-title" style="margin:14px 0 16px;">Settings</p>
-      <p class="field-label" style="margin-top:0;">DATA</p>
+      <p class="field-label" style="margin-top:0;">CUSTOMIZE</p>
+      <button type="button" class="settings-row" id="settings-categories-btn" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">🏷️</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Manage categories</p>
+          <span class="settings-row-sub">Add, edit, or remove expense categories</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>
+      <button type="button" class="settings-row" id="settings-paymentmethods-btn" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:rgba(91,168,255,.14);">💳</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Manage payment methods</p>
+          <span class="settings-row-sub">Add, edit, or remove payment methods</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>
+      <button type="button" class="settings-row" id="settings-groups-btn">
+        <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">🏷️</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Manage groups</p>
+          <span class="settings-row-sub">Rename, merge, or tag past expenses to a group</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>
+      <p class="field-label">DATA</p>
       <button type="button" class="settings-row" id="settings-bulkdelete-btn">
         <span class="settings-row-icon">🗑️</span>
         <div class="settings-row-info">
@@ -541,7 +633,7 @@ input{outline:none;}
         </div>
         <span class="settings-row-chevron">›</span>
       </button>
-      <p class="stub-text" style="text-align:left;margin-top:18px;">Managing categories and payment methods, export/import, and changing your PIN land in a future build pass.</p>
+      <p class="stub-text" style="text-align:left;margin-top:18px;">Export/import and changing your PIN land in a future build pass.</p>
     </div>
   </div>
   <div class="bottom-nav">
@@ -589,6 +681,92 @@ input{outline:none;}
   </div>
 </div>
 
+<!-- ============================== MANAGE CATEGORIES ============================== -->
+<div class="screen is-hidden" id="categories-screen">
+  <div class="topbar">
+    <p class="topbar-title">Manage categories</p>
+    <button class="topbar-close" id="categories-close-btn">✕</button>
+  </div>
+  <div class="scroll">
+    <div style="padding:0 20px 28px;">
+      <div id="categories-list"></div>
+      <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="categories-add-btn">+ Add category</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== MANAGE PAYMENT METHODS ============================== -->
+<div class="screen is-hidden" id="paymentmethods-screen">
+  <div class="topbar">
+    <p class="topbar-title">Manage payment methods</p>
+    <button class="topbar-close" id="paymentmethods-close-btn">✕</button>
+  </div>
+  <div class="scroll">
+    <div style="padding:0 20px 28px;">
+      <div id="paymentmethods-list"></div>
+      <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="paymentmethods-add-btn">+ Add payment method</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== MANAGE GROUPS ============================== -->
+<div class="screen is-hidden" id="groups-screen">
+  <div class="topbar">
+    <p class="topbar-title">Manage groups</p>
+    <button class="topbar-close" id="groups-close-btn">✕</button>
+  </div>
+  <div class="scroll">
+    <div style="padding:0 20px 28px;">
+      <div id="groups-list"></div>
+      <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="groups-add-btn">+ Add group</button>
+      <button type="button" class="warranty-toggle-btn" style="margin-top:10px;" id="groups-tag-btn">+ Tag past expenses</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== TAG PAST EXPENSES ============================== -->
+<div class="screen is-hidden" id="tagexpenses-screen">
+  <div class="topbar">
+    <p class="topbar-title">Tag past expenses</p>
+    <button class="topbar-close" id="tagexpenses-close-btn">✕</button>
+  </div>
+  <div class="scroll">
+    <div style="padding:0 20px 28px;">
+      <p class="field-label" style="margin-top:0;">TAG TO</p>
+      <div id="tag-group-area"></div>
+
+      <p class="field-label">FIND EXPENSES</p>
+      <div class="segmented-tabs" id="tag-mode-tabs">
+        <button type="button" class="segmented-tab active" data-tagmode="range">By date range</button>
+        <button type="button" class="segmented-tab" data-tagmode="manual">Pick manually</button>
+      </div>
+
+      <div id="tag-range-panel" style="margin-top:18px;">
+        <div class="ins-custom-range" style="margin-top:0;">
+          <div>
+            <p class="field-label" style="margin:0 0 4px;">FROM</p>
+            <input type="date" class="date-input" id="tag-range-start">
+          </div>
+          <div>
+            <p class="field-label" style="margin:0 0 4px;">TO</p>
+            <input type="date" class="date-input" id="tag-range-end">
+          </div>
+        </div>
+        <p class="empty-hint" id="tag-range-preview" style="padding:24px 0;">Pick a date range to see what can be tagged.</p>
+        <button type="button" class="save-btn hidden" id="tag-range-go-btn"></button>
+      </div>
+
+      <div id="tag-manual-panel" class="hidden" style="margin-top:18px;">
+        <div id="tag-manual-list"></div>
+      </div>
+    </div>
+  </div>
+  <div class="save-bar hidden" id="tag-manual-bar">
+    <p style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:8px;" id="tag-manual-summary">0 selected</p>
+    <button type="button" class="save-btn" id="tag-manual-go-btn">Tag selected</button>
+  </div>
+</div>
+
 <!-- ============================== BULK DELETE CONFIRM ============================== -->
 <div id="bulkdelete-confirm-overlay" class="confirm-overlay">
   <div class="confirm-sheet">
@@ -597,6 +775,99 @@ input{outline:none;}
     <p class="confirm-sheet-sub" id="bulkdelete-confirm-sub">This can be undone for a few seconds after.</p>
     <button type="button" class="danger-btn" id="bulkdelete-confirm-btn">Delete</button>
     <button type="button" class="confirm-sheet-cancel" id="bulkdelete-confirm-cancel-btn">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================== CATEGORY EDIT SHEET ============================== -->
+<div id="category-edit-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title" id="category-edit-title">Add category</p>
+      <button type="button" class="topbar-close" id="category-edit-close-btn">✕</button>
+    </div>
+    <p class="field-label" style="margin-top:14px;">NAME</p>
+    <input type="text" class="sheet-input" id="category-edit-name" placeholder="e.g. Subscriptions" maxlength="24">
+    <p class="field-label">ICON</p>
+    <div class="icon-grid" id="category-edit-icon-grid"></div>
+    <p class="field-label">COLOR</p>
+    <div class="color-row" id="category-edit-color-row"></div>
+    <button type="button" class="save-btn" id="category-edit-save-btn" style="margin-top:18px;">Save category</button>
+    <button type="button" class="text-danger-btn hidden" id="category-edit-delete-btn">Delete category</button>
+  </div>
+</div>
+
+<!-- ============================== PAYMENT METHOD EDIT SHEET ============================== -->
+<div id="paymentmethod-edit-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title" id="paymentmethod-edit-title">Add payment method</p>
+      <button type="button" class="topbar-close" id="paymentmethod-edit-close-btn">✕</button>
+    </div>
+    <p class="field-label" style="margin-top:14px;">NAME</p>
+    <input type="text" class="sheet-input" id="paymentmethod-edit-name" placeholder="e.g. Wallet" maxlength="24">
+    <p class="field-label">ICON</p>
+    <div class="icon-grid" id="paymentmethod-edit-icon-grid"></div>
+    <button type="button" class="save-btn" id="paymentmethod-edit-save-btn" style="margin-top:18px;">Save payment method</button>
+    <button type="button" class="text-danger-btn hidden" id="paymentmethod-edit-delete-btn">Delete payment method</button>
+  </div>
+</div>
+
+<!-- ============================== GROUP EDIT SHEET ============================== -->
+<div id="group-edit-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title" id="group-edit-title">Add group</p>
+      <button type="button" class="topbar-close" id="group-edit-close-btn">✕</button>
+    </div>
+    <p class="field-label" style="margin-top:14px;">NAME</p>
+    <input type="text" class="sheet-input" id="group-edit-name" placeholder="e.g. Goa Trip" maxlength="40">
+    <button type="button" class="save-btn" id="group-edit-save-btn" style="margin-top:18px;">Save group</button>
+    <button type="button" class="text-danger-btn hidden" id="group-edit-merge-btn" style="color:var(--grape);">Merge into another group</button>
+    <button type="button" class="text-danger-btn hidden" id="group-edit-delete-btn">Delete group</button>
+  </div>
+</div>
+
+<!-- ============================== MERGE GROUP PICKER ============================== -->
+<div id="group-merge-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title">Merge into…</p>
+      <button type="button" class="topbar-close" id="group-merge-close-btn">✕</button>
+    </div>
+    <div id="group-merge-pick-panel" style="margin-top:10px;">
+      <div id="group-merge-list"></div>
+    </div>
+    <div id="group-merge-confirm-panel" class="hidden" style="margin-top:10px;">
+      <p class="confirm-sheet-sub" id="group-merge-confirm-text" style="text-align:left;margin-bottom:14px;"></p>
+      <button type="button" class="save-btn" id="group-merge-confirm-btn">Merge groups</button>
+      <button type="button" class="confirm-sheet-cancel" id="group-merge-back-btn">Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== MANAGE DELETE CONFIRM (shared by Categories, Payment methods & Groups) ============================== -->
+<div id="manage-confirm-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">🗑️</div>
+    <p class="confirm-sheet-title" id="manage-confirm-title">Delete this?</p>
+    <p class="confirm-sheet-sub" id="manage-confirm-sub"></p>
+    <button type="button" class="danger-btn" id="manage-confirm-btn">Delete</button>
+    <button type="button" class="confirm-sheet-cancel" id="manage-confirm-cancel-btn">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================== TAG CONFIRM ============================== -->
+<div id="tag-confirm-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">🏷️</div>
+    <p class="confirm-sheet-title" id="tag-confirm-title">Tag these expenses?</p>
+    <p class="confirm-sheet-sub" id="tag-confirm-sub"></p>
+    <button type="button" class="save-btn" id="tag-confirm-btn">Tag expenses</button>
+    <button type="button" class="confirm-sheet-cancel" id="tag-confirm-cancel-btn">Cancel</button>
   </div>
 </div>
 
@@ -750,6 +1021,44 @@ const DB = {
     tx.objectStore('paymentMethods').put(pm);
     await txDone(tx);
   },
+  async deleteCategory(id){
+    const db=await openDB();
+    const tx=db.transaction('categories','readwrite');
+    tx.objectStore('categories').delete(id);
+    await txDone(tx);
+  },
+  async deletePaymentMethod(id){
+    const db=await openDB();
+    const tx=db.transaction('paymentMethods','readwrite');
+    tx.objectStore('paymentMethods').delete(id);
+    await txDone(tx);
+  },
+  async deleteGroup(id){
+    const db=await openDB();
+    const tx=db.transaction('groups','readwrite');
+    tx.objectStore('groups').delete(id);
+    await txDone(tx);
+  },
+  // Used to warn before a delete, not to block it — expenses referencing a
+  // since-deleted category/payment method already render gracefully
+  // everywhere via `cat?cat.icon:'❔'`-style fallbacks, so deleting one in
+  // use is safe; the count is just for an honest confirmation message.
+  async countExpensesByCategory(id){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('expenses','readonly').objectStore('expenses').index('categoryId').count(id);
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
+  async countExpensesByPaymentMethod(id){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('expenses','readonly').objectStore('expenses').index('paymentMethod').count(id);
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
   async getAllGroups(){
     const db=await openDB();
     return new Promise((resolve,reject)=>{
@@ -846,11 +1155,30 @@ const state = {
   insView:'categories',      // 'categories'|'compare'|'payment'|'groups' — which Insights sub-view is showing; persists across navigation
   insCompareCategoryId:null, // selected category for Compare — lazily defaults to the first category the first time Compare is viewed, then persists
   insSelectedGroupId:null,   // selected group for the Groups view — persists once chosen, no lazy default (there may be no groups yet)
+  mgrEditingType:null,   // 'category'|'paymentMethod' — which manager sheet is open, null when closed
+  mgrEditingId:null,     // id being edited in the open category/payment-method sheet, null when adding a new one
+  mgrSelectedIcon:null,  // icon chosen in the open sheet
+  mgrSelectedColor:null, // color chosen in the open sheet (categories only — payment methods have no color)
+  mgrPendingDelete:null, // {type, id} awaiting confirmation in manage-confirm-overlay, null when no delete is pending
+  mgrMergeSourceId:null, // group being merged FROM, while the merge picker is open
+  mgrMergeTargetId:null, // group chosen to merge INTO, once picked in the merge picker; null while still picking
+  tagGroupMode:null,        // 'existing'|'new' — target-group mode on the Tag Past Expenses screen
+  tagSelectedGroupId:null,  // chosen existing group's id, when tagGroupMode==='existing'
+  tagNewGroupName:'',       // freeform text typed so far, when tagGroupMode==='new'
+  tagMode:'range',          // 'range'|'manual' — which Tag Past Expenses sub-mode is active
+  tagStartISO:null,         // FROM date for range mode
+  tagEndISO:null,           // TO date for range mode
+  tagManualSelected:new Set(), // ids ticked in manual tag mode
+  tagPendingBatch:[],       // expense objects awaiting the tag-confirm dialog
+  txnFilterCategoryIds:new Set(), // category ids filtered IN on Transactions; empty = no restriction
+  txnFilterPaymentIds:new Set(),  // payment method ids filtered IN on Transactions; empty = no restriction
+  txnFilterStartISO:null,         // Transactions filter lower date bound (inclusive), or null = unbounded
+  txnFilterEndISO:null,           // Transactions filter upper date bound (inclusive), or null = unbounded
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
 /* ============================== SCREEN SYSTEM ============================== */
-const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen'];
+const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen'];
 function showScreen(id){
   SCREENS.forEach(s => document.getElementById(s).classList.toggle('is-hidden', s!==id));
 }
@@ -1248,10 +1576,15 @@ function formatGroupLabel(dateISO){
   if(dateISO===yest) return 'Yesterday';
   return new Date(dateISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
 }
-async function renderTransactions(){
+// Shared by the visible list and the filter sheet's live "Show N expenses"
+// preview, so both always agree without querying IndexedDB twice.
+async function getFilteredTransactions(){
   const search=(document.getElementById('txn-search').value||'').toLowerCase().trim();
   let list=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
-
+  if(state.txnFilterCategoryIds.size>0) list=list.filter(e => state.txnFilterCategoryIds.has(e.categoryId));
+  if(state.txnFilterPaymentIds.size>0) list=list.filter(e => state.txnFilterPaymentIds.has(e.paymentMethod));
+  if(state.txnFilterStartISO) list=list.filter(e => e.date >= state.txnFilterStartISO);
+  if(state.txnFilterEndISO) list=list.filter(e => e.date <= state.txnFilterEndISO);
   if(search){
     list=list.filter(e=>{
       const cat=state.categories.find(c=>c.id===e.categoryId);
@@ -1261,10 +1594,25 @@ async function renderTransactions(){
     });
   }
   list.sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
+  return list;
+}
+function hasActiveTxnFilters(){
+  return state.txnFilterCategoryIds.size>0 || state.txnFilterPaymentIds.size>0 || !!state.txnFilterStartISO || !!state.txnFilterEndISO;
+}
+function updateTxnFilterBtnState(){
+  const count = (state.txnFilterCategoryIds.size>0?1:0) + (state.txnFilterPaymentIds.size>0?1:0) + ((state.txnFilterStartISO||state.txnFilterEndISO)?1:0);
+  const btn=document.getElementById('txn-filter-btn');
+  btn.textContent = count>0 ? `Filter • ${count}` : 'Filter';
+  btn.classList.toggle('active', count>0);
+}
+async function renderTransactions(){
+  const search=(document.getElementById('txn-search').value||'').toLowerCase().trim();
+  const list=await getFilteredTransactions();
+  updateTxnFilterBtnState();
 
   const container=document.getElementById('txn-list'); container.innerHTML='';
   if(list.length===0){
-    container.innerHTML=`<p class="empty-hint">${search ? 'No expenses match your search.' : 'No expenses yet — tap + to add your first one.'}</p>`;
+    container.innerHTML=`<p class="empty-hint">${(search||hasActiveTxnFilters()) ? 'No expenses match your search or filters.' : 'No expenses yet — tap + to add your first one.'}</p>`;
     return;
   }
   let lastGroup=null;
@@ -1288,6 +1636,67 @@ async function renderTransactions(){
       </div>`);
   });
 }
+
+/* ============================== TRANSACTIONS FILTERS ============================== */
+function renderTxnFilterCatGrid(){
+  const grid=document.getElementById('txn-filter-cat-grid'); grid.innerHTML='';
+  state.categories.forEach(cat=>{
+    const selected=state.txnFilterCategoryIds.has(cat.id);
+    const bg = selected ? cat.color+'26' : 'var(--surface)';
+    const border = selected ? cat.color : 'transparent';
+    grid.insertAdjacentHTML('beforeend', `
+      <button type="button" class="cat-chip" data-cat="${cat.id}" style="background:${bg};border-color:${border}">
+        <span class="cat-emoji">${cat.icon}</span><span class="cat-name">${esc(cat.name)}</span>
+      </button>`);
+  });
+}
+function renderTxnFilterPayRow(){
+  const row=document.getElementById('txn-filter-pay-row'); row.innerHTML='';
+  state.paymentMethods.forEach(pm=>{
+    const selected=state.txnFilterPaymentIds.has(pm.id);
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    row.insertAdjacentHTML('beforeend', `
+      <button type="button" class="pay-chip" data-pay="${pm.id}" style="background:${bg};color:${color}">
+        <span>${pm.icon}</span>${esc(pm.name)}
+      </button>`);
+  });
+}
+async function updateTxnFilterShowBtn(){
+  const list=await getFilteredTransactions();
+  document.getElementById('txn-filter-show-btn').textContent = `Show ${list.length} expense${list.length===1?'':'s'}`;
+}
+// Every toggle inside the sheet takes effect immediately (consistent with
+// search-as-you-type and Insights' instant period switching elsewhere in
+// the app) — there's no separate "Apply" step, so closing the sheet by any
+// route always leaves the live list already in the right state.
+async function onTxnFilterChange(){
+  await renderTransactions();
+  await updateTxnFilterShowBtn();
+}
+async function openTxnFilterSheet(){
+  renderTxnFilterCatGrid();
+  renderTxnFilterPayRow();
+  document.getElementById('txn-filter-start').value = state.txnFilterStartISO || '';
+  document.getElementById('txn-filter-end').value = state.txnFilterEndISO || '';
+  await updateTxnFilterShowBtn();
+  document.getElementById('txn-filter-overlay').classList.add('show');
+}
+function closeTxnFilterSheet(){
+  document.getElementById('txn-filter-overlay').classList.remove('show');
+}
+async function clearTxnFilters(){
+  state.txnFilterCategoryIds=new Set();
+  state.txnFilterPaymentIds=new Set();
+  state.txnFilterStartISO=null;
+  state.txnFilterEndISO=null;
+  document.getElementById('txn-filter-start').value='';
+  document.getElementById('txn-filter-end').value='';
+  renderTxnFilterCatGrid();
+  renderTxnFilterPayRow();
+  await onTxnFilterChange();
+}
+
 async function openEditFromId(id){
   const exp=await DB.getExpense(id);
   if(!exp){ toast('That expense was not found'); return; }
@@ -1403,6 +1812,507 @@ function openBulkDeleteConfirm(batch){
 }
 function closeBulkDeleteConfirm(){
   document.getElementById('bulkdelete-confirm-overlay').classList.remove('show');
+}
+
+/* ============================== MANAGE CATEGORIES & PAYMENT METHODS ============================== */
+// Curated picks rather than a free emoji keyboard — faster to tap on
+// mobile, and keeps icons legible at the small sizes used everywhere
+// (recent-row, cat-chip, etc). Payment methods get a separate, smaller
+// set since they're about *how* you paid, not *what* it was for.
+const CATEGORY_ICON_CHOICES=['🍔','🍕','☕','🛒','🚗','⛽','✈️','🏠','📱','💡','🛍️','👗','💊','🏋️','🎬','🎮','📚','🎓','🐾','🎁','💼','🧾','🧸','✨'];
+const PAYMENT_ICON_CHOICES=['💳','📲','💵','🏦','💰','🧾','🪙','💸','🏧','📱'];
+// Mirrors the app's existing 6 design-token colors (--coral/--mint/--grape/
+// --sunshine/--sky/--pink) so new categories stay on-palette.
+const CATEGORY_COLOR_CHOICES=['#FF6B5B','#2EC4B6','#8657E0','#FFC23C','#5BA8FF','#FF8FB3'];
+
+function openCategoriesScreen(){
+  state.returnScreen='settings-screen';
+  renderCategoriesScreen();
+  showScreen('categories-screen');
+}
+function renderCategoriesScreen(){
+  const list=document.getElementById('categories-list'); list.innerHTML='';
+  if(state.categories.length===0){ list.innerHTML='<p class="empty-hint">No categories yet.</p>'; return; }
+  state.categories.forEach(cat=>{
+    list.insertAdjacentHTML('beforeend', `
+      <button type="button" class="settings-row" data-catid="${cat.id}" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:${cat.color}22;">${cat.icon}</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">${esc(cat.name)}${cat.isDefault?'<span class="manage-default-tag">Default</span>':''}</p>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>`);
+  });
+}
+
+function openPaymentMethodsScreen(){
+  state.returnScreen='settings-screen';
+  renderPaymentMethodsScreen();
+  showScreen('paymentmethods-screen');
+}
+function renderPaymentMethodsScreen(){
+  const list=document.getElementById('paymentmethods-list'); list.innerHTML='';
+  if(state.paymentMethods.length===0){ list.innerHTML='<p class="empty-hint">No payment methods yet.</p>'; return; }
+  state.paymentMethods.forEach(pm=>{
+    list.insertAdjacentHTML('beforeend', `
+      <button type="button" class="settings-row" data-pmid="${pm.id}" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:var(--chip);">${pm.icon}</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">${esc(pm.name)}${pm.isDefault?'<span class="manage-default-tag">Default</span>':''}</p>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>`);
+  });
+}
+
+function renderCategoryEditIconGrid(){
+  const grid=document.getElementById('category-edit-icon-grid'); grid.innerHTML='';
+  CATEGORY_ICON_CHOICES.forEach(icon=>{
+    const sel=icon===state.mgrSelectedIcon;
+    grid.insertAdjacentHTML('beforeend', `<button type="button" class="icon-chip ${sel?'selected':''}" data-icon="${icon}">${icon}</button>`);
+  });
+}
+function renderCategoryEditColorRow(){
+  const row=document.getElementById('category-edit-color-row'); row.innerHTML='';
+  CATEGORY_COLOR_CHOICES.forEach(color=>{
+    const sel=color===state.mgrSelectedColor;
+    row.insertAdjacentHTML('beforeend', `<button type="button" class="color-swatch ${sel?'selected':''}" data-color="${color}" style="background:${color};"></button>`);
+  });
+}
+function renderPaymentMethodEditIconGrid(){
+  const grid=document.getElementById('paymentmethod-edit-icon-grid'); grid.innerHTML='';
+  PAYMENT_ICON_CHOICES.forEach(icon=>{
+    const sel=icon===state.mgrSelectedIcon;
+    grid.insertAdjacentHTML('beforeend', `<button type="button" class="icon-chip ${sel?'selected':''}" data-icon="${icon}">${icon}</button>`);
+  });
+}
+
+function openCategoryEdit(id){
+  state.mgrEditingType='category';
+  state.mgrEditingId=id;
+  const existing = id ? state.categories.find(c=>c.id===id) : null;
+  state.mgrSelectedIcon = existing ? existing.icon : CATEGORY_ICON_CHOICES[0];
+  state.mgrSelectedColor = existing ? existing.color : CATEGORY_COLOR_CHOICES[0];
+  document.getElementById('category-edit-title').textContent = existing ? 'Edit category' : 'Add category';
+  document.getElementById('category-edit-name').value = existing ? existing.name : '';
+  document.getElementById('category-edit-delete-btn').classList.toggle('hidden', !existing);
+  renderCategoryEditIconGrid();
+  renderCategoryEditColorRow();
+  document.getElementById('category-edit-overlay').classList.add('show');
+}
+function closeCategoryEdit(){
+  document.getElementById('category-edit-overlay').classList.remove('show');
+}
+async function saveCategoryEdit(){
+  const name=document.getElementById('category-edit-name').value.trim();
+  if(!name){ toast('Give it a name first'); return; }
+  const existing = state.mgrEditingId ? state.categories.find(c=>c.id===state.mgrEditingId) : null;
+  const cat = {
+    id: existing ? existing.id : genId(),
+    name, icon: state.mgrSelectedIcon, color: state.mgrSelectedColor,
+    isDefault: existing ? existing.isDefault : false,
+  };
+  await DB.putCategory(cat);
+  if(existing) Object.assign(existing, cat);
+  else state.categories.push(cat);
+  closeCategoryEdit();
+  renderCategoriesScreen();
+  refreshAllExpenseViews();
+  toast(existing ? 'Category updated' : 'Category added');
+}
+function requestDeleteCategory(){
+  const id=state.mgrEditingId;
+  const cat=state.categories.find(c=>c.id===id);
+  if(!cat) return;
+  if(state.categories.length<=1){ toast("You need at least one category"); return; }
+  closeCategoryEdit();
+  openManageDeleteConfirm('category', id, cat.name);
+}
+
+function openPaymentMethodEdit(id){
+  state.mgrEditingType='paymentMethod';
+  state.mgrEditingId=id;
+  const existing = id ? state.paymentMethods.find(p=>p.id===id) : null;
+  state.mgrSelectedIcon = existing ? existing.icon : PAYMENT_ICON_CHOICES[0];
+  document.getElementById('paymentmethod-edit-title').textContent = existing ? 'Edit payment method' : 'Add payment method';
+  document.getElementById('paymentmethod-edit-name').value = existing ? existing.name : '';
+  document.getElementById('paymentmethod-edit-delete-btn').classList.toggle('hidden', !existing);
+  renderPaymentMethodEditIconGrid();
+  document.getElementById('paymentmethod-edit-overlay').classList.add('show');
+}
+function closePaymentMethodEdit(){
+  document.getElementById('paymentmethod-edit-overlay').classList.remove('show');
+}
+async function savePaymentMethodEdit(){
+  const name=document.getElementById('paymentmethod-edit-name').value.trim();
+  if(!name){ toast('Give it a name first'); return; }
+  const existing = state.mgrEditingId ? state.paymentMethods.find(p=>p.id===state.mgrEditingId) : null;
+  const pm = {
+    id: existing ? existing.id : genId(),
+    name, icon: state.mgrSelectedIcon,
+    isDefault: existing ? existing.isDefault : false,
+  };
+  await DB.putPaymentMethod(pm);
+  if(existing) Object.assign(existing, pm);
+  else state.paymentMethods.push(pm);
+  closePaymentMethodEdit();
+  renderPaymentMethodsScreen();
+  refreshAllExpenseViews();
+  toast(existing ? 'Payment method updated' : 'Payment method added');
+}
+function requestDeletePaymentMethod(){
+  const id=state.mgrEditingId;
+  const pm=state.paymentMethods.find(p=>p.id===id);
+  if(!pm) return;
+  if(state.paymentMethods.length<=1){ toast("You need at least one payment method"); return; }
+  closePaymentMethodEdit();
+  openManageDeleteConfirm('paymentMethod', id, pm.name);
+}
+
+// Shared by both managers — closes whichever edit sheet was open first, so
+// only one overlay is ever stacked at a time.
+async function openManageDeleteConfirm(type, id, name){
+  state.mgrPendingDelete={type, id};
+  let count, label;
+  if(type==='category'){ count=await DB.countExpensesByCategory(id); label='category'; }
+  else if(type==='paymentMethod'){ count=await DB.countExpensesByPaymentMethod(id); label='payment method'; }
+  else { count=(await getExpensesByGroupId(id)).length; label='group'; }
+  document.getElementById('manage-confirm-title').textContent = `Delete "${name}"?`;
+  document.getElementById('manage-confirm-sub').textContent = count>0
+    ? `${count} expense${count===1?'':'s'} ${count===1?'uses':'use'} this ${label} — they won't be deleted, just unlinked from it.`
+    : `No expenses use this ${label} yet.`;
+  document.getElementById('manage-confirm-overlay').classList.add('show');
+}
+function closeManageDeleteConfirm(){
+  document.getElementById('manage-confirm-overlay').classList.remove('show');
+  state.mgrPendingDelete=null;
+}
+async function confirmManageDelete(){
+  const pending=state.mgrPendingDelete;
+  if(!pending) return;
+  closeManageDeleteConfirm();
+  if(pending.type==='category'){
+    await DB.deleteCategory(pending.id);
+    state.categories=state.categories.filter(c=>c.id!==pending.id);
+    state.txnFilterCategoryIds.delete(pending.id); // keep the Transactions filter consistent if it was filtering on this
+    renderCategoriesScreen();
+    toast('Category deleted');
+  } else if(pending.type==='paymentMethod'){
+    await DB.deletePaymentMethod(pending.id);
+    state.paymentMethods=state.paymentMethods.filter(p=>p.id!==pending.id);
+    state.txnFilterPaymentIds.delete(pending.id);
+    renderPaymentMethodsScreen();
+    toast('Payment method deleted');
+  } else {
+    await DB.deleteGroup(pending.id);
+    state.groups=state.groups.filter(g=>g.id!==pending.id);
+    if(state.insSelectedGroupId===pending.id) state.insSelectedGroupId=null; // don't keep Insights pointed at a dead group
+    renderGroupsScreen();
+    toast('Group deleted');
+  }
+  refreshAllExpenseViews();
+}
+
+/* ============================== MANAGE GROUPS (rename/delete/merge) ============================== */
+// No index on expenses.groupId (only date/categoryId/paymentMethod are
+// indexed — see Architecture decisions), so this pulls the same wide
+// cursor Insights' Groups view already uses and filters in JS.
+async function getExpensesByGroupId(id){
+  return (await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id] && e.groupId===id);
+}
+
+function openGroupsScreen(){
+  state.returnScreen='settings-screen';
+  renderGroupsScreen();
+  showScreen('groups-screen');
+}
+function renderGroupsScreen(){
+  const list=document.getElementById('groups-list'); list.innerHTML='';
+  if(state.groups.length===0){
+    list.innerHTML='<p class="empty-hint">No groups yet — tag an expense to one from Add/Edit, or start here.</p>';
+    return;
+  }
+  state.groups.forEach(g=>{
+    list.insertAdjacentHTML('beforeend', `
+      <button type="button" class="settings-row" data-groupid="${g.id}" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:var(--chip);">🏷️</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">${esc(g.name)}</p>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>`);
+  });
+}
+
+function openGroupEdit(id){
+  state.mgrEditingType='group';
+  state.mgrEditingId=id;
+  const existing = id ? state.groups.find(g=>g.id===id) : null;
+  document.getElementById('group-edit-title').textContent = existing ? 'Edit group' : 'Add group';
+  document.getElementById('group-edit-name').value = existing ? existing.name : '';
+  document.getElementById('group-edit-delete-btn').classList.toggle('hidden', !existing);
+  document.getElementById('group-edit-merge-btn').classList.toggle('hidden', !existing || state.groups.length<=1);
+  document.getElementById('group-edit-overlay').classList.add('show');
+}
+function closeGroupEdit(){
+  document.getElementById('group-edit-overlay').classList.remove('show');
+}
+async function saveGroupEdit(){
+  const name=document.getElementById('group-edit-name').value.trim();
+  if(!name){ toast('Give it a name first'); return; }
+  const existing = state.mgrEditingId ? state.groups.find(g=>g.id===state.mgrEditingId) : null;
+  // Same case-insensitive guard used when groups are created inline from
+  // Add/Edit, so renaming one to match another doesn't quietly fork a duplicate.
+  const clash = state.groups.find(g => g.id!==(existing?existing.id:null) && g.name.toLowerCase()===name.toLowerCase());
+  if(clash){ toast(`"${clash.name}" already exists`); return; }
+  const group = { id: existing ? existing.id : genId(), name };
+  await DB.putGroup(group);
+  if(existing) Object.assign(existing, group);
+  else state.groups.push(group);
+  closeGroupEdit();
+  renderGroupsScreen();
+  refreshAllExpenseViews();
+  toast(existing ? 'Group updated' : 'Group added');
+}
+function requestDeleteGroup(){
+  const id=state.mgrEditingId;
+  const group=state.groups.find(g=>g.id===id);
+  if(!group) return;
+  closeGroupEdit();
+  openManageDeleteConfirm('group', id, group.name);
+}
+
+function openGroupMerge(){
+  state.mgrMergeSourceId=state.mgrEditingId;
+  state.mgrMergeTargetId=null;
+  closeGroupEdit();
+  renderGroupMergeList();
+  document.getElementById('group-merge-pick-panel').classList.remove('hidden');
+  document.getElementById('group-merge-confirm-panel').classList.add('hidden');
+  document.getElementById('group-merge-overlay').classList.add('show');
+}
+function renderGroupMergeList(){
+  const list=document.getElementById('group-merge-list'); list.innerHTML='';
+  const others=state.groups.filter(g=>g.id!==state.mgrMergeSourceId);
+  if(others.length===0){ list.innerHTML='<p class="empty-hint">No other groups to merge into.</p>'; return; }
+  others.forEach(g=>{
+    list.insertAdjacentHTML('beforeend', `
+      <button type="button" class="settings-row" data-mergetarget="${g.id}" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:var(--chip);">🏷️</span>
+        <div class="settings-row-info"><p class="settings-row-title">${esc(g.name)}</p></div>
+        <span class="settings-row-chevron">›</span>
+      </button>`);
+  });
+}
+async function pickGroupMergeTarget(targetId){
+  state.mgrMergeTargetId=targetId;
+  const source=state.groups.find(g=>g.id===state.mgrMergeSourceId);
+  const target=state.groups.find(g=>g.id===targetId);
+  const count=(await getExpensesByGroupId(state.mgrMergeSourceId)).length;
+  document.getElementById('group-merge-confirm-text').textContent =
+    `${count} expense${count===1?'':'s'} from "${source?source.name:''}" will move to "${target?target.name:''}", and "${source?source.name:''}" will be deleted.`;
+  document.getElementById('group-merge-pick-panel').classList.add('hidden');
+  document.getElementById('group-merge-confirm-panel').classList.remove('hidden');
+}
+function closeGroupMerge(){
+  document.getElementById('group-merge-overlay').classList.remove('show');
+  state.mgrMergeSourceId=null;
+  state.mgrMergeTargetId=null;
+}
+function backFromGroupMergeConfirm(){
+  state.mgrMergeTargetId=null;
+  document.getElementById('group-merge-pick-panel').classList.remove('hidden');
+  document.getElementById('group-merge-confirm-panel').classList.add('hidden');
+}
+async function confirmGroupMerge(){
+  const sourceId=state.mgrMergeSourceId, targetId=state.mgrMergeTargetId;
+  if(!sourceId || !targetId) return;
+  const expenses=await getExpensesByGroupId(sourceId);
+  for(const exp of expenses){
+    exp.groupId=targetId;
+    await DB.addExpense(exp); // put() — works for update since the id matches, same trick used when saving an edited expense
+  }
+  await DB.deleteGroup(sourceId);
+  state.groups=state.groups.filter(g=>g.id!==sourceId);
+  if(state.insSelectedGroupId===sourceId) state.insSelectedGroupId=targetId;
+  closeGroupMerge();
+  renderGroupsScreen();
+  refreshAllExpenseViews();
+  toast('Groups merged');
+}
+
+/* ============================== TAG PAST EXPENSES ============================== */
+// The retroactive-tagging gap the handover doc flagged: Groups are
+// forward-only at entry time, so anything logged before a group existed
+// had no way to join it short of editing each expense one by one. This
+// reuses Bulk Delete's two-mode shape (by range / pick manually) but the
+// action is a relabel, not a delete, so nothing here is undo-tracked the
+// way deletes are — re-tagging is just editing the same field again.
+let tagRangeMatchedCache=[];
+let tagManualListCache=[];
+
+function renderTagGroupArea(){
+  const area=document.getElementById('tag-group-area');
+  const chipsHTML=state.groups.map(g=>{
+    const selected=state.tagGroupMode==='existing' && state.tagSelectedGroupId===g.id;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    return `<button type="button" class="pay-chip" data-taggroupid="${g.id}" style="background:${bg};color:${color}">${esc(g.name)}</button>`;
+  }).join('');
+  const newSelected = state.tagGroupMode==='new';
+  const newChipHTML = `<button type="button" class="pay-chip" data-taggroupid="new" style="background:${newSelected?'var(--grape)':'var(--surface)'};color:${newSelected?'white':'var(--ink)'}">+ New</button>`;
+  area.innerHTML = `
+    <div class="pay-row">${chipsHTML}${newChipHTML}</div>
+    <input id="tag-group-new-input" type="text" class="date-input ${newSelected?'':'hidden'}" placeholder="Group name (e.g. Goa Trip)" maxlength="40" value="${esc(state.tagNewGroupName)}">`;
+}
+
+function setTagMode(mode){
+  state.tagMode=mode;
+  document.querySelectorAll('#tag-mode-tabs .segmented-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.tagmode===mode);
+  });
+  document.getElementById('tag-range-panel').classList.toggle('hidden', mode!=='range');
+  document.getElementById('tag-manual-panel').classList.toggle('hidden', mode!=='manual');
+  document.getElementById('tag-manual-bar').classList.toggle('hidden', mode!=='manual' || state.tagManualSelected.size===0);
+  if(mode==='manual') renderTagManualList();
+}
+
+async function updateTagRangePreview(){
+  const preview=document.getElementById('tag-range-preview');
+  const goBtn=document.getElementById('tag-range-go-btn');
+  if(!state.tagStartISO || !state.tagEndISO){
+    preview.textContent='Pick a date range to see what can be tagged.';
+    goBtn.classList.add('hidden');
+    tagRangeMatchedCache=[];
+    return;
+  }
+  if(state.tagStartISO > state.tagEndISO){
+    preview.textContent='The from date is after the to date.';
+    goBtn.classList.add('hidden');
+    tagRangeMatchedCache=[];
+    return;
+  }
+  const all=(await DB.getExpensesByDateRange(state.tagStartISO, state.tagEndISO)).filter(e => !pendingDeletes[e.id]);
+  tagRangeMatchedCache = all.filter(e => !e.groupId); // only ungrouped — already-grouped expenses are left alone here; Pick manually can still override them
+  const groupedCount = all.length - tagRangeMatchedCache.length;
+  if(tagRangeMatchedCache.length===0){
+    preview.textContent = groupedCount>0
+      ? `All ${groupedCount} expense${groupedCount===1?'':'s'} in this range ${groupedCount===1?'is':'are'} already grouped.`
+      : 'No expenses in this range.';
+    goBtn.classList.add('hidden');
+    return;
+  }
+  preview.textContent = `${tagRangeMatchedCache.length} ungrouped expense${tagRangeMatchedCache.length===1?'':'s'} in this range` +
+    (groupedCount>0 ? ` (${groupedCount} already grouped, skipped)` : '') + '.';
+  goBtn.textContent = `Tag ${tagRangeMatchedCache.length} expense${tagRangeMatchedCache.length===1?'':'s'}`;
+  goBtn.classList.remove('hidden');
+}
+
+async function renderTagManualList(){
+  const list=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
+  list.sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
+  tagManualListCache=list;
+  const container=document.getElementById('tag-manual-list'); container.innerHTML='';
+  if(list.length===0){ container.innerHTML='<p class="empty-hint">No expenses to show.</p>'; return; }
+  let lastGroup=null;
+  list.forEach(e=>{
+    const groupLabel=formatGroupLabel(e.date);
+    if(groupLabel!==lastGroup){
+      container.insertAdjacentHTML('beforeend', `<p class="txn-group-label">${esc(groupLabel.toUpperCase())}</p>`);
+      lastGroup=groupLabel;
+    }
+    const cat=state.categories.find(c=>c.id===e.categoryId);
+    const grp=state.groups.find(g=>g.id===e.groupId);
+    const checked=state.tagManualSelected.has(e.id);
+    container.insertAdjacentHTML('beforeend', `
+      <div class="recent-row" data-id="${e.id}">
+        <span class="bulkdelete-checkbox ${checked?'checked':''}"></span>
+        <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
+        <div class="recent-info">
+          <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
+          ${grp ? `<span class="recent-pm">${esc(grp.name)}</span>` : ''}
+        </div>
+        <span class="recent-amt">-${formatINR(e.amount)}</span>
+      </div>`);
+  });
+}
+function updateTagManualSummary(){
+  const selected=tagManualListCache.filter(e => state.tagManualSelected.has(e.id));
+  const bar=document.getElementById('tag-manual-bar');
+  if(selected.length===0){ bar.classList.add('hidden'); return; }
+  bar.classList.remove('hidden');
+  document.getElementById('tag-manual-summary').textContent=`${selected.length} selected`;
+}
+
+function getTagTargetDisplayName(){
+  if(state.tagGroupMode==='existing'){
+    const g=state.groups.find(x=>x.id===state.tagSelectedGroupId);
+    return g ? g.name : null;
+  }
+  if(state.tagGroupMode==='new'){
+    const name=(state.tagNewGroupName||'').trim();
+    return name || null;
+  }
+  return null;
+}
+// The group itself isn't created until the batch is actually confirmed —
+// same reasoning as Add/Edit's inline group creation: an abandoned/cancelled
+// tag action should never leave an orphan group behind.
+async function resolveTagTargetGroupId(){
+  if(state.tagGroupMode==='existing') return state.tagSelectedGroupId;
+  if(state.tagGroupMode==='new'){
+    const name=(state.tagNewGroupName||'').trim();
+    if(!name) return null;
+    const existingMatch=state.groups.find(g=>g.name.toLowerCase()===name.toLowerCase());
+    if(existingMatch) return existingMatch.id;
+    const newGroup={ id:genId(), name };
+    await DB.putGroup(newGroup);
+    state.groups.push(newGroup);
+    return newGroup.id;
+  }
+  return null;
+}
+
+function openTagExpensesScreen(){
+  state.returnScreen='groups-screen';
+  state.tagGroupMode=null; state.tagSelectedGroupId=null; state.tagNewGroupName='';
+  state.tagStartISO=null; state.tagEndISO=null;
+  state.tagManualSelected=new Set();
+  tagRangeMatchedCache=[]; tagManualListCache=[];
+  document.getElementById('tag-range-start').value='';
+  document.getElementById('tag-range-end').value='';
+  document.getElementById('tag-range-preview').textContent='Pick a date range to see what can be tagged.';
+  document.getElementById('tag-range-go-btn').classList.add('hidden');
+  renderTagGroupArea();
+  setTagMode('range');
+  showScreen('tagexpenses-screen');
+}
+
+function requestTagBatch(batch){
+  const targetName=getTagTargetDisplayName();
+  if(!targetName){ toast('Pick or create a group first'); return; }
+  state.tagPendingBatch=batch;
+  document.getElementById('tag-confirm-title').textContent = `Tag ${batch.length} expense${batch.length===1?'':'s'} to "${targetName}"?`;
+  document.getElementById('tag-confirm-sub').textContent = `They'll show up under this group in Insights going forward.`;
+  document.getElementById('tag-confirm-overlay').classList.add('show');
+}
+function closeTagConfirm(){
+  document.getElementById('tag-confirm-overlay').classList.remove('show');
+}
+async function confirmTagExpenses(){
+  const batch=state.tagPendingBatch;
+  closeTagConfirm();
+  const targetId=await resolveTagTargetGroupId();
+  if(!targetId){ toast('Pick or create a group first'); return; }
+  for(const exp of batch){
+    exp.groupId=targetId;
+    await DB.addExpense(exp);
+  }
+  const group=state.groups.find(g=>g.id===targetId);
+  toast(`${batch.length} expense${batch.length===1?'':'s'} tagged to ${group?group.name:'group'}`);
+  refreshAllExpenseViews();
+  showScreen('groups-screen');
+  renderGroupsScreen();
 }
 
 /* ============================== INSIGHTS ============================== */
@@ -2081,6 +2991,38 @@ document.getElementById('txn-search').addEventListener('input', () => {
   txnSearchTimer=setTimeout(renderTransactions, 150);
 });
 
+document.getElementById('txn-filter-btn').addEventListener('click', openTxnFilterSheet);
+document.getElementById('txn-filter-close-btn').addEventListener('click', closeTxnFilterSheet);
+document.getElementById('txn-filter-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='txn-filter-overlay') closeTxnFilterSheet();
+});
+document.getElementById('txn-filter-show-btn').addEventListener('click', closeTxnFilterSheet);
+document.getElementById('txn-filter-clear-btn').addEventListener('click', clearTxnFilters);
+document.getElementById('txn-filter-cat-grid').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-cat]'); if(!btn) return;
+  const id=btn.dataset.cat;
+  if(state.txnFilterCategoryIds.has(id)) state.txnFilterCategoryIds.delete(id);
+  else state.txnFilterCategoryIds.add(id);
+  renderTxnFilterCatGrid();
+  onTxnFilterChange();
+});
+document.getElementById('txn-filter-pay-row').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-pay]'); if(!btn) return;
+  const id=btn.dataset.pay;
+  if(state.txnFilterPaymentIds.has(id)) state.txnFilterPaymentIds.delete(id);
+  else state.txnFilterPaymentIds.add(id);
+  renderTxnFilterPayRow();
+  onTxnFilterChange();
+});
+document.getElementById('txn-filter-start').addEventListener('change', (e) => {
+  state.txnFilterStartISO = e.target.value || null;
+  onTxnFilterChange();
+});
+document.getElementById('txn-filter-end').addEventListener('change', (e) => {
+  state.txnFilterEndISO = e.target.value || null;
+  onTxnFilterChange();
+});
+
 document.getElementById('home-tabs').addEventListener('click', (e) => {
   const btn=e.target.closest('.home-tab'); if(!btn) return;
   setHomeTab(btn.dataset.hometab);
@@ -2148,6 +3090,133 @@ document.getElementById('bulkdelete-confirm-btn').addEventListener('click', () =
     onUndo: refreshAllExpenseViews,
   });
 });
+
+document.getElementById('settings-categories-btn').addEventListener('click', openCategoriesScreen);
+document.getElementById('categories-close-btn').addEventListener('click', () => showScreen('settings-screen'));
+document.getElementById('categories-list').addEventListener('click', (e) => {
+  const row=e.target.closest('[data-catid]'); if(!row) return;
+  openCategoryEdit(row.dataset.catid);
+});
+document.getElementById('categories-add-btn').addEventListener('click', () => openCategoryEdit(null));
+document.getElementById('category-edit-close-btn').addEventListener('click', closeCategoryEdit);
+document.getElementById('category-edit-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='category-edit-overlay') closeCategoryEdit();
+});
+document.getElementById('category-edit-icon-grid').addEventListener('click', (e) => {
+  const btn=e.target.closest('.icon-chip'); if(!btn) return;
+  state.mgrSelectedIcon=btn.dataset.icon;
+  renderCategoryEditIconGrid();
+});
+document.getElementById('category-edit-color-row').addEventListener('click', (e) => {
+  const btn=e.target.closest('.color-swatch'); if(!btn) return;
+  state.mgrSelectedColor=btn.dataset.color;
+  renderCategoryEditColorRow();
+});
+document.getElementById('category-edit-save-btn').addEventListener('click', saveCategoryEdit);
+document.getElementById('category-edit-delete-btn').addEventListener('click', requestDeleteCategory);
+
+document.getElementById('settings-paymentmethods-btn').addEventListener('click', openPaymentMethodsScreen);
+document.getElementById('paymentmethods-close-btn').addEventListener('click', () => showScreen('settings-screen'));
+document.getElementById('paymentmethods-list').addEventListener('click', (e) => {
+  const row=e.target.closest('[data-pmid]'); if(!row) return;
+  openPaymentMethodEdit(row.dataset.pmid);
+});
+document.getElementById('paymentmethods-add-btn').addEventListener('click', () => openPaymentMethodEdit(null));
+document.getElementById('paymentmethod-edit-close-btn').addEventListener('click', closePaymentMethodEdit);
+document.getElementById('paymentmethod-edit-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='paymentmethod-edit-overlay') closePaymentMethodEdit();
+});
+document.getElementById('paymentmethod-edit-icon-grid').addEventListener('click', (e) => {
+  const btn=e.target.closest('.icon-chip'); if(!btn) return;
+  state.mgrSelectedIcon=btn.dataset.icon;
+  renderPaymentMethodEditIconGrid();
+});
+document.getElementById('paymentmethod-edit-save-btn').addEventListener('click', savePaymentMethodEdit);
+document.getElementById('paymentmethod-edit-delete-btn').addEventListener('click', requestDeletePaymentMethod);
+
+document.getElementById('manage-confirm-cancel-btn').addEventListener('click', closeManageDeleteConfirm);
+document.getElementById('manage-confirm-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='manage-confirm-overlay') closeManageDeleteConfirm();
+});
+document.getElementById('manage-confirm-btn').addEventListener('click', confirmManageDelete);
+
+document.getElementById('settings-groups-btn').addEventListener('click', openGroupsScreen);
+document.getElementById('groups-close-btn').addEventListener('click', () => showScreen('settings-screen'));
+document.getElementById('groups-list').addEventListener('click', (e) => {
+  const row=e.target.closest('[data-groupid]'); if(!row) return;
+  openGroupEdit(row.dataset.groupid);
+});
+document.getElementById('groups-add-btn').addEventListener('click', () => openGroupEdit(null));
+document.getElementById('groups-tag-btn').addEventListener('click', openTagExpensesScreen);
+document.getElementById('group-edit-close-btn').addEventListener('click', closeGroupEdit);
+document.getElementById('group-edit-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='group-edit-overlay') closeGroupEdit();
+});
+document.getElementById('group-edit-save-btn').addEventListener('click', saveGroupEdit);
+document.getElementById('group-edit-delete-btn').addEventListener('click', requestDeleteGroup);
+document.getElementById('group-edit-merge-btn').addEventListener('click', openGroupMerge);
+
+document.getElementById('group-merge-close-btn').addEventListener('click', closeGroupMerge);
+document.getElementById('group-merge-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='group-merge-overlay') closeGroupMerge();
+});
+document.getElementById('group-merge-list').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-mergetarget]'); if(!btn) return;
+  pickGroupMergeTarget(btn.dataset.mergetarget);
+});
+document.getElementById('group-merge-back-btn').addEventListener('click', backFromGroupMergeConfirm);
+document.getElementById('group-merge-confirm-btn').addEventListener('click', confirmGroupMerge);
+
+document.getElementById('tagexpenses-close-btn').addEventListener('click', () => { showScreen('groups-screen'); renderGroupsScreen(); });
+document.getElementById('tag-group-area').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-taggroupid]'); if(!btn) return;
+  if(btn.dataset.taggroupid==='new'){
+    state.tagGroupMode='new'; state.tagSelectedGroupId=null;
+    renderTagGroupArea();
+    document.getElementById('tag-group-new-input').focus();
+  } else {
+    state.tagGroupMode='existing'; state.tagSelectedGroupId=btn.dataset.taggroupid; state.tagNewGroupName='';
+    renderTagGroupArea();
+  }
+});
+document.getElementById('tag-group-area').addEventListener('input', (e) => {
+  if(e.target.id==='tag-group-new-input') state.tagNewGroupName=e.target.value;
+});
+document.getElementById('tag-mode-tabs').addEventListener('click', (e) => {
+  const btn=e.target.closest('.segmented-tab'); if(!btn) return;
+  setTagMode(btn.dataset.tagmode);
+});
+document.getElementById('tag-range-start').addEventListener('change', (e) => {
+  state.tagStartISO=e.target.value||null;
+  updateTagRangePreview();
+});
+document.getElementById('tag-range-end').addEventListener('change', (e) => {
+  state.tagEndISO=e.target.value||null;
+  updateTagRangePreview();
+});
+document.getElementById('tag-range-go-btn').addEventListener('click', () => {
+  if(!tagRangeMatchedCache.length) return;
+  requestTagBatch(tagRangeMatchedCache);
+});
+document.getElementById('tag-manual-list').addEventListener('click', (e) => {
+  const row=e.target.closest('.recent-row'); if(!row) return;
+  const id=row.dataset.id;
+  if(state.tagManualSelected.has(id)) state.tagManualSelected.delete(id);
+  else state.tagManualSelected.add(id);
+  const box=row.querySelector('.bulkdelete-checkbox');
+  if(box) box.classList.toggle('checked', state.tagManualSelected.has(id));
+  updateTagManualSummary();
+});
+document.getElementById('tag-manual-go-btn').addEventListener('click', () => {
+  const selected=tagManualListCache.filter(e => state.tagManualSelected.has(e.id));
+  if(!selected.length) return;
+  requestTagBatch(selected);
+});
+document.getElementById('tag-confirm-cancel-btn').addEventListener('click', closeTagConfirm);
+document.getElementById('tag-confirm-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='tag-confirm-overlay') closeTagConfirm();
+});
+document.getElementById('tag-confirm-btn').addEventListener('click', confirmTagExpenses);
 
 document.getElementById('ins-period-type-tabs').addEventListener('click', (e) => {
   const btn=e.target.closest('.segmented-tab'); if(!btn) return;
