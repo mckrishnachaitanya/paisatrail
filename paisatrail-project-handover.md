@@ -22,6 +22,10 @@ Personal expense tracker PWA. Re-paste this into Project knowledge at the start 
 
 - **Income tracking:** opt-in alongside expenses on the same Add screen via an Expense/Income segmented toggle. Income entries are stored in the same `expenses` IndexedDB store with `type:'income'` and `incomeCategoryId` (pointing into the hardcoded `INCOME_CATEGORIES` list — 7 fixed categories: Salary, Freelance, Business, Rental, Gift, Investment, Other). Expense records written from now on carry `type:'expense'`; records without a `type` field (all existing data) are treated as expenses via `isExpenseEntry()`/`isIncomeEntry()` backward-compat helpers — these helpers are used in every DB query so income never pollutes budgets, forecast, warranty, insights, or bulk-delete. Home screen now shows a 3-stat cashflow card (Income / Expenses / Net) instead of the old single spend total; the recent list shows both types. Transactions list shows income rows in mint with a + prefix; the filter sheet has a new TYPE toggle (All / Expenses / Income) that hides the category filter when Income-only is selected. Expense-only fields (warranty, group, recurring, attachments) are hidden automatically on the Add screen when income mode is active.
 
+- **Manual lock button:** 🔒 icon on the top-right of all four main screens (Home, Transactions, Insights, Settings). Calls `lockVault()` — identical behaviour to the idle-auto-lock including biometric auto-prompt on the way back in.
+- **Expanded category icon set:** `CATEGORY_ICON_CHOICES` expanded from 24 to 71 unique icons across themed groups (food, transport, home, health, fitness, entertainment, finance, travel, family, shopping, misc). Health kept to just 🏥+💊 per Krishna's call.
+- **Polished app icon:** `icons/icon.svg` — Option 1 design (coral background, bold white ₹ with dotted arc trail). Confirmed set on device by Krishna; V2 complete.
+
 **Krishna's call: dark mode dropped entirely** (not a fan, isn't getting built — see §8). **Independent V2 task, no urgency:** polished app icon.
 
 **V3 (later, needs a backend):** multi-device cloud sync.
@@ -75,10 +79,11 @@ Palette: paper `#FFFCF7` · ink `#241F3D` · sunshine `#FFC23C` · coral `#FF6B5
 Single repo root, no wrapper folder: `index.html` (entire app), `manifest.json`, `sw.js`, `icons/icon.svg` (placeholder).
 
 ## 8. Next up
-1. Real-device Android testing — standing checklist, not a blocker. Recurring Expenses, the amount-range filter, the warranty-soon banner, Cash-Flow Forecasting, Budgets (including the 4-tab Home bar), and Biometric Unlock are all confirmed working per Krishna's initial round of testing.
-2. **V2 build order:** (1) quick wins ✅ shipped, (2) cash-flow forecasting ✅ shipped, (3) budgets ✅ shipped, (4) dark mode — **dropped, Krishna isn't a fan; not getting built.** (5) biometric unlock ✅ shipped (replaced the originally-planned step-up concept; see §2), (6) income tracking ✅ shipped. Only the polished app icon (pure asset task) remains, available whenever Krishna wants it, no urgency.
+1. Real-device Android testing — standing checklist, not a blocker. All V2 features confirmed working on device: Recurring Expenses, amount-range filter, warranty-soon banner, Cash-Flow Forecasting, Budgets, Biometric Unlock, Income Tracking, Manual Lock button, expanded icon set (71 icons), polished app icon. Income tracking had a critical bug (sed overshoot applied isExpenseEntry guard to getFilteredTransactions and home overview base query — both fixed same session).
+2. **V2 build order:** (1) quick wins ✅ shipped, (2) cash-flow forecasting ✅ shipped, (3) budgets ✅ shipped, (4) dark mode — **dropped, Krishna isn't a fan; not getting built.** (5) biometric unlock ✅ shipped (replaced the originally-planned step-up concept; see §2), (6) income tracking ✅ shipped, (7) manual lock button ✅ shipped, (8) expanded icon set (71 icons) ✅ shipped, (9) polished app icon ✅ confirmed set on device by Krishna. V2 fully complete.
 
 3. **V3 backlog (not yet scoped, rough priority order):**
+   - **Forecast + income integration** — forecast tab currently projects expense spending only; once income entry becomes a habit, add projected savings (income minus projected spend) and overspend warnings. Deliberately deferred — only useful when income is logged consistently.
    - **Multiple accounts/wallets** — cash, savings account, credit card as separate tracked balances with a net worth view. Pairs naturally with income tracking.
    - **Lightweight split expenses** — log your share only; no contacts or settlement tracking. Full Splitwise-style is out of scope.
    - **Multi-device cloud sync** — needs a backend; pushed further out.

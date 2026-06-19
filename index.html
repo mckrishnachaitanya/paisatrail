@@ -551,8 +551,10 @@ input{outline:none;}
       <p class="field-label">CATEGORY</p>
       <div class="cat-grid" id="add-category-grid"></div>
 
-      <p class="field-label">PAID VIA</p>
-      <div class="pay-row" id="add-payment-row"></div>
+      <div id="add-payment-section">
+        <p class="field-label">PAID VIA</p>
+        <div class="pay-row" id="add-payment-row"></div>
+      </div>
 
       <p class="field-label">NOTE</p>
       <input id="add-note" type="text" placeholder="What was this for?">
@@ -1914,7 +1916,7 @@ async function renderHomeOverviewPanel(){
     recent.forEach(e=>{
       const isInc=isIncomeEntry(e);
       const cat=isInc ? INCOME_CATEGORIES.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
-      const pm=state.paymentMethods.find(p=>p.id===e.paymentMethod);
+      const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
       const amtText=isInc ? formatINR(e.amount) : `-${formatINR(e.amount)}`;
       if(isInc){
@@ -1924,7 +1926,7 @@ async function renderHomeOverviewPanel(){
             <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'💰'}</div>
             <div class="recent-info">
               <p class="recent-title">${esc(e.note || (cat?cat.name:'Income'))}</p>
-              <span class="recent-pm">${pm?esc(pm.name):'—'}</span>
+              <span class="recent-pm">${cat?esc(cat.name):'Income'}</span>
             </div>
             <span class="${amtClass}">${amtText}</span>
           </div>`);
@@ -2148,17 +2150,18 @@ async function renderTransactions(){
       }
       const isInc=isIncomeEntry(e);
       const cat=isInc ? INCOME_CATEGORIES.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
-      const pm=state.paymentMethods.find(p=>p.id===e.paymentMethod);
+      const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
       const amtText=isInc ? formatINR(e.amount) : `-${formatINR(e.amount)}`;
       const defaultLabel=isInc ? 'Income' : 'Expense';
       const fallbackIcon=isInc ? '💰' : '❔';
+      const subtitle=isInc ? (cat?esc(cat.name):'Income') : (pm?esc(pm.name):'—');
       container.insertAdjacentHTML('beforeend', `
         <div class="recent-row" data-id="${e.id}">
           <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:fallbackIcon}</div>
           <div class="recent-info">
             <p class="recent-title">${esc(e.note || (cat?cat.name:defaultLabel))}</p>
-            <span class="recent-pm">${pm?esc(pm.name):'—'}</span>
+            <span class="recent-pm">${subtitle}</span>
           </div>
           <span class="${amtClass}">${amtText}</span>
           <button class="txn-delete" data-del="${e.id}">🗑️</button>
@@ -3850,6 +3853,7 @@ async function renderInsights(){
 function renderAddModeUI(){
   const isIncome = state.addMode === 'income';
   document.getElementById('add-expense-only-fields').classList.toggle('hidden', isIncome);
+  document.getElementById('add-payment-section').classList.toggle('hidden', isIncome);
   renderCategoryGrid();
   updateNotePlaceholder();
   renderPaymentChips();
@@ -4180,7 +4184,6 @@ async function saveExpense(){
   // Income path — much simpler: no warranty, no group, no recurring
   if(isIncome){
     if(!state.selectedIncomeCategoryId){ toast('Pick an income category'); return; }
-    if(!state.selectedPaymentId){ toast('Pick a payment method'); return; }
     const date=document.getElementById('add-date').value || todayISO();
     const note=document.getElementById('add-note').value.trim();
     const isEdit=!!state.editingExpenseId;
@@ -4188,7 +4191,6 @@ async function saveExpense(){
     const income={
       id, type:'income', amount,
       incomeCategoryId: state.selectedIncomeCategoryId,
-      paymentMethod: state.selectedPaymentId,
       date, note, attachmentIds:[],
       createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
     };
