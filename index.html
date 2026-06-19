@@ -1873,7 +1873,7 @@ async function renderHomeOverviewPanel(){
   const startISO=(()=>{ const tz=monthStart.getTimezoneOffset()*60000; return new Date(monthStart-tz).toISOString().slice(0,10); })();
   const endISO=todayISO();
 
-  const all=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+  const all=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id]);
   const expenses=all.filter(isExpenseEntry);
   const incomes=all.filter(isIncomeEntry);
   const expenseTotal=expenses.reduce((s,e)=>s+Number(e.amount),0);
@@ -2086,7 +2086,7 @@ function formatGroupLabel(dateISO){
 // preview, so both always agree without querying IndexedDB twice.
 async function getFilteredTransactions(){
   const search=(document.getElementById('txn-search').value||'').toLowerCase().trim();
-  let list=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+  let list=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
   // Type filter — 'all' shows everything; 'expense' and 'income' narrow to one type
   if(state.txnFilterType==='expense') list=list.filter(isExpenseEntry);
   if(state.txnFilterType==='income') list=list.filter(isIncomeEntry);
