@@ -249,6 +249,34 @@ input{outline:none;}
 .warranty-card-icon{font-size:16px;}
 .warranty-card-title{flex:1;font-size:13px;font-weight:700;}
 
+/* Collapsed row for the 5 optional Add/Edit sections (Warranty/Group/Split/
+   Recurring/Attachments) — replaces 5 stacked full-width toggle buttons with
+   one row of compact chips. Tapping a chip opens that section's existing
+   content inline below the row; tapping again (or the ✕) collapses it.
+   A small mint dot marks chips that already hold data, so collapsing a
+   filled-in section doesn't make it look like the data was lost. */
+.opt-row{display:flex;gap:7px;}
+.opt-chip{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:11px 2px;
+  border-radius:16px;background:var(--surface);border:2px solid transparent;position:relative;}
+.opt-chip.active{border-color:var(--grape);background:var(--chip);}
+.opt-chip .opt-chip-icon{font-size:17px;}
+.opt-chip .opt-chip-label{font-size:9px;font-weight:700;color:var(--ink);}
+.opt-chip-dot{position:absolute;top:6px;right:14px;width:8px;height:8px;border-radius:50%;
+  background:var(--mint);border:1.5px solid var(--surface);}
+.opt-expand{margin-top:10px;padding:13px;border-radius:18px;background:var(--surface);
+  display:flex;flex-direction:column;gap:10px;}
+.opt-expand-head{display:flex;align-items:center;gap:8px;}
+.opt-expand-icon{font-size:16px;}
+.opt-expand-title{flex:1;font-size:13px;font-weight:700;}
+.opt-expand-close{font-size:14px;color:var(--muted);width:24px;height:24px;display:flex;
+  align-items:center;justify-content:center;flex-shrink:0;}
+/* "Turn off" link used inside each section's card now that the outer
+   .opt-expand header already shows that section's icon/title/collapse —
+   the card itself no longer needs its own duplicate header, just this one
+   small action to actually disable the feature (distinct from collapsing). */
+.opt-card-remove{align-self:flex-end;font-size:11px;font-weight:700;color:var(--coral);
+  padding:2px 4px;}
+
 .attach-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
 .attach-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 4px;
   border-radius:18px;border:2px dashed var(--border);font-size:18px;}
@@ -561,20 +589,49 @@ input{outline:none;}
 
       <!-- Fields only relevant to expenses; hidden automatically when income mode is active -->
       <div id="add-expense-only-fields">
-        <p class="field-label">WARRANTY</p>
-        <div id="add-warranty-area"></div>
+        <p class="field-label">MORE OPTIONS</p>
+        <div class="opt-row" id="add-opt-row"></div>
 
-        <p class="field-label">GROUP</p>
-        <div id="add-group-area"></div>
-
-        <p class="field-label">SPLIT</p>
-        <div id="add-split-area"></div>
-
-        <p class="field-label">RECURRING</p>
-        <div id="add-recurring-area"></div>
-
-        <p class="field-label">ATTACHMENTS</p>
-        <div id="add-attachment-area"></div>
+        <!-- Each section keeps its own area div exactly as before (existing
+             renderWarrantyArea/renderGroupArea/renderSplitArea/etc still
+             target these same ids and are unchanged) — only the wrapper
+             around it is new, toggled open/closed by the chip row above.
+             Only one wrapper is open at a time. -->
+        <div class="opt-expand hidden" id="add-warranty-wrap">
+          <div class="opt-expand-head">
+            <span class="opt-expand-icon">🛡️</span><span class="opt-expand-title">Warranty</span>
+            <button type="button" class="opt-expand-close" data-closeopt="warranty">✕</button>
+          </div>
+          <div id="add-warranty-area"></div>
+        </div>
+        <div class="opt-expand hidden" id="add-group-wrap">
+          <div class="opt-expand-head">
+            <span class="opt-expand-icon">🏷️</span><span class="opt-expand-title">Group</span>
+            <button type="button" class="opt-expand-close" data-closeopt="group">✕</button>
+          </div>
+          <div id="add-group-area"></div>
+        </div>
+        <div class="opt-expand hidden" id="add-split-wrap">
+          <div class="opt-expand-head">
+            <span class="opt-expand-icon">✂️</span><span class="opt-expand-title">Split</span>
+            <button type="button" class="opt-expand-close" data-closeopt="split">✕</button>
+          </div>
+          <div id="add-split-area"></div>
+        </div>
+        <div class="opt-expand hidden" id="add-recurring-wrap">
+          <div class="opt-expand-head">
+            <span class="opt-expand-icon">🔁</span><span class="opt-expand-title">Recurring</span>
+            <button type="button" class="opt-expand-close" data-closeopt="recurring">✕</button>
+          </div>
+          <div id="add-recurring-area"></div>
+        </div>
+        <div class="opt-expand hidden" id="add-attachment-wrap">
+          <div class="opt-expand-head">
+            <span class="opt-expand-icon">📎</span><span class="opt-expand-title">Attachments</span>
+            <button type="button" class="opt-expand-close" data-closeopt="attach">✕</button>
+          </div>
+          <div id="add-attachment-area"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1538,6 +1595,7 @@ const state = {
   splitWith:'',           // freeform names of who else was in on the split, comma-separated
   splitShareManual:false, // true once the user hand-edits "Your share" — stops it from being silently overwritten if Total changes again
   splitSettled:false,     // marks a split as squared away; only meaningful when splitEnabled — drives the Unsettled/All filter
+  activeOptKey:null,      // 'warranty'|'group'|'split'|'recurring'|'attach'|null — which of the 5 collapsed Add/Edit sections is currently expanded; only one at a time
   recurringLinkedId:null, // if the expense being edited already came from a recurring rule, its id — locks the section to read-only
   recurringEnabled:false, // is the "Make this recurring" toggle on (only meaningful when recurringLinkedId is null)
   recurringFrequency:'monthly', // 'weekly'|'monthly'|'yearly' chosen while recurringEnabled
@@ -3177,11 +3235,7 @@ function renderRecurringArea(){
   if(state.recurringLinkedId){
     area.innerHTML=`
       <div class="warranty-card">
-        <div class="warranty-card-head">
-          <span class="warranty-card-icon">🔁</span>
-          <span class="warranty-card-title">Generated by a recurring rule</span>
-        </div>
-        <p class="empty-hint" style="padding:4px 0 0;text-align:left;">Manage it from Settings → Recurring expenses.</p>
+        <p class="empty-hint" style="padding:0;text-align:left;">This expense was generated by a recurring rule. Manage it from Settings → Recurring expenses.</p>
       </div>`;
     return;
   }
@@ -3190,6 +3244,7 @@ function renderRecurringArea(){
     document.getElementById('recurring-add-toggle-btn').onclick=()=>{
       state.recurringEnabled=true;
       renderRecurringArea();
+      renderOptRow();
     };
     return;
   }
@@ -3201,16 +3256,13 @@ function renderRecurringArea(){
   }).join('');
   area.innerHTML=`
     <div class="warranty-card">
-      <div class="warranty-card-head">
-        <span class="warranty-card-icon">🔁</span>
-        <span class="warranty-card-title">Repeats</span>
-        <button type="button" class="attach-icon-btn" id="recurring-remove-toggle-btn">✕</button>
-      </div>
       <div class="pay-row">${chipsHTML}</div>
+      <button type="button" class="opt-card-remove" id="recurring-remove-toggle-btn">Turn off</button>
     </div>`;
   document.getElementById('recurring-remove-toggle-btn').onclick=()=>{
     state.recurringEnabled=false;
     renderRecurringArea();
+    renderOptRow();
   };
   document.querySelectorAll('#add-recurring-area [data-freq]').forEach(btn=>{
     btn.onclick=()=>{
@@ -3915,6 +3967,7 @@ function renderAddModeUI(){
     renderSplitArea();
     renderRecurringArea();
     renderAttachmentArea();
+    renderOptRow();
   }
 }
 function renderCategoryGrid(){
@@ -4005,6 +4058,7 @@ function renderWarrantyArea(){
       const purchaseDate=document.getElementById('add-date').value || todayISO();
       state.warrantyExpiry=addMonthsISO(purchaseDate,12);
       renderWarrantyArea();
+      renderOptRow();
     };
     return;
   }
@@ -4016,17 +4070,14 @@ function renderWarrantyArea(){
   }).join('');
   area.innerHTML=`
     <div class="warranty-card">
-      <div class="warranty-card-head">
-        <span class="warranty-card-icon">🛡️</span>
-        <span class="warranty-card-title">Under warranty</span>
-        <button type="button" class="attach-icon-btn" id="warranty-remove-btn">✕</button>
-      </div>
       <div class="pay-row">${chipsHTML}</div>
       <input id="warranty-expiry-date" type="date" class="date-input" value="${state.warrantyExpiry || ''}">
+      <button type="button" class="opt-card-remove" id="warranty-remove-btn">Turn off</button>
     </div>`;
   document.getElementById('warranty-remove-btn').onclick=()=>{
     state.warrantyEnabled=false; state.warrantyDurationMonths=null; state.warrantyExpiry=null;
     renderWarrantyArea();
+    renderOptRow();
   };
   document.querySelectorAll('#add-warranty-area [data-duration]').forEach(btn=>{
     btn.onclick=()=>{
@@ -4050,6 +4101,7 @@ function renderGroupArea(){
     document.getElementById('group-add-btn').onclick=()=>{
       state.groupEnabled=true;
       renderGroupArea();
+      renderOptRow();
     };
     return;
   }
@@ -4063,17 +4115,14 @@ function renderGroupArea(){
   const newChipHTML = `<button type="button" class="pay-chip" data-group-id="new" style="background:${newSelected?'var(--grape)':'var(--surface)'};color:${newSelected?'white':'var(--ink)'}">+ New</button>`;
   area.innerHTML=`
     <div class="warranty-card">
-      <div class="warranty-card-head">
-        <span class="warranty-card-icon">🏷️</span>
-        <span class="warranty-card-title">Group</span>
-        <button type="button" class="attach-icon-btn" id="group-remove-btn">✕</button>
-      </div>
       <div class="pay-row">${chipsHTML}${newChipHTML}</div>
       <input id="group-new-input" type="text" class="date-input ${newSelected?'':'hidden'}" placeholder="Group name (e.g. Goa Trip)" maxlength="40" value="${esc(state.newGroupName)}">
+      <button type="button" class="opt-card-remove" id="group-remove-btn">Turn off</button>
     </div>`;
   document.getElementById('group-remove-btn').onclick=()=>{
     state.groupEnabled=false; state.groupMode=null; state.selectedGroupId=null; state.newGroupName='';
     renderGroupArea();
+    renderOptRow();
   };
   document.querySelectorAll('#add-group-area [data-group-id]').forEach(btn=>{
     btn.onclick=()=>{
@@ -4091,6 +4140,42 @@ function renderGroupArea(){
     state.newGroupName=e.target.value; // not saved to DB until saveExpense() runs — avoids creating orphan groups from abandoned edits
   });
 }
+const ADD_OPT_DEFS=[
+  {key:'warranty', icon:'🛡️', label:'Warranty', wrapId:'add-warranty-wrap', hasData:()=>state.warrantyEnabled},
+  {key:'group',    icon:'🏷️', label:'Group',    wrapId:'add-group-wrap',    hasData:()=>state.groupEnabled},
+  {key:'split',    icon:'✂️', label:'Split',    wrapId:'add-split-wrap',    hasData:()=>state.splitEnabled},
+  {key:'recurring',icon:'🔁', label:'Recurring',wrapId:'add-recurring-wrap',hasData:()=>state.recurringEnabled || !!state.recurringLinkedId},
+  {key:'attach',   icon:'📎', label:'Attach',   wrapId:'add-attachment-wrap',hasData:()=>(state.pendingAttachments.length + state.existingAttachmentIds.length)>0},
+];
+// Renders the single "MORE OPTIONS" chip row that replaced 5 separately
+// stacked full-width sections (Warranty/Group/Split/Recurring/Attachments).
+// Only one section's wrap div is shown at a time, toggled by state.activeOptKey.
+// Each section's own render*Area() function is unchanged and still targets
+// its original inner div — this only controls which outer wrap is visible.
+function renderOptRow(){
+  const row=document.getElementById('add-opt-row');
+  row.innerHTML=ADD_OPT_DEFS.map(o=>{
+    const active=state.activeOptKey===o.key;
+    const dot=o.hasData() ? '<span class="opt-chip-dot"></span>' : '';
+    return `<button type="button" class="opt-chip ${active?'active':''}" data-optkey="${o.key}">
+      <span class="opt-chip-icon">${o.icon}</span><span class="opt-chip-label">${o.label}</span>${dot}
+    </button>`;
+  }).join('');
+  document.querySelectorAll('#add-opt-row [data-optkey]').forEach(btn=>{
+    btn.onclick=()=> toggleOptExpand(btn.dataset.optkey);
+  });
+  ADD_OPT_DEFS.forEach(o=>{
+    document.getElementById(o.wrapId).classList.toggle('hidden', state.activeOptKey!==o.key);
+  });
+}
+function toggleOptExpand(key){
+  state.activeOptKey = (state.activeOptKey===key) ? null : key;
+  renderOptRow();
+}
+document.addEventListener('click', (e)=>{
+  const closeBtn=e.target.closest('[data-closeopt]');
+  if(closeBtn){ state.activeOptKey=null; renderOptRow(); }
+});
 const SPLIT_PEOPLE_OPTIONS=[2,3,4,5];
 function renderSplitArea(){
   const area=document.getElementById('add-split-area');
@@ -4106,6 +4191,7 @@ function renderSplitArea(){
       state.splitPeople = null;
       state.splitShareManual=false;
       renderSplitArea();
+      renderOptRow();
     };
     return;
   }
@@ -4128,12 +4214,7 @@ function renderSplitArea(){
       </button>` : '';
   area.innerHTML=`
     <div class="warranty-card">
-      <div class="warranty-card-head">
-        <span class="warranty-card-icon">✂️</span>
-        <span class="warranty-card-title">Split expense</span>
-        <button type="button" class="attach-icon-btn" id="split-remove-btn">✕</button>
-      </div>
-      <p class="field-label" style="margin:10px 0 4px;">TOTAL BILL</p>
+      <p class="field-label" style="margin:0 0 4px;">TOTAL BILL</p>
       <input id="split-total-input" type="number" inputmode="decimal" class="sheet-input" placeholder="0" min="0" step="0.01" value="${total!=null?total:''}">
       <p class="field-label" style="margin:10px 0 4px;">SPLIT BETWEEN</p>
       <div class="pay-row">${peopleChipsHTML}</div>
@@ -4152,6 +4233,7 @@ function renderSplitArea(){
         </div>
       </div>
       ${settledHTML}
+      <button type="button" class="opt-card-remove" id="split-remove-btn">Turn off</button>
     </div>`;
   if(showSettled){
     document.getElementById('split-settled-toggle').onclick=()=>{
@@ -4162,6 +4244,7 @@ function renderSplitArea(){
   document.getElementById('split-remove-btn').onclick=()=>{
     state.splitEnabled=false; state.splitTotal=null; state.splitPeople=null; state.splitWith=''; state.splitShareManual=false; state.splitSettled=false;
     renderSplitArea();
+    renderOptRow();
   };
   document.querySelectorAll('#add-split-area [data-people]').forEach(btn=>{
     btn.onclick=()=>{
@@ -4293,6 +4376,7 @@ async function renderAttachmentArea(){
   document.getElementById('attach-camera-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-camera-input').click(); };
   document.getElementById('attach-gallery-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-gallery-input').click(); };
   document.getElementById('attach-file-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-file-input').click(); };
+  renderOptRow();
 }
 function openAddScreen(existing){
   state.returnScreen = getCurrentScreen();
@@ -4322,6 +4406,7 @@ function openAddScreen(existing){
   state.recurringLinkedId = existing ? (existing.recurringId || null) : null;
   state.recurringEnabled = false;
   state.recurringFrequency = 'monthly';
+  state.activeOptKey = null; // always start collapsed — even when editing an expense that already has Warranty/Group/etc set (the mint dot on its chip signals that, no need to force it open)
 
   const isIncome = state.addMode === 'income';
   document.getElementById('add-screen-title').textContent = existing ? (isIncome ? 'Edit income' : 'Edit expense') : (isIncome ? 'Add income' : 'Add expense');
