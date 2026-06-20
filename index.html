@@ -189,7 +189,8 @@ input{outline:none;}
 .budget-progress-fill{height:100%;border-radius:6px;transition:width .3s;}
 
 .recent-row{display:flex;align-items:center;gap:11px;padding:10px;border-radius:18px;
-  background:var(--surface);margin-bottom:8px;position:relative;z-index:1;
+  background:#39FF14; /* TEMP DEBUG — was var(--surface); loud green so we can see if this card paints over the FAB while scrolling. Revert once confirmed. */
+  margin-bottom:8px;position:relative;z-index:1;
   transition:margin-right .25s cubic-bezier(.32,1,.28,1);}
 .recent-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;font-size:16px;flex-shrink:0;}
