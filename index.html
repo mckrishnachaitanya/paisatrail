@@ -49,7 +49,20 @@ input{outline:none;}
 .screen{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;overflow:hidden;
   opacity:1;transition:opacity .2s;z-index:10;}
 .screen.is-hidden{opacity:0;pointer-events:none;z-index:0;}
-.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  /* isolation:isolate establishes a real stacking context here, containing
+     any z-indexed descendant (e.g. .recent-row's z-index:1, meant only to
+     sit above its own swipe-to-delete background) so it can't escape and
+     compete with .bottom-nav's stacking context above the .scroll/.screen
+     boundary. Without this, .recent-row's z-index:1 climbed all the way up
+     to .screen (the nearest actual stacking context, since neither .scroll
+     nor .swipe-wrap establish one on their own — position:relative alone,
+     without a z-index, doesn't), landing it above .bottom-nav wherever they
+     geometrically overlap — exactly the seam where the FAB pokes above the
+     row via its negative margin. Confirmed by temporarily recoloring
+     .recent-row neon green: a sliver of green cut straight across the FAB's
+     dome. */
+  isolation:isolate;}
 
 /* ============================== PIN SCREEN ============================== */
 #pin-screen{align-items:center;justify-content:center;gap:26px;padding:40px 24px;background:var(--canvas);}
@@ -93,16 +106,9 @@ input{outline:none;}
 #toast-undo-btn{color:var(--sunshine);font-weight:800;font-size:13px;flex-shrink:0;}
 
 /* ============================== BOTTOM NAV ============================== */
-/* transform:translateZ(0) + will-change:transform force this row onto its
-   own GPU-composited layer, isolated from .scroll's momentum-scroll repaints.
-   Without this, the FAB — which pokes above the row via a negative margin,
-   right at the boundary with the scrolling sibling above it — could get a
-   stale/duplicate paint left behind mid-scroll on Android WebViews (reported
-   as the + button "getting overlapped" while scrolling, not while
-   navigating between tabs). */
 .bottom-nav{position:relative;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
   padding:10px 28px calc(10px + env(safe-area-inset-bottom,0px));background:var(--paper);
-  border-top:1px solid var(--border);transform:translateZ(0);will-change:transform;}
+  border-top:1px solid var(--border);z-index:5;} /* explicit precedence over any in-list z-index (e.g. .recent-row's 1) as a backstop alongside .scroll's isolation:isolate */
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:19px;color:var(--muted);
   width:40px;}
 .nav-item.active{color:var(--grape);}
@@ -189,8 +195,7 @@ input{outline:none;}
 .budget-progress-fill{height:100%;border-radius:6px;transition:width .3s;}
 
 .recent-row{display:flex;align-items:center;gap:11px;padding:10px;border-radius:18px;
-  background:#39FF14; /* TEMP DEBUG — was var(--surface); loud green so we can see if this card paints over the FAB while scrolling. Revert once confirmed. */
-  margin-bottom:8px;position:relative;z-index:1;
+  background:var(--surface);margin-bottom:8px;position:relative;z-index:1;
   transition:margin-right .25s cubic-bezier(.32,1,.28,1);}
 .recent-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;font-size:16px;flex-shrink:0;}
