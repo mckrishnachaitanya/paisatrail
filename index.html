@@ -567,6 +567,9 @@ input{outline:none;}
         <p class="field-label">GROUP</p>
         <div id="add-group-area"></div>
 
+        <p class="field-label">SPLIT</p>
+        <div id="add-split-area"></div>
+
         <p class="field-label">RECURRING</p>
         <div id="add-recurring-area"></div>
 
@@ -645,6 +648,12 @@ input{outline:none;}
         <p class="field-label" style="margin:0 0 4px;">MAX</p>
         <input type="number" inputmode="decimal" class="sheet-input" id="txn-filter-max-amount" placeholder="Any" min="0" step="0.01">
       </div>
+    </div>
+    <p class="field-label">SPLIT</p>
+    <button type="button" class="pay-chip" id="txn-filter-split-toggle" style="width:100%;justify-content:center;">✂️ Split expenses only</button>
+    <div class="segmented-tabs hidden" id="txn-filter-split-status-tabs" style="margin-top:10px;">
+      <button type="button" class="segmented-tab active" data-splitstatus="unsettled">Unsettled</button>
+      <button type="button" class="segmented-tab" data-splitstatus="all">All splits</button>
     </div>
     <button type="button" class="save-btn" id="txn-filter-show-btn" style="margin-top:18px;">Show expenses</button>
     <button type="button" class="text-danger-btn" id="txn-filter-clear-btn" style="color:var(--muted);">Clear all filters</button>
@@ -1132,6 +1141,7 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&am
 function genId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function todayISO(){ const d=new Date(); const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); }
 function formatINR(n){ const num=Number(n)||0; return '₹' + num.toLocaleString('en-IN',{maximumFractionDigits:2}); }
+function splitTitlePrefix(e){ return (e.splitTotal!=null) ? '✂️ ' : ''; }
 function addMonthsISO(dateISO, months){
   const d=new Date((dateISO||todayISO())+'T00:00:00');
   d.setMonth(d.getMonth()+months);
@@ -1522,6 +1532,12 @@ const state = {
   groupMode:null,        // 'existing'|'new'|null — which group-picker mode is active while groupEnabled
   selectedGroupId:null,  // chosen existing group's id, when groupMode==='existing'
   newGroupName:'',       // freeform text typed so far, when groupMode==='new' — only created in DB on Save
+  splitEnabled:false,    // is the "Split" toggle on for the expense being added/edited
+  splitTotal:null,       // full bill amount (number), entered by the user — the amount field itself stays "your share"
+  splitPeople:null,      // 2/3/4/5 if an equal-split chip is selected, null if not chosen / share was hand-edited
+  splitWith:'',           // freeform names of who else was in on the split, comma-separated
+  splitShareManual:false, // true once the user hand-edits "Your share" — stops it from being silently overwritten if Total changes again
+  splitSettled:false,     // marks a split as squared away; only meaningful when splitEnabled — drives the Unsettled/All filter
   recurringLinkedId:null, // if the expense being edited already came from a recurring rule, its id — locks the section to read-only
   recurringEnabled:false, // is the "Make this recurring" toggle on (only meaningful when recurringLinkedId is null)
   recurringFrequency:'monthly', // 'weekly'|'monthly'|'yearly' chosen while recurringEnabled
@@ -1561,6 +1577,8 @@ const state = {
   txnFilterMinAmount:null,        // Transactions filter lower amount bound (inclusive), or null = unbounded
   txnFilterMaxAmount:null,        // Transactions filter upper amount bound (inclusive), or null = unbounded
   txnFilterType:'all',            // 'all' | 'expense' | 'income' — type filter on Transactions screen
+  txnFilterSplitOnly:false,       // true = show only split expenses
+  txnFilterSplitStatus:'unsettled', // 'unsettled' | 'all' — sub-filter within split-only view, only matters when txnFilterSplitOnly is true
   addMode:'expense',              // 'expense' | 'income' — current mode of the Add/Edit screen
   selectedIncomeCategoryId:null,  // selected income category while in income mode
   recurringRules:[],              // in-memory cache of all recurring rules, mirrors state.groups
@@ -1937,7 +1955,7 @@ async function renderHomeOverviewPanel(){
             <div class="recent-row" data-id="${e.id}">
               <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
               <div class="recent-info">
-                <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
+                <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:'Expense'))}</p>
                 <span class="recent-pm">${pm?esc(pm.name):'—'}</span>
               </div>
               <span class="${amtClass}">${amtText}</span>
@@ -2100,6 +2118,10 @@ async function getFilteredTransactions(){
   if(state.txnFilterEndISO) list=list.filter(e => e.date <= state.txnFilterEndISO);
   if(state.txnFilterMinAmount!=null) list=list.filter(e => Number(e.amount) >= state.txnFilterMinAmount);
   if(state.txnFilterMaxAmount!=null) list=list.filter(e => Number(e.amount) <= state.txnFilterMaxAmount);
+  if(state.txnFilterSplitOnly){
+    list=list.filter(e => e.splitTotal!=null);
+    if(state.txnFilterSplitStatus==='unsettled') list=list.filter(e => !e.splitSettled);
+  }
   if(search){
     list=list.filter(e=>{
       if(isIncomeEntry(e)){
@@ -2117,10 +2139,10 @@ async function getFilteredTransactions(){
   return list;
 }
 function hasActiveTxnFilters(){
-  return state.txnFilterType!=='all' || state.txnFilterCategoryIds.size>0 || state.txnFilterPaymentIds.size>0 || !!state.txnFilterStartISO || !!state.txnFilterEndISO || state.txnFilterMinAmount!=null || state.txnFilterMaxAmount!=null;
+  return state.txnFilterType!=='all' || state.txnFilterCategoryIds.size>0 || state.txnFilterPaymentIds.size>0 || !!state.txnFilterStartISO || !!state.txnFilterEndISO || state.txnFilterMinAmount!=null || state.txnFilterMaxAmount!=null || state.txnFilterSplitOnly;
 }
 function updateTxnFilterBtnState(){
-  const count = (state.txnFilterType!=='all'?1:0) + (state.txnFilterCategoryIds.size>0?1:0) + (state.txnFilterPaymentIds.size>0?1:0) + ((state.txnFilterStartISO||state.txnFilterEndISO)?1:0) + ((state.txnFilterMinAmount!=null||state.txnFilterMaxAmount!=null)?1:0);
+  const count = (state.txnFilterType!=='all'?1:0) + (state.txnFilterCategoryIds.size>0?1:0) + (state.txnFilterPaymentIds.size>0?1:0) + ((state.txnFilterStartISO||state.txnFilterEndISO)?1:0) + ((state.txnFilterMinAmount!=null||state.txnFilterMaxAmount!=null)?1:0) + (state.txnFilterSplitOnly?1:0);
   const btn=document.getElementById('txn-filter-btn');
   btn.textContent = count>0 ? `Filter • ${count}` : 'Filter';
   btn.classList.toggle('active', count>0);
@@ -2138,8 +2160,18 @@ async function renderTransactions(){
   updateTxnFilterBtnState();
 
   const container=document.getElementById('txn-list'); container.innerHTML='';
+  if(state.txnFilterSplitOnly){
+    const unsettled=list.filter(e=>!e.splitSettled);
+    const pendingAmt=unsettled.reduce((s,e)=>s+Math.max(0,(e.splitTotal||0)-Number(e.amount)),0);
+    const summaryText = unsettled.length>0
+      ? `${unsettled.length} unsettled · ${formatINR(pendingAmt)} pending from others`
+      : (list.length>0 ? 'All splits settled ✓' : '');
+    if(summaryText){
+      container.insertAdjacentHTML('beforeend', `<p class="spend-count" style="margin:0 0 12px;color:var(--muted);">${summaryText}</p>`);
+    }
+  }
   if(list.length===0){
-    container.innerHTML=`<p class="empty-hint">${(search||hasActiveTxnFilters()) ? 'No entries match your search or filters.' : 'No entries yet — tap + to add your first one.'}</p>`;
+    container.insertAdjacentHTML('beforeend', `<p class="empty-hint">${(search||hasActiveTxnFilters()) ? 'No entries match your search or filters.' : 'No entries yet — tap + to add your first one.'}</p>`);
   } else {
     let lastGroup=null;
     list.forEach(e=>{
@@ -2155,12 +2187,20 @@ async function renderTransactions(){
       const amtText=isInc ? formatINR(e.amount) : `-${formatINR(e.amount)}`;
       const defaultLabel=isInc ? 'Income' : 'Expense';
       const fallbackIcon=isInc ? '💰' : '❔';
-      const subtitle=isInc ? (cat?esc(cat.name):'Income') : (pm?esc(pm.name):'—');
+      // When viewing the split filter, swap the usual payment-method
+      // subtitle for the split context (total + who) — that's the whole
+      // reason this filter exists, so it should be visible without opening
+      // each expense.
+      let subtitle = isInc ? (cat?esc(cat.name):'Income') : (pm?esc(pm.name):'—');
+      if(!isInc && state.txnFilterSplitOnly && e.splitTotal!=null){
+        const withText = e.splitWith ? ` with ${esc(e.splitWith)}` : '';
+        subtitle = `${formatINR(e.splitTotal)} total${withText}${e.splitSettled?' · Settled':''}`;
+      }
       container.insertAdjacentHTML('beforeend', `
         <div class="recent-row" data-id="${e.id}">
           <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:fallbackIcon}</div>
           <div class="recent-info">
-            <p class="recent-title">${esc(e.note || (cat?cat.name:defaultLabel))}</p>
+            <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:defaultLabel))}</p>
             <span class="recent-pm">${subtitle}</span>
           </div>
           <span class="${amtClass}">${amtText}</span>
@@ -2222,8 +2262,18 @@ async function openTxnFilterSheet(){
   const showCatFilter = state.txnFilterType !== 'income';
   document.getElementById('txn-filter-cat-label').classList.toggle('hidden', !showCatFilter);
   document.getElementById('txn-filter-cat-grid').classList.toggle('hidden', !showCatFilter);
+  syncSplitFilterUI();
   await renderTransactions();
   document.getElementById('txn-filter-overlay').classList.add('show');
+}
+function syncSplitFilterUI(){
+  const toggle=document.getElementById('txn-filter-split-toggle');
+  toggle.style.background = state.txnFilterSplitOnly ? 'var(--grape)' : 'var(--surface)';
+  toggle.style.color = state.txnFilterSplitOnly ? 'white' : 'var(--ink)';
+  document.getElementById('txn-filter-split-status-tabs').classList.toggle('hidden', !state.txnFilterSplitOnly);
+  document.querySelectorAll('#txn-filter-split-status-tabs .segmented-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.splitstatus === state.txnFilterSplitStatus);
+  });
 }
 function closeTxnFilterSheet(){
   document.getElementById('txn-filter-overlay').classList.remove('show');
@@ -2236,6 +2286,8 @@ async function clearTxnFilters(){
   state.txnFilterEndISO=null;
   state.txnFilterMinAmount=null;
   state.txnFilterMaxAmount=null;
+  state.txnFilterSplitOnly=false;
+  state.txnFilterSplitStatus='unsettled';
   document.getElementById('txn-filter-start').value='';
   document.getElementById('txn-filter-end').value='';
   document.getElementById('txn-filter-min-amount').value='';
@@ -2247,6 +2299,7 @@ async function clearTxnFilters(){
   document.getElementById('txn-filter-cat-grid').classList.remove('hidden');
   renderTxnFilterCatGrid();
   renderTxnFilterPayRow();
+  syncSplitFilterUI();
   await onTxnFilterChange();
 }
 
@@ -2941,7 +2994,7 @@ async function exportData(){
     // not device security, and restoring an old PIN hash onto a different
     // session would be confusing at best.
     const payload={
-      app:'PaisaTrail', schemaVersion:3, exportedAt:new Date().toISOString(),
+      app:'PaisaTrail', schemaVersion:4, exportedAt:new Date().toISOString(),
       categories, paymentMethods, groups, expenses, attachments, recurring, budgets,
     };
     const blob=new Blob([JSON.stringify(payload)], {type:'application/json'});
@@ -3821,8 +3874,7 @@ async function renderInsightsGroupsPanel(){
           <div class="recent-row">
             <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
             <div class="recent-info">
-              <p class="recent-title">${esc(e.note || (cat?cat.name:'Expense'))}</p>
-              <span class="recent-pm">${dateLabel}</span>
+              <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:'Expense'))}</p>
             </div>
             <span class="recent-amt">-${formatINR(e.amount)}</span>
           </div>`;
@@ -3860,6 +3912,7 @@ function renderAddModeUI(){
   if(!isIncome){
     renderWarrantyArea();
     renderGroupArea();
+    renderSplitArea();
     renderRecurringArea();
     renderAttachmentArea();
   }
@@ -4038,6 +4091,108 @@ function renderGroupArea(){
     state.newGroupName=e.target.value; // not saved to DB until saveExpense() runs — avoids creating orphan groups from abandoned edits
   });
 }
+const SPLIT_PEOPLE_OPTIONS=[2,3,4,5];
+function renderSplitArea(){
+  const area=document.getElementById('add-split-area');
+  if(!state.splitEnabled){
+    area.innerHTML=`<button type="button" class="warranty-toggle-btn" id="split-add-btn"><span>✂️</span><span>Split this expense</span></button>`;
+    document.getElementById('split-add-btn').onclick=()=>{
+      state.splitEnabled=true;
+      // Seed the total from whatever's already in the Amount field — the
+      // common case is the user already typed the full bill there before
+      // noticing Split, so this avoids re-typing it.
+      const amt=parseFloat(document.getElementById('add-amount').value);
+      state.splitTotal = amt>0 ? amt : null;
+      state.splitPeople = null;
+      state.splitShareManual=false;
+      renderSplitArea();
+    };
+    return;
+  }
+  const total=state.splitTotal;
+  const yourShare=parseFloat(document.getElementById('add-amount').value)||0;
+  const othersOwe = total!=null ? Math.max(0, total-yourShare) : 0;
+  const peopleChipsHTML=SPLIT_PEOPLE_OPTIONS.map(n=>{
+    const selected=state.splitPeople===n;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    return `<button type="button" class="pay-chip" data-people="${n}" style="background:${bg};color:${color}">${n} people</button>`;
+  }).join('');
+  // Settling only makes sense once a split expense actually exists — a
+  // brand-new, unsaved entry has nothing to settle yet.
+  const showSettled = !!state.editingExpenseId;
+  const settledHTML = showSettled ? `
+      <p class="field-label" style="margin:14px 0 4px;">STATUS</p>
+      <button type="button" class="pay-chip" id="split-settled-toggle" style="width:100%;justify-content:center;background:${state.splitSettled?'var(--mint)':'var(--surface)'};color:${state.splitSettled?'white':'var(--ink)'}">
+        ${state.splitSettled ? '✓ Settled' : 'Mark as settled'}
+      </button>` : '';
+  area.innerHTML=`
+    <div class="warranty-card">
+      <div class="warranty-card-head">
+        <span class="warranty-card-icon">✂️</span>
+        <span class="warranty-card-title">Split expense</span>
+        <button type="button" class="attach-icon-btn" id="split-remove-btn">✕</button>
+      </div>
+      <p class="field-label" style="margin:10px 0 4px;">TOTAL BILL</p>
+      <input id="split-total-input" type="number" inputmode="decimal" class="sheet-input" placeholder="0" min="0" step="0.01" value="${total!=null?total:''}">
+      <p class="field-label" style="margin:10px 0 4px;">SPLIT BETWEEN</p>
+      <div class="pay-row">${peopleChipsHTML}</div>
+      <p class="field-label" style="margin:10px 0 4px;">SPLIT WITH</p>
+      <input id="split-with-input" type="text" class="sheet-input" placeholder="e.g. Rahul, Priya" maxlength="80" value="${esc(state.splitWith)}">
+      <p class="empty-hint" style="padding:8px 0 0;">Your share fills into the Amount field above — pick a number of people for an equal split, or edit Amount directly for a custom share.</p>
+      <div class="ins-compare-card" style="margin-top:8px;">
+        <div class="ins-compare-side">
+          <span class="ins-compare-label">Your share</span>
+          <span class="ins-compare-amt strong">${formatINR(yourShare)}</span>
+        </div>
+        <div class="ins-compare-arrow">·</div>
+        <div class="ins-compare-side">
+          <span class="ins-compare-label">Others owe</span>
+          <span class="ins-compare-amt">${formatINR(othersOwe)}</span>
+        </div>
+      </div>
+      ${settledHTML}
+    </div>`;
+  if(showSettled){
+    document.getElementById('split-settled-toggle').onclick=()=>{
+      state.splitSettled=!state.splitSettled;
+      renderSplitArea();
+    };
+  }
+  document.getElementById('split-remove-btn').onclick=()=>{
+    state.splitEnabled=false; state.splitTotal=null; state.splitPeople=null; state.splitWith=''; state.splitShareManual=false; state.splitSettled=false;
+    renderSplitArea();
+  };
+  document.querySelectorAll('#add-split-area [data-people]').forEach(btn=>{
+    btn.onclick=()=>{
+      const n=parseInt(btn.dataset.people, 10);
+      state.splitPeople=n;
+      state.splitShareManual=false;
+      if(state.splitTotal!=null){
+        const equalShare=Math.round((state.splitTotal/n)*100)/100;
+        document.getElementById('add-amount').value=equalShare;
+      }
+      renderSplitArea();
+    };
+  });
+  document.getElementById('split-total-input').addEventListener('input', (e)=>{
+    const val=parseFloat(e.target.value);
+    state.splitTotal = val>0 ? val : null;
+    // Keep an equal split in sync as the total changes, unless the user has
+    // already hand-edited their share (then leave their custom number alone).
+    if(!state.splitShareManual && state.splitPeople && state.splitTotal!=null){
+      const equalShare=Math.round((state.splitTotal/state.splitPeople)*100)/100;
+      document.getElementById('add-amount').value=equalShare;
+    }
+    renderSplitArea();
+    // Re-focus after the re-render wipes focus, so typing a multi-digit total stays smooth
+    const input=document.getElementById('split-total-input');
+    input.focus(); input.selectionStart=input.selectionEnd=input.value.length;
+  });
+  document.getElementById('split-with-input').addEventListener('input', (e)=>{
+    state.splitWith=e.target.value;
+  });
+}
 function detectFileType(mimeType, name){
   const m=(mimeType||'').toLowerCase(), n=(name||'').toLowerCase();
   if(m==='application/pdf' || n.endsWith('.pdf')) return 'pdf';
@@ -4158,6 +4313,12 @@ function openAddScreen(existing){
   state.groupMode = existing && existing.groupId ? 'existing' : null;
   state.selectedGroupId = existing ? (existing.groupId || null) : null;
   state.newGroupName = '';
+  state.splitEnabled = existing ? !!existing.splitTotal : false;
+  state.splitTotal = existing ? (existing.splitTotal || null) : null;
+  state.splitPeople = null; // never persisted — chip selection is a one-time entry aid, not stored state
+  state.splitWith = existing ? (existing.splitWith || '') : '';
+  state.splitShareManual = !!existing; // editing an existing split: treat the saved share as already-final, don't let a people-chip silently recompute it
+  state.splitSettled = existing ? !!existing.splitSettled : false;
   state.recurringLinkedId = existing ? (existing.recurringId || null) : null;
   state.recurringEnabled = false;
   state.recurringFrequency = 'monthly';
@@ -4203,6 +4364,10 @@ async function saveExpense(){
   if(!state.selectedCategoryId){ toast('Pick a category'); return; }
   if(!state.selectedPaymentId){ toast('Pick a payment method'); return; }
   if(state.warrantyEnabled && !state.warrantyExpiry){ toast('Pick a warranty end date'); return; }
+  if(state.splitEnabled){
+    if(!state.splitTotal || state.splitTotal<=0){ toast('Enter the total bill amount'); return; }
+    if(state.splitTotal < amount){ toast('Total bill can\'t be less than your share'); return; }
+  }
 
   const date=document.getElementById('add-date').value || todayISO();
   const note=document.getElementById('add-note').value.trim();
@@ -4281,6 +4446,9 @@ async function saveExpense(){
     date, note, attachmentIds, recurringId, groupId,
     warrantyExpiry: state.warrantyEnabled ? state.warrantyExpiry : null,
     warrantyDurationMonths: state.warrantyEnabled ? state.warrantyDurationMonths : null,
+    splitTotal: state.splitEnabled ? state.splitTotal : null,
+    splitWith: state.splitEnabled ? (state.splitWith||'').trim() : '',
+    splitSettled: state.splitEnabled ? state.splitSettled : false,
     createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
   };
   await DB.addExpense(expense); // put() — works for both create and update since the id matches
@@ -4299,6 +4467,15 @@ document.querySelectorAll('.fab-add').forEach(b => b.addEventListener('click', (
 document.getElementById('add-close-btn').addEventListener('click', () => goToReturnScreen());
 document.getElementById('attach-viewer-close').addEventListener('click', closeAttachmentViewer);
 document.getElementById('add-save-btn').addEventListener('click', saveExpense);
+document.getElementById('add-amount').addEventListener('input', () => {
+  // While Split is on, hand-editing Amount directly is how a custom
+  // (non-equal) share gets set — mark it manual so the equal-split sync in
+  // renderSplitArea stops overwriting it, and refresh the Others-owe figure.
+  if(state.splitEnabled){
+    state.splitShareManual=true;
+    renderSplitArea();
+  }
+});
 
 // Expense / Income mode toggle on the Add screen
 document.getElementById('add-type-toggle').addEventListener('click', (e) => {
@@ -4424,6 +4601,17 @@ document.getElementById('txn-filter-min-amount').addEventListener('change', (e) 
 });
 document.getElementById('txn-filter-max-amount').addEventListener('change', (e) => {
   state.txnFilterMaxAmount = e.target.value!=='' ? parseFloat(e.target.value) : null;
+  onTxnFilterChange();
+});
+document.getElementById('txn-filter-split-toggle').addEventListener('click', () => {
+  state.txnFilterSplitOnly = !state.txnFilterSplitOnly;
+  syncSplitFilterUI();
+  onTxnFilterChange();
+});
+document.getElementById('txn-filter-split-status-tabs').addEventListener('click', (e) => {
+  const btn=e.target.closest('.segmented-tab'); if(!btn) return;
+  state.txnFilterSplitStatus = btn.dataset.splitstatus;
+  syncSplitFilterUI();
   onTxnFilterChange();
 });
 
