@@ -191,16 +191,6 @@ input{outline:none;}
 .backup-nudge-banner-icon{font-size:18px;flex-shrink:0;}
 .backup-nudge-banner-text{flex:1;font-size:13px;font-weight:700;color:var(--ink);}
 .backup-nudge-banner-chevron{font-size:18px;color:var(--muted);flex-shrink:0;}
-.whatsnew-banner{display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:16px;
-  background:rgba(46,196,182,.16);margin-bottom:14px;cursor:pointer;}
-.whatsnew-banner-icon{font-size:18px;flex-shrink:0;}
-.whatsnew-banner-text{flex:1;font-size:13px;font-weight:700;color:var(--ink);}
-.whatsnew-banner-chevron{font-size:18px;color:var(--muted);flex-shrink:0;}
-.guide-whatsnew-card{background:rgba(46,196,182,.12);border-radius:18px;padding:16px;margin-bottom:18px;}
-.guide-whatsnew-card-title{font-size:13px;font-weight:700;color:var(--mint);margin-bottom:8px;}
-.guide-whatsnew-card-date{font-size:11px;color:var(--muted);margin-bottom:10px;}
-.guide-whatsnew-card-list{font-size:13px;line-height:1.6;color:var(--ink);padding-left:18px;}
-.guide-whatsnew-card-list li{margin-bottom:4px;}
 .budget-card{background:var(--surface);border-radius:18px;padding:14px;margin-bottom:10px;cursor:pointer;}
 .budget-card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .budget-card-icon{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
@@ -279,6 +269,8 @@ input{outline:none;}
   border-radius:18px;border:2px solid transparent;background:var(--surface);}
 .cat-emoji{font-size:19px;}
 .cat-name{font-size:10px;font-weight:700;}
+.cat-chip-more{border-style:dashed;border-color:var(--border);}
+.cat-chip-more .cat-name{color:var(--muted);}
 
 .pay-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;}
 .pay-row::-webkit-scrollbar{display:none;}
@@ -368,14 +360,6 @@ input{outline:none;}
 .settings-row-title{font-size:14px;font-weight:700;}
 .settings-row-sub{font-size:11px;color:var(--muted);margin-top:2px;display:block;}
 .settings-row-chevron{font-size:18px;color:var(--muted);flex-shrink:0;}
-.guide-section{background:var(--surface);border-radius:18px;margin-bottom:10px;overflow:hidden;}
-.guide-section-summary{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;list-style:none;}
-.guide-section-summary::-webkit-details-marker{display:none;}
-.guide-section-icon{font-size:18px;flex-shrink:0;width:24px;text-align:center;}
-.guide-section-title{flex:1;font-size:14px;font-weight:700;}
-.guide-section-summary::after{content:'›';font-size:18px;color:var(--muted);flex-shrink:0;transition:transform .15s;}
-.guide-section[open] .guide-section-summary::after{transform:rotate(90deg);}
-.guide-section-body{padding:0 14px 16px 50px;font-size:13px;line-height:1.5;color:var(--muted);white-space:pre-line;}
 
 /* Reusable segmented control — Bulk delete's mode switch today, Insights'
    period/view switches later. Visually mirrors .home-tabs but kept
@@ -521,7 +505,6 @@ input{outline:none;}
       </div>
 
       <div id="home-panel-overview">
-        <div id="home-whatsnew-banner" class="whatsnew-banner hidden"></div>
         <div id="home-backup-banner" class="backup-nudge-banner hidden"></div>
         <div id="home-warranty-banner" class="warranty-soon-banner hidden"></div>
         <div class="spend-card">
@@ -848,24 +831,7 @@ input{outline:none;}
         <p class="topbar-title">Settings</p>
         <button type="button" class="topbar-lock-btn" id="settings-lock-btn" title="Lock app">🔒</button>
       </div>
-      <p class="field-label" style="margin-top:0;">HELP</p>
-      <button type="button" class="settings-row" id="settings-guide-btn" style="margin-bottom:8px;">
-        <span class="settings-row-icon" style="background:rgba(255,194,60,.14);">💡</span>
-        <div class="settings-row-info">
-          <p class="settings-row-title">How this app works</p>
-          <span class="settings-row-sub">A quick guide to every tab and feature</span>
-        </div>
-        <span class="settings-row-chevron">›</span>
-      </button>
-      <button type="button" class="settings-row" id="settings-notif-row">
-        <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">🔔</span>
-        <div class="settings-row-info">
-          <p class="settings-row-title">Notifications</p>
-          <span class="settings-row-sub" id="settings-notif-sub">Get notified in-app when something new ships</span>
-        </div>
-        <div class="switch" id="settings-notif-switch"><div class="switch-thumb"></div></div>
-      </button>
-      <p class="field-label">CUSTOMIZE</p>
+      <p class="field-label" style="margin-top:0;">CUSTOMIZE</p>
       <button type="button" class="settings-row" id="settings-categories-btn" style="margin-bottom:8px;">
         <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">🏷️</span>
         <div class="settings-row-info">
@@ -947,21 +913,6 @@ input{outline:none;}
     <button class="fab-add">＋</button>
     <div class="nav-item" data-nav="stats"><span>📊</span><span class="nav-label">Insights</span></div>
     <div class="nav-item active" data-nav="settings"><span>⚙️</span><span class="nav-label">Settings</span></div>
-  </div>
-</div>
-
-<!-- ============================== APP GUIDE ============================== -->
-<div class="screen is-hidden" id="guide-screen">
-  <div class="topbar">
-    <p class="topbar-title">How this app works</p>
-    <button class="topbar-close" id="guide-close-btn">✕</button>
-  </div>
-  <div class="scroll">
-    <div style="padding:0 20px 28px;">
-      <p class="empty-hint" style="text-align:left;padding:0 0 16px;">Tap any section below to see what it does.</p>
-      <div id="guide-whatsnew"></div>
-      <div id="guide-sections"></div>
-    </div>
   </div>
 </div>
 
@@ -1737,6 +1688,8 @@ const state = {
   txnFilterSplitStatus:'unsettled', // 'unsettled' | 'all' — sub-filter within split-only view, only matters when txnFilterSplitOnly is true
   addMode:'expense',              // 'expense' | 'income' — current mode of the Add/Edit screen
   selectedIncomeCategoryId:null,  // selected income category while in income mode
+  catUsageCounts:{},              // {categoryId: count} — fetched once per Add-screen open, used to sort the category grid by frequency
+  catGridExpanded:false,          // false = collapsed to top 6 most-used categories with a "+N more" chip; true = showing all
   recurringRules:[],              // in-memory cache of all recurring rules, mirrors state.groups
   mgrRecurringCategoryId:null,    // selected category while adding/editing a recurring rule
   mgrRecurringPaymentId:null,     // selected payment method while adding/editing a recurring rule
@@ -1748,7 +1701,7 @@ const state = {
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
 /* ============================== SCREEN SYSTEM ============================== */
-const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen','recurring-screen','guide-screen'];
+const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen','recurring-screen'];
 function showScreen(id){
   SCREENS.forEach(s => document.getElementById(s).classList.toggle('is-hidden', s!==id));
 }
@@ -1906,14 +1859,7 @@ async function handlePINDigit(d){
   } else if(state.pinMode==='setup-confirm'){
     if(entered!==pinTemp){ pinError('PINs do not match'); state.pinMode='setup'; return; }
     Store.set('pt_pin', await Crypto.hashPIN(entered));
-    await unlockSuccess();
-    // First-ever launch only — this branch is unreachable any other way
-    // (PIN change/unlock never pass through 'setup-confirm'). Shown once;
-    // Store flag prevents it firing again even if setup somehow re-runs.
-    if(!Store.get('pt_guide_shown')){
-      Store.set('pt_guide_shown','1');
-      openGuideScreen('home-screen');
-    }
+    unlockSuccess();
   } else if(state.pinMode==='unlock'){
     if(!(await verifyAgainstStoredPIN(entered))) return;
     unlockSuccess();
@@ -1959,7 +1905,6 @@ async function unlockSuccess(){
   state.recurringRules=await DB.getAllRecurring();
   state.budgets=await DB.getAllBudgets();
   await runRecurringCatchUpAll(); // before navigating, so the screen about to render already reflects anything just generated
-  await checkWhatsNewOnOpen();
   const target = screenBeforeLock || 'home-screen';
   showScreen(target);
   if(target==='home-screen') renderHome(); // add-screen etc. keep their existing in-progress DOM as-is
@@ -2073,7 +2018,6 @@ async function renderBackupNudgeBanner(){
   banner.classList.remove('hidden');
 }
 async function renderHomeOverviewPanel(){
-  await renderWhatsNewBanner();
   await renderBackupNudgeBanner();
   await renderWarrantyBanner();
   const today=new Date();
@@ -3279,142 +3223,7 @@ async function confirmImport(){
   }
 }
 
-/* ============================== APP GUIDE ============================== */
-// Content lives in app-guide.json, not inline here, so editing/expanding
-// the help text never touches index.html itself. Fetched once per session
-// and cached in memory; the file itself is precached by sw.js (cache-first,
-// same as manifest.json/icons) so it's available offline after first load.
-// releaseNotes (newest first) doubles as the version source for the What's
-// New banner/notification below — there's deliberately no separate
-// APP_VERSION constant in this file. Krishna announces something new by
-// adding one entry here; nothing else needs touching.
-let guideContentCache=null;
-async function loadGuideContent(){
-  if(guideContentCache) return guideContentCache;
-  try{
-    const res=await fetch('./app-guide.json');
-    guideContentCache=await res.json();
-  } catch(err){
-    guideContentCache={ sections:[], releaseNotes:[] };
-  }
-  return guideContentCache;
-}
-function getLatestReleaseNote(data){
-  return (data.releaseNotes && data.releaseNotes[0]) || null;
-}
-async function renderGuideScreen(){
-  const data=await loadGuideContent();
-  const whatsNewEl=document.getElementById('guide-whatsnew');
-  const latest=getLatestReleaseNote(data);
-  whatsNewEl.innerHTML = latest ? `
-    <div class="guide-whatsnew-card">
-      <p class="guide-whatsnew-card-title">🆕 What's new</p>
-      <p class="guide-whatsnew-card-date">${esc(latest.date)}</p>
-      <ul class="guide-whatsnew-card-list">${latest.highlights.map(h=>`<li>${esc(h)}</li>`).join('')}</ul>
-    </div>` : '';
-
-  const container=document.getElementById('guide-sections');
-  if(!data.sections.length){
-    container.innerHTML='<p class="empty-hint">Couldn\'t load the guide right now — check your connection and try again.</p>';
-    return;
-  }
-  // Native <details>/<summary> — each section expands/collapses
-  // independently (unlike Add/Edit's MORE OPTIONS row, this is meant for
-  // reading, not data entry, so there's no reason to force only one open).
-  container.innerHTML=data.sections.map(s => `
-    <details class="guide-section">
-      <summary class="guide-section-summary">
-        <span class="guide-section-icon">${s.icon}</span>
-        <span class="guide-section-title">${esc(s.title)}</span>
-      </summary>
-      <div class="guide-section-body">${esc(s.body)}</div>
-    </details>`).join('');
-}
-let guideReturnScreen='settings-screen';
-function openGuideScreen(returnTo){
-  guideReturnScreen=returnTo || getCurrentScreen();
-  showScreen('guide-screen');
-  renderGuideScreen();
-}
-function closeGuideScreen(){
-  showScreen(guideReturnScreen);
-  if(guideReturnScreen==='home-screen') renderHome();
-}
-
-/* ============================== WHAT'S NEW + NOTIFICATIONS ============================== */
-function isNotifAvailable(){ return ('Notification' in window); }
-function isNotifEnabled(){ return Store.get('pt_notif_enabled')==='1'; }
-async function enableNotifications(){
-  if(!isNotifAvailable()){ toast('Notifications are not supported on this device'); return false; }
-  const perm=await Notification.requestPermission();
-  if(perm!=='granted'){ toast('Notification permission was not granted'); return false; }
-  Store.set('pt_notif_enabled','1');
-  return true;
-}
-function disableNotifications(){
-  Store.set('pt_notif_enabled','0');
-}
-function renderNotifRow(){
-  const sw=document.getElementById('settings-notif-switch');
-  const sub=document.getElementById('settings-notif-sub');
-  if(!sw) return;
-  const on=isNotifEnabled();
-  sw.classList.toggle('on', on);
-  sub.textContent = on ? "You'll get notified in-app when something new ships — tap to turn off" : 'Get notified in-app when something new ships';
-}
-// Banner condition is re-evaluated fresh on every Home render, purely from
-// stored state — it doesn't matter whether pt_last_seen_version was just
-// updated by checkWhatsNewOnOpen() (notifications-enabled path) or is still
-// stale (notifications-disabled path, where the banner is the only signal
-// and persists until What's New is actually opened).
-async function shouldShowWhatsNewBanner(){
-  const data=await loadGuideContent();
-  const latest=getLatestReleaseNote(data);
-  if(!latest) return false;
-  const lastSeen=Store.get('pt_last_seen_version');
-  if(lastSeen===null) return false; // bootstrap state — nothing to announce yet
-  return lastSeen!==latest.version;
-}
-async function renderWhatsNewBanner(){
-  const banner=document.getElementById('home-whatsnew-banner');
-  const show=await shouldShowWhatsNewBanner();
-  if(!show){ banner.classList.add('hidden'); banner.innerHTML=''; return; }
-  banner.innerHTML=`<span class="whatsnew-banner-icon">🆕</span><span class="whatsnew-banner-text">New in this update — tap to see what's new</span><span class="whatsnew-banner-chevron">›</span>`;
-  banner.classList.remove('hidden');
-}
-function openWhatsNewFromBanner(){
-  Store.set('pt_last_seen_version', getLatestReleaseNote(guideContentCache || {}).version);
-  openGuideScreen('home-screen');
-}
-// Runs once per app open (called from unlockSuccess). First-ever-open
-// bootstrap: silently records the current version with no banner/popup,
-// since there's nothing meaningfully "new" to announce on day one (and the
-// App Guide's own first-launch auto-show already covers that moment).
-// Otherwise, if Notifications are on, fires one OS popup and immediately
-// marks the version seen (auto-clearing the Home banner too, per design);
-// if Notifications are off, leaves the version unmarked so the Home banner
-// — the only signal in that case — keeps showing until actually opened.
-async function checkWhatsNewOnOpen(){
-  const data=await loadGuideContent();
-  const latest=getLatestReleaseNote(data);
-  if(!latest) return;
-  const lastSeen=Store.get('pt_last_seen_version');
-  if(lastSeen===null){
-    Store.set('pt_last_seen_version', latest.version);
-    return;
-  }
-  if(lastSeen===latest.version) return;
-  if(isNotifEnabled() && isNotifAvailable() && Notification.permission==='granted'){
-    try{
-      new Notification('PaisaTrail updated', { body: latest.highlights[0] || "Tap to see what's new", icon:'./icons/icon.svg' });
-    } catch(err){}
-    Store.set('pt_last_seen_version', latest.version);
-  }
-}
-
 /* ============================== RECURRING EXPENSES ============================== */
-
-
 const RECURRING_FREQUENCIES=[{v:'weekly',label:'Weekly'},{v:'monthly',label:'Monthly'},{v:'yearly',label:'Yearly'}];
 const RECURRING_CATCHUP_CAP=24; // max occurrences backfilled per rule per pass, so an install reopened after a long gap doesn't flood the list
 function recurringFrequencyLabel(freq){
@@ -4346,7 +4155,18 @@ function renderCategoryGrid(){
         </button>`);
     });
   } else {
-    state.categories.forEach(cat=>{
+    const COLLAPSE_AT=6; // 2 rows of 3 — keeps the common case to a single glance
+    const counts=state.catUsageCounts || {};
+    const sorted=state.categories.slice().sort((a,b) => (counts[b.id]||0) - (counts[a.id]||0));
+    // Never hide the currently-selected category (e.g. editing an old expense
+    // whose category isn't a frequent one) — auto-expand instead of burying it.
+    if(sorted.length>COLLAPSE_AT && !state.catGridExpanded && state.selectedCategoryId
+       && !sorted.slice(0,COLLAPSE_AT).some(c => c.id===state.selectedCategoryId)){
+      state.catGridExpanded=true;
+    }
+    const collapsed=sorted.length>COLLAPSE_AT && !state.catGridExpanded;
+    const visible=collapsed ? sorted.slice(0,COLLAPSE_AT) : sorted;
+    visible.forEach(cat=>{
       const selected=state.selectedCategoryId===cat.id;
       const bg = selected ? cat.color+'26' : 'var(--surface)';
       const border = selected ? cat.color : 'transparent';
@@ -4355,6 +4175,12 @@ function renderCategoryGrid(){
           <span class="cat-emoji">${cat.icon}</span><span class="cat-name">${esc(cat.name)}</span>
         </button>`);
     });
+    if(collapsed){
+      grid.insertAdjacentHTML('beforeend', `
+        <button type="button" class="cat-chip cat-chip-more" data-catmore="1">
+          <span class="cat-emoji">⋯</span><span class="cat-name">${sorted.length-visible.length} more</span>
+        </button>`);
+    }
   }
 }
 // Category-aware nudges — when the note is left blank, the list later falls
@@ -4379,6 +4205,17 @@ const INCOME_CATEGORIES=[
 // e.type === 'expense' directly to avoid breaking old data.
 function isExpenseEntry(e){ return !e.type || e.type==='expense'; }
 function isIncomeEntry(e){ return e.type==='income'; }
+
+// Single-pass usage count per category, all-time — powers the "most-used
+// first" sort on the Add screen's category grid. Fetched once per Add-screen
+// open (see openAddScreen) and cached on state, not re-queried on every chip
+// tap/re-render.
+async function getCategoryUsageCounts(){
+  const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+  const counts={};
+  all.forEach(e=>{ if(e.categoryId) counts[e.categoryId]=(counts[e.categoryId]||0)+1; });
+  return counts;
+}
 
 const NOTE_PLACEHOLDERS={
   'Food': "e.g. Dinner at Truffles, Swiggy order",
@@ -4741,13 +4578,15 @@ async function renderAttachmentArea(){
   document.getElementById('attach-file-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-file-input').click(); };
   renderOptRow();
 }
-function openAddScreen(existing){
+async function openAddScreen(existing){
   state.returnScreen = getCurrentScreen();
   state.editingExpenseId = existing ? existing.id : null;
   state.editingExpense = existing || null;
   state.addMode = (existing && existing.type==='income') ? 'income' : 'expense';
   state.selectedCategoryId = existing ? existing.categoryId : (state.categories[0] ? state.categories[0].id : null);
   state.selectedIncomeCategoryId = existing ? (existing.incomeCategoryId || INCOME_CATEGORIES[0].id) : INCOME_CATEGORIES[0].id;
+  state.catGridExpanded = false; // always start collapsed — same pattern as MORE OPTIONS below
+  state.catUsageCounts = await getCategoryUsageCounts();
   state.selectedPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
   state.pendingAttachments = [];
   state.existingAttachmentIds = existing ? ((existing.attachmentIds && existing.attachmentIds.length) ? existing.attachmentIds.slice() : (existing.attachmentId ? [existing.attachmentId] : [])) : [];
@@ -4947,6 +4786,8 @@ document.getElementById('add-type-toggle').addEventListener('click', (e) => {
 document.getElementById('add-category-grid').addEventListener('click', (e) => {
   const incomeBtn=e.target.closest('.cat-chip[data-incomecat]');
   if(incomeBtn){ state.selectedIncomeCategoryId=incomeBtn.dataset.incomecat; renderCategoryGrid(); updateNotePlaceholder(); return; }
+  const moreBtn=e.target.closest('.cat-chip-more');
+  if(moreBtn){ state.catGridExpanded=true; renderCategoryGrid(); return; }
   const btn=e.target.closest('.cat-chip'); if(!btn) return;
   state.selectedCategoryId=btn.dataset.cat;
   renderCategoryGrid();
@@ -5134,20 +4975,6 @@ document.getElementById('import-confirm-overlay').addEventListener('click', (e) 
 document.getElementById('import-confirm-btn').addEventListener('click', confirmImport);
 
 document.getElementById('settings-changepin-btn').addEventListener('click', startChangePIN);
-document.getElementById('settings-guide-btn').addEventListener('click', () => openGuideScreen('settings-screen'));
-document.getElementById('guide-close-btn').addEventListener('click', closeGuideScreen);
-document.getElementById('settings-notif-row').addEventListener('click', async () => {
-  if(isNotifEnabled()){
-    disableNotifications();
-    renderNotifRow();
-    toast('Notifications turned off');
-    return;
-  }
-  const ok=await enableNotifications();
-  renderNotifRow();
-  if(ok) toast('Notifications turned on');
-});
-document.getElementById('home-whatsnew-banner').addEventListener('click', openWhatsNewFromBanner);
 
 // Manual lock buttons — one on each main screen's top-right corner.
 // Calls the same lockVault() the idle-auto-lock uses so behaviour is identical.
@@ -5417,7 +5244,7 @@ document.querySelectorAll('[data-nav]').forEach(item => {
     if(nav==='home') renderHome();
     if(nav==='transactions') renderTransactions();
     if(nav==='stats') renderInsights();
-    if(nav==='settings'){ renderBiometricRow(); renderNotifRow(); }
+    if(nav==='settings') renderBiometricRow();
   });
 });
 
@@ -5434,7 +5261,6 @@ function init(){
     showScreen('pin-screen');
   }
   renderBiometricRow();
-  renderNotifRow();
 }
 init();
 </script>
