@@ -186,6 +186,11 @@ input{outline:none;}
 .warranty-soon-banner-icon{font-size:18px;flex-shrink:0;}
 .warranty-soon-banner-text{flex:1;font-size:13px;font-weight:700;color:var(--ink);}
 .warranty-soon-banner-chevron{font-size:18px;color:var(--muted);flex-shrink:0;}
+.backup-nudge-banner{display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:16px;
+  background:rgba(134,87,224,.14);margin-bottom:14px;cursor:pointer;}
+.backup-nudge-banner-icon{font-size:18px;flex-shrink:0;}
+.backup-nudge-banner-text{flex:1;font-size:13px;font-weight:700;color:var(--ink);}
+.backup-nudge-banner-chevron{font-size:18px;color:var(--muted);flex-shrink:0;}
 .budget-card{background:var(--surface);border-radius:18px;padding:14px;margin-bottom:10px;cursor:pointer;}
 .budget-card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .budget-card-icon{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
@@ -193,6 +198,13 @@ input{outline:none;}
 .budget-card-amounts{font-family:var(--font-mono);font-size:11px;color:var(--muted);flex-shrink:0;}
 .budget-progress-track{height:8px;border-radius:6px;background:var(--chip);overflow:hidden;}
 .budget-progress-fill{height:100%;border-radius:6px;transition:width .3s;}
+.budget-pace{font-size:11px;font-weight:600;margin-top:7px;}
+.budget-pace.ok{color:var(--mint);}
+.budget-pace.warn{color:var(--coral);}
+.budget-suggest-hint{font-size:12px;font-weight:600;color:var(--grape);margin-top:8px;cursor:pointer;}
+.budget-recap-line{font-size:12px;color:var(--muted);margin-top:12px;}
+.budget-recap-line.under{color:var(--mint);}
+.budget-recap-line.over{color:var(--coral);}
 
 .recent-row{display:flex;align-items:center;gap:11px;padding:10px;border-radius:18px;
   background:var(--surface);margin-bottom:8px;position:relative;z-index:1;
@@ -491,6 +503,7 @@ input{outline:none;}
       </div>
 
       <div id="home-panel-overview">
+        <div id="home-backup-banner" class="backup-nudge-banner hidden"></div>
         <div id="home-warranty-banner" class="warranty-soon-banner hidden"></div>
         <div class="spend-card">
           <div class="cashflow-row">
@@ -1165,6 +1178,8 @@ input{outline:none;}
     <p class="empty-hint hidden" id="budget-edit-target-readonly" style="text-align:left;padding:10px 0 0;"></p>
     <p class="field-label">MONTHLY LIMIT</p>
     <input type="number" inputmode="decimal" class="sheet-input" id="budget-edit-limit" placeholder="0" min="0" step="0.01">
+    <p class="budget-suggest-hint hidden" id="budget-edit-suggest"></p>
+    <p class="budget-recap-line hidden" id="budget-edit-recap"></p>
     <button type="button" class="save-btn" id="budget-edit-save-btn" style="margin-top:18px;">Save budget</button>
     <button type="button" class="text-danger-btn hidden" id="budget-edit-delete-btn">Delete</button>
   </div>
@@ -1677,6 +1692,7 @@ const state = {
   mgrRecurringFrequency:'monthly',// selected frequency — only editable when adding a new rule, read-only display once created
   budgets:[],                     // in-memory cache of all budgets, mirrors state.recurringRules
   mgrBudgetCategoryId:null,       // categoryId selected while adding a new budget (null = the special "Overall" target); locked/unused once editing an existing budget
+  budgetEditHistory:null,         // {lastMonthSpent, lastMonthActive, suggested, targetIsOverall} for whichever target is selected in the open budget sheet — null until fetched, refetched on target change
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
@@ -1976,7 +1992,29 @@ async function renderWarrantyBanner(){
   banner.innerHTML=`<span class="warranty-soon-banner-icon">🛡️</span><span class="warranty-soon-banner-text">${esc(text)}</span><span class="warranty-soon-banner-chevron">›</span>`;
   banner.classList.remove('hidden');
 }
+const BACKUP_NUDGE_DAYS=15; // how long since the last export before the Home banner nags again
+// Gated on there being at least one expense ever recorded — no point nagging
+// a brand-new install with nothing to back up yet.
+async function shouldShowBackupNudge(){
+  const any=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e=>!pendingDeletes[e.id]);
+  if(any.length===0) return false;
+  const lastExport=parseInt(Store.get('pt_last_export')||'0');
+  if(!lastExport) return true;
+  return (Date.now()-lastExport) >= BACKUP_NUDGE_DAYS*86400000;
+}
+async function renderBackupNudgeBanner(){
+  const banner=document.getElementById('home-backup-banner');
+  const show=await shouldShowBackupNudge();
+  if(!show){ banner.classList.add('hidden'); banner.innerHTML=''; return; }
+  const lastExport=parseInt(Store.get('pt_last_export')||'0');
+  const text = lastExport
+    ? `Last backed up ${fmtDuration(Math.floor((Date.now()-lastExport)/86400000))} ago — tap to back up now`
+    : `You haven't backed up your data yet — tap to back up now`;
+  banner.innerHTML=`<span class="backup-nudge-banner-icon">💾</span><span class="backup-nudge-banner-text">${esc(text)}</span><span class="backup-nudge-banner-chevron">›</span>`;
+  banner.classList.remove('hidden');
+}
 async function renderHomeOverviewPanel(){
+  await renderBackupNudgeBanner();
   await renderWarrantyBanner();
   const today=new Date();
   const monthStart=new Date(today.getFullYear(), today.getMonth(), 1);
@@ -3096,6 +3134,7 @@ async function exportData(){
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+    Store.set('pt_last_export', String(Date.now()));
     toast('Backup downloaded');
   } catch(err){
     toast('Export failed — please try again');
@@ -3597,6 +3636,20 @@ function budgetSpentAmount(budget, monthExpenses){
   if(!budget.categoryId) return monthExpenses.reduce((s,e)=>s+Number(e.amount),0); // Overall
   return monthExpenses.filter(e=>e.categoryId===budget.categoryId).reduce((s,e)=>s+Number(e.amount),0);
 }
+// Simple linear pace projection: spend-rate-so-far extrapolated across the
+// full month. Deliberately not forecast-engine-aware (no recurring lookahead)
+// — keeps it cheap to compute on every Home render and easy to reason about.
+// Suppressed for the first 2 days of the month since one early purchase can
+// make the rate wildly noisy before there's enough signal.
+function computeBudgetPace(spent, limit){
+  if(!(limit>0)) return null;
+  const now=new Date();
+  const daysElapsed=now.getDate();
+  if(daysElapsed<3) return null;
+  const daysInMonth=new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const projected=(spent/daysElapsed)*daysInMonth;
+  return { projected, over: projected>limit };
+}
 // Targets you can still set a NEW budget for — every category without one
 // already, plus the special "Overall" target if it isn't taken. Used both
 // to populate the add-sheet's picker and to decide whether "+ Add budget"
@@ -3618,6 +3671,32 @@ function budgetDisplayInfo(budget){
     color: isOverall ? '#8657E0' : (cat ? cat.color : '#9088A8'),
     name: isOverall ? 'Overall' : (cat ? cat.name : 'Deleted category'),
   };
+}
+// Bounds for the calendar month N months before the current one (1 = last
+// month, 2 = the one before that, etc). Reuses monthBounds/dateToISO from
+// the Insights section below — safe since these are hoisted function
+// declarations in the same scope.
+function monthsAgoBounds(n){
+  const now=new Date();
+  return monthBounds(dateToISO(new Date(now.getFullYear(), now.getMonth()-n, 1)));
+}
+// Pulls last month's actual spend for a target (for the edit sheet's
+// "last month" recap) plus a suggested monthly limit averaged across
+// however many of the last 3 calendar months were actually "active" (had
+// ANY app usage) — averaging in silent pre-app months would understate the
+// suggestion for a newer install. targetCategoryId is null for "Overall".
+async function getBudgetHistoryData(targetCategoryId){
+  const m1=monthsAgoBounds(1), m2=monthsAgoBounds(2), m3=monthsAgoBounds(3);
+  const expenses=(await DB.getExpensesByDateRange(m3.startISO, m1.endISO)).filter(e=>!pendingDeletes[e.id] && isExpenseEntry(e));
+  const inBounds=(e,b)=> e.date>=b.startISO && e.date<=b.endISO;
+  const sumFor=(b)=> expenses.filter(e=>inBounds(e,b) && (targetCategoryId ? e.categoryId===targetCategoryId : true)).reduce((s,e)=>s+Number(e.amount),0);
+  const monthActive=(b)=> expenses.some(e=>inBounds(e,b));
+  const activeMonths=[m1,m2,m3].filter(monthActive);
+  let suggested=null;
+  if(activeMonths.length>0){
+    suggested = activeMonths.reduce((s,b)=>s+sumFor(b),0) / activeMonths.length;
+  }
+  return { lastMonthSpent: sumFor(m1), lastMonthActive: monthActive(m1), suggested, targetIsOverall: !targetCategoryId };
 }
 function updateBudgetsAddBtn(){
   document.getElementById('budgets-add-btn').classList.toggle('hidden', getAvailableBudgetTargets().length===0);
@@ -3646,6 +3725,10 @@ async function renderHomeBudgetsPanel(){
     const pctDisplay=Math.round(r.pct*100);
     const barColor = r.pct>=1 ? 'var(--coral)' : r.pct>=0.8 ? 'var(--sunshine)' : 'var(--mint)';
     const widthPct=Math.min(100, pctDisplay);
+    const pace=computeBudgetPace(r.spent, r.budget.monthlyLimit);
+    const paceHtml = pace
+      ? `<div class="budget-pace ${pace.over?'warn':'ok'}">${pace.over ? `⚠️ On pace for ${formatINR(pace.projected)} — ${formatINR(pace.projected-r.budget.monthlyLimit)} over` : `✓ On pace for ${formatINR(pace.projected)}`}</div>`
+      : '';
     list.insertAdjacentHTML('beforeend', `
       <div class="budget-card" data-budgetid="${r.budget.id}">
         <div class="budget-card-head">
@@ -3654,6 +3737,7 @@ async function renderHomeBudgetsPanel(){
           <span class="budget-card-amounts">${formatINR(r.spent)} / ${formatINR(r.budget.monthlyLimit)}</span>
         </div>
         <div class="budget-progress-track"><div class="budget-progress-fill" style="width:${widthPct}%;background:${barColor};"></div></div>
+        ${paceHtml}
       </div>`);
   });
 }
@@ -3669,9 +3753,42 @@ function renderBudgetEditTargetGrid(){
     </button>`;
   }).join('');
 }
+function updateBudgetEditSuggestHint(){
+  const el=document.getElementById('budget-edit-suggest');
+  const existing=state.mgrEditingId ? state.budgets.find(b=>b.id===state.mgrEditingId) : null;
+  const hist=state.budgetEditHistory;
+  if(existing || !hist || hist.suggested==null){ el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  el.textContent = `Suggested: ${formatINR(Math.round(hist.suggested))} (3-month avg) · tap to use`;
+}
+function updateBudgetRecapText(){
+  const el=document.getElementById('budget-edit-recap');
+  const hist=state.budgetEditHistory;
+  if(!hist || !hist.lastMonthActive){ el.classList.add('hidden'); return; }
+  el.classList.remove('hidden','under','over');
+  const limit=parseFloat(document.getElementById('budget-edit-limit').value);
+  const spentLabel = hist.targetIsOverall ? `${formatINR(hist.lastMonthSpent)} spent in total` : `${formatINR(hist.lastMonthSpent)} spent in this category`;
+  if(limit>0){
+    const diff=limit-hist.lastMonthSpent;
+    if(diff>=0){ el.textContent=`Last month: ${spentLabel} — ${formatINR(diff)} under this budget.`; el.classList.add('under'); }
+    else { el.textContent=`Last month: ${spentLabel} — ${formatINR(Math.abs(diff))} over this budget.`; el.classList.add('over'); }
+  } else {
+    el.textContent=`Last month: ${spentLabel}.`;
+  }
+}
+async function refreshBudgetEditInsights(){
+  const existing=state.mgrEditingId ? state.budgets.find(b=>b.id===state.mgrEditingId) : null;
+  const targetId = existing ? existing.categoryId : state.mgrBudgetCategoryId;
+  state.budgetEditHistory = await getBudgetHistoryData(targetId);
+  updateBudgetEditSuggestHint();
+  updateBudgetRecapText();
+}
 function openBudgetEdit(id){
   state.mgrEditingType='budget';
   state.mgrEditingId=id;
+  state.budgetEditHistory=null;
+  document.getElementById('budget-edit-suggest').classList.add('hidden');
+  document.getElementById('budget-edit-recap').classList.add('hidden');
   const existing=id ? state.budgets.find(b=>b.id===id) : null;
   document.getElementById('budget-edit-title').textContent = existing ? 'Edit budget' : 'Add budget';
   document.getElementById('budget-edit-limit').value = existing ? existing.monthlyLimit : '';
@@ -3688,6 +3805,7 @@ function openBudgetEdit(id){
   }
   document.getElementById('budget-edit-delete-btn').classList.toggle('hidden', !existing);
   document.getElementById('budget-edit-overlay').classList.add('show');
+  refreshBudgetEditInsights();
 }
 function closeBudgetEdit(){
   document.getElementById('budget-edit-overlay').classList.remove('show');
@@ -4761,6 +4879,10 @@ document.getElementById('home-tabs').addEventListener('click', (e) => {
   setHomeTab(btn.dataset.hometab);
 });
 document.getElementById('home-warranty-banner').addEventListener('click', () => setHomeTab('warranties'));
+document.getElementById('home-backup-banner').addEventListener('click', async () => {
+  await exportData();
+  await renderBackupNudgeBanner();
+});
 document.getElementById('forecast-window-tabs').addEventListener('click', (e) => {
   const btn=e.target.closest('[data-forecastwindow]'); if(!btn) return;
   setForecastWindow(btn.dataset.forecastwindow);
@@ -4784,6 +4906,14 @@ document.getElementById('budget-edit-target-grid').addEventListener('click', (e)
   const btn=e.target.closest('[data-budgettarget]'); if(!btn) return;
   state.mgrBudgetCategoryId = btn.dataset.budgettarget==='overall' ? null : btn.dataset.budgettarget;
   renderBudgetEditTargetGrid();
+  refreshBudgetEditInsights();
+});
+document.getElementById('budget-edit-limit').addEventListener('input', updateBudgetRecapText);
+document.getElementById('budget-edit-suggest').addEventListener('click', () => {
+  const hist=state.budgetEditHistory;
+  if(!hist || hist.suggested==null) return;
+  document.getElementById('budget-edit-limit').value = Math.round(hist.suggested);
+  updateBudgetRecapText();
 });
 document.getElementById('home-warranties-list').addEventListener('click', (e) => {
   const row=e.target.closest('.recent-row'); if(!row) return;
