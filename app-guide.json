@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "releaseNotes": [
+    {
+      "version": "2026-06-21",
+      "date": "2026-06-21",
+      "highlights": [
+        "Budgets now warn you if you're on pace to go over your monthly limit, before it actually happens.",
+        "New budgets suggest a starting amount based on your last 3 months of spending.",
+        "A reminder shows up on Home if you haven't backed up your data in a while — tap it to back up instantly.",
+        "New \"How this app works\" guide in Settings, explaining every tab and feature."
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "id": "home-overview",
+      "icon": "🏠",
+      "title": "Home — Overview",
+      "body": "Your at-a-glance view of the month. See how much money came in, went out, and what's left over, plus your most recent expenses and a quick breakdown of what you've spent on by category."
+    },
+    {
+      "id": "home-warranties",
+      "icon": "🛡️",
+      "title": "Home — Warranties",
+      "body": "Tracks warranty coverage for things you've bought — phones, appliances, anything with a guarantee period. Mark an expense as \"under warranty\" when you add it, and this tab shows what's still covered and what's about to run out."
+    },
+    {
+      "id": "home-forecast",
+      "icon": "📈",
+      "title": "Home — Forecast",
+      "body": "A look ahead at what you're likely to spend for the rest of the month (or the next 30 days), based on what's already gone out, what's due to repeat, and your typical day-to-day spending."
+    },
+    {
+      "id": "home-budgets",
+      "icon": "💰",
+      "title": "Home — Budgets",
+      "body": "Set a monthly spending limit — either overall or for a specific category — and track how close you are to it. You'll also see whether you're on pace to stay under or go over, based on how fast you're spending so far this month."
+    },
+    {
+      "id": "transactions",
+      "icon": "📋",
+      "title": "Transactions",
+      "body": "Every expense and income entry you've ever logged, grouped by date. Search, filter by category, payment method, date, or amount, and tap any entry to edit or delete it."
+    },
+    {
+      "id": "insights",
+      "icon": "📊",
+      "title": "Insights",
+      "body": "Dig into your spending patterns — by category, by payment method, or by comparing one period to another, like this week vs last week, or this month vs last month."
+    },
+    {
+      "id": "settings",
+      "icon": "⚙️",
+      "title": "Settings",
+      "body": "Manage categories, payment methods, and groups; set up recurring expenses; back up or restore your data; and control your PIN and biometric unlock."
+    },
+    {
+      "id": "split",
+      "icon": "✂️",
+      "title": "Split expenses",
+      "body": "When you split a bill with someone, log the full amount and how many ways it's split — the app works out your share automatically, and that share is what counts toward your budgets and totals. Mark it as settled once everyone's paid up."
+    },
+    {
+      "id": "recurring",
+      "icon": "🔁",
+      "title": "Recurring expenses",
+      "body": "For things that repeat — rent, subscriptions, EMIs — set it up once and the app logs it automatically going forward (weekly, monthly, or yearly), so you don't have to re-enter it every time."
+    }
+  ]
+}
