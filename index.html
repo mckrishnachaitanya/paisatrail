@@ -3639,7 +3639,7 @@ function renderRecurringEditGroupRow(){
     };
   });
 }
-async function openRecurringEdit(id){
+function openRecurringEdit(id){
   state.mgrEditingType='recurring';
   state.mgrEditingId=id;
   const existing=id ? state.recurringRules.find(r=>r.id===id) : null;
@@ -3652,7 +3652,8 @@ async function openRecurringEdit(id){
   state.mgrRecurringFrequency = existing ? existing.frequency : 'monthly';
   state.mgrRecurringGroupId = existing ? (existing.groupId || null) : null;
   state.mgrRecurringCatGridExpanded = false;
-  state.catUsageCounts = await getCategoryUsageCounts();
+  // Use cached usage counts if available; fetch async in background to update sort order
+  getCategoryUsageCounts().then(counts=>{ state.catUsageCounts=counts; renderRecurringEditCatGrid(); }).catch(()=>{});
   renderRecurringEditCatGrid();
   renderRecurringEditPayRow();
   renderRecurringEditGroupRow();
