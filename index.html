@@ -282,7 +282,7 @@ input{outline:none;}
 .cat-chip-more{border-style:dashed;border-color:var(--border);}
 .cat-chip-more .cat-name{color:var(--muted);}
 
-.pay-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;}
+.pay-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;flex-shrink:0;}
 .pay-row::-webkit-scrollbar{display:none;}
 .pay-chip{display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:20px;
   background:var(--surface);font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0;}
@@ -3604,10 +3604,6 @@ function renderRecurringEditCatGrid(){
 }
 function renderRecurringEditPayRow(){
   const row=document.getElementById('recurring-edit-pay-row'); row.innerHTML='';
-  if(!state.paymentMethods || state.paymentMethods.length===0){
-    row.innerHTML='<span style="color:red;font-size:12px;">DEBUG: no payment methods in state</span>';
-    return;
-  }
   state.paymentMethods.forEach(pm=>{
     const selected=state.mgrRecurringPaymentId===pm.id;
     const bg = selected ? 'var(--grape)' : 'var(--surface)';
