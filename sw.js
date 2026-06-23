@@ -6,7 +6,7 @@
 // Everything else (manifest.json, icons) stays cache-first — bump
 // CACHE_NAME if either of those ever needs to change.
 
-const CACHE_NAME = 'paisatrail-v2';
+const CACHE_NAME = 'paisatrail-v3';
 const PRECACHE_URLS = [
   './',
   './index.html',
