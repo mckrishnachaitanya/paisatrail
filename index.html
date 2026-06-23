@@ -427,9 +427,9 @@ input{outline:none;}
   backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;
   opacity:0;pointer-events:none;transition:opacity .2s;}
 .edit-sheet-overlay.show{opacity:1;pointer-events:auto;}
-.edit-sheet{width:100%;max-width:480px;max-height:86vh;background:var(--paper);
+.edit-sheet{width:100%;max-width:480px;max-height:86vh;min-height:0;background:var(--paper);
   border-radius:26px 26px 0 0;padding:10px 22px calc(20px + env(safe-area-inset-bottom,0px));
-  display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 .edit-sheet-grip{width:36px;height:4px;border-radius:4px;background:var(--border);
   margin:0 auto 14px;flex-shrink:0;}
 .edit-sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
