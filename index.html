@@ -1748,6 +1748,7 @@ const state = {
   mgrRecurringPaymentId:null,     // selected payment method while adding/editing a recurring rule
   mgrRecurringFrequency:'monthly',// selected frequency — only editable when adding a new rule, read-only display once created
   mgrRecurringGroupId:null,       // selected group while adding/editing a recurring rule (null = no group)
+  mgrRecurringCatGridExpanded:false, // false = collapsed to top 6; true = all categories shown
   budgets:[],                     // in-memory cache of all budgets, mirrors state.recurringRules
   mgrBudgetCategoryId:null,       // categoryId selected while adding a new budget (null = the special "Overall" target); locked/unused once editing an existing budget
   budgetEditHistory:null,         // {lastMonthSpent, lastMonthActive, suggested, targetIsOverall} for whichever target is selected in the open budget sheet — null until fetched, refetched on target change
@@ -3576,15 +3577,30 @@ function renderRecurringScreen(){
 }
 function renderRecurringEditCatGrid(){
   const grid=document.getElementById('recurring-edit-cat-grid'); grid.innerHTML='';
-  state.categories.forEach(cat=>{
+  const COLLAPSE_AT=6;
+  const counts=state.catUsageCounts || {};
+  const sorted=state.categories.slice().sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0));
+  if(sorted.length>COLLAPSE_AT && !state.mgrRecurringCatGridExpanded && state.mgrRecurringCategoryId
+     && !sorted.slice(0,COLLAPSE_AT).some(c=>c.id===state.mgrRecurringCategoryId)){
+    state.mgrRecurringCatGridExpanded=true;
+  }
+  const collapsed=sorted.length>COLLAPSE_AT && !state.mgrRecurringCatGridExpanded;
+  const visible=collapsed ? sorted.slice(0,COLLAPSE_AT) : sorted;
+  visible.forEach(cat=>{
     const selected=state.mgrRecurringCategoryId===cat.id;
     const bg = selected ? cat.color+'26' : 'var(--surface)';
     const border = selected ? cat.color : 'transparent';
     grid.insertAdjacentHTML('beforeend', `
-      <button type="button" class="cat-chip" data-cat="${cat.id}" style="background:${bg};border-color:${border}">
+      <button type="button" class="cat-chip" data-rcat="${cat.id}" style="background:${bg};border-color:${border}">
         <span class="cat-emoji">${cat.icon}</span><span class="cat-name">${esc(cat.name)}</span>
       </button>`);
   });
+  if(collapsed){
+    grid.insertAdjacentHTML('beforeend', `
+      <button type="button" class="cat-chip cat-chip-more" data-rcatmore="1">
+        <span class="cat-emoji">⋯</span><span class="cat-name">${sorted.length-visible.length} more</span>
+      </button>`);
+  }
 }
 function renderRecurringEditPayRow(){
   const row=document.getElementById('recurring-edit-pay-row'); row.innerHTML='';
@@ -3623,7 +3639,7 @@ function renderRecurringEditGroupRow(){
     };
   });
 }
-function openRecurringEdit(id){
+async function openRecurringEdit(id){
   state.mgrEditingType='recurring';
   state.mgrEditingId=id;
   const existing=id ? state.recurringRules.find(r=>r.id===id) : null;
@@ -3635,6 +3651,8 @@ function openRecurringEdit(id){
   state.mgrRecurringPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
   state.mgrRecurringFrequency = existing ? existing.frequency : 'monthly';
   state.mgrRecurringGroupId = existing ? (existing.groupId || null) : null;
+  state.mgrRecurringCatGridExpanded = false;
+  state.catUsageCounts = await getCategoryUsageCounts();
   renderRecurringEditCatGrid();
   renderRecurringEditPayRow();
   renderRecurringEditGroupRow();
@@ -5377,8 +5395,9 @@ document.getElementById('recurring-edit-save-btn').addEventListener('click', sav
 document.getElementById('recurring-edit-pause-btn').addEventListener('click', toggleRecurringPause);
 document.getElementById('recurring-edit-delete-btn').addEventListener('click', requestDeleteRecurring);
 document.getElementById('recurring-edit-cat-grid').addEventListener('click', (e) => {
-  const btn=e.target.closest('[data-cat]'); if(!btn) return;
-  state.mgrRecurringCategoryId=btn.dataset.cat;
+  if(e.target.closest('[data-rcatmore]')){ state.mgrRecurringCatGridExpanded=true; renderRecurringEditCatGrid(); return; }
+  const btn=e.target.closest('[data-rcat]'); if(!btn) return;
+  state.mgrRecurringCategoryId=btn.dataset.rcat;
   renderRecurringEditCatGrid();
 });
 document.getElementById('recurring-edit-pay-row').addEventListener('click', (e) => {
