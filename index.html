@@ -1210,6 +1210,8 @@ input{outline:none;}
     <p class="empty-hint hidden" id="recurring-edit-cadence-readonly" style="text-align:left;padding:10px 0 0;"></p>
     <p class="field-label">ENDS (OPTIONAL)</p>
     <input type="date" class="date-input" id="recurring-edit-end">
+    <p class="field-label">GROUP (OPTIONAL)</p>
+    <div class="pay-row" id="recurring-edit-group-row"></div>
     <button type="button" class="save-btn" id="recurring-edit-save-btn" style="margin-top:18px;">Save recurring expense</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-pause-btn" style="color:var(--grape);">Pause</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-delete-btn">Delete</button>
@@ -1745,6 +1747,7 @@ const state = {
   mgrRecurringCategoryId:null,    // selected category while adding/editing a recurring rule
   mgrRecurringPaymentId:null,     // selected payment method while adding/editing a recurring rule
   mgrRecurringFrequency:'monthly',// selected frequency — only editable when adding a new rule, read-only display once created
+  mgrRecurringGroupId:null,       // selected group while adding/editing a recurring rule (null = no group)
   budgets:[],                     // in-memory cache of all budgets, mirrors state.recurringRules
   mgrBudgetCategoryId:null,       // categoryId selected while adding a new budget (null = the special "Overall" target); locked/unused once editing an existing budget
   budgetEditHistory:null,         // {lastMonthSpent, lastMonthActive, suggested, targetIsOverall} for whichever target is selected in the open budget sheet — null until fetched, refetched on target change
@@ -3458,7 +3461,7 @@ async function catchUpSingleRule(rule){
   while(rule.active && rule.nextDueISO<=today && count<RECURRING_CATCHUP_CAP){
     const expense={
       id:genId(), amount:rule.amount, categoryId:rule.categoryId, paymentMethod:rule.paymentMethod,
-      date:rule.nextDueISO, note:rule.name, attachmentIds:[], recurringId:rule.id, groupId:null,
+      date:rule.nextDueISO, note:rule.name, attachmentIds:[], recurringId:rule.id, groupId:rule.groupId||null,
       warrantyExpiry:null, warrantyDurationMonths:null, createdAt:Date.now(),
     };
     await DB.addExpense(expense);
@@ -3604,6 +3607,22 @@ function renderRecurringEditFreqRow(){
     row.insertAdjacentHTML('beforeend', `<button type="button" class="pay-chip" data-freq="${f.v}" style="background:${bg};color:${color}">${f.label}</button>`);
   });
 }
+function renderRecurringEditGroupRow(){
+  const row=document.getElementById('recurring-edit-group-row'); row.innerHTML='';
+  // "None" chip
+  const noneSelected = !state.mgrRecurringGroupId;
+  row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-rgrp="none" style="background:${noneSelected?'var(--grape)':'var(--surface)'};color:${noneSelected?'white':'var(--ink)'}">None</button>`);
+  state.groups.forEach(g=>{
+    const selected = state.mgrRecurringGroupId===g.id;
+    row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-rgrp="${g.id}" style="background:${selected?'var(--grape)':'var(--surface)'};color:${selected?'white':'var(--ink)'}">${esc(g.name)}</button>`);
+  });
+  row.querySelectorAll('[data-rgrp]').forEach(btn=>{
+    btn.onclick=()=>{
+      state.mgrRecurringGroupId = btn.dataset.rgrp==='none' ? null : btn.dataset.rgrp;
+      renderRecurringEditGroupRow();
+    };
+  });
+}
 function openRecurringEdit(id){
   state.mgrEditingType='recurring';
   state.mgrEditingId=id;
@@ -3615,8 +3634,10 @@ function openRecurringEdit(id){
   state.mgrRecurringCategoryId = existing ? existing.categoryId : (state.categories[0] ? state.categories[0].id : null);
   state.mgrRecurringPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
   state.mgrRecurringFrequency = existing ? existing.frequency : 'monthly';
+  state.mgrRecurringGroupId = existing ? (existing.groupId || null) : null;
   renderRecurringEditCatGrid();
   renderRecurringEditPayRow();
+  renderRecurringEditGroupRow();
 
   // Frequency and start date only make sense to set once, at creation —
   // changing either after occurrences already exist would scramble the
@@ -3652,7 +3673,7 @@ async function saveRecurringEdit(){
   if(existing){
     existing.name=name; existing.amount=amount;
     existing.categoryId=state.mgrRecurringCategoryId; existing.paymentMethod=state.mgrRecurringPaymentId;
-    existing.endDate=endDate;
+    existing.endDate=endDate; existing.groupId=state.mgrRecurringGroupId||null;
     if(existing.endDate && existing.nextDueISO>existing.endDate) existing.active=false;
     await DB.putRecurring(existing);
     closeRecurringEdit();
@@ -3663,6 +3684,7 @@ async function saveRecurringEdit(){
     const rule={
       id:genId(), name, amount, categoryId:state.mgrRecurringCategoryId, paymentMethod:state.mgrRecurringPaymentId,
       frequency:state.mgrRecurringFrequency, startDate, endDate, nextDueISO:startDate, active:true, createdAt:Date.now(),
+      groupId:state.mgrRecurringGroupId||null,
     };
     await DB.putRecurring(rule);
     state.recurringRules.push(rule);
