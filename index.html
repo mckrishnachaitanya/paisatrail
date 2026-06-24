@@ -874,6 +874,13 @@ input{outline:none;}
         </div>
         <div class="switch" id="settings-notif-switch"><div class="switch-thumb"></div></div>
       </button>
+      <button type="button" class="settings-row" id="settings-forcerefresh-btn">
+        <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">🔄</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Check for updates</p>
+          <span class="settings-row-sub" id="settings-forcerefresh-sub">Force-fetch the latest version of the app</span>
+        </div>
+      </button>
       <p class="field-label">CUSTOMIZE</p>
       <button type="button" class="settings-row" id="settings-categories-btn" style="margin-bottom:8px;">
         <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">🏷️</span>
@@ -3471,7 +3478,9 @@ async function checkWhatsNewOnOpen(){
     try{
       new Notification('PaisaTrail updated', { body: latest.highlights[0] || "Tap to see what's new", icon:'./icons/icon.svg' });
     } catch(err){}
-    Store.set('pt_last_seen_version', latest.version);
+    // Do NOT mark version seen here — only mark it when the user actually
+    // opens the What's New screen. This keeps the Home banner visible as a
+    // persistent fallback in case the OS notification goes unnoticed.
   }
 }
 
@@ -5275,6 +5284,7 @@ document.getElementById('import-confirm-btn').addEventListener('click', confirmI
 
 document.getElementById('settings-changepin-btn').addEventListener('click', startChangePIN);
 document.getElementById('settings-guide-btn').addEventListener('click', () => openGuideScreen('settings-screen'));
+document.getElementById('settings-forcerefresh-btn').addEventListener('click', forceRefreshApp);
 document.getElementById('guide-close-btn').addEventListener('click', closeGuideScreen);
 document.getElementById('settings-notif-row').addEventListener('click', async () => {
   if(isNotifEnabled()){
@@ -5564,6 +5574,25 @@ document.querySelectorAll('[data-nav]').forEach(item => {
 
 /* ============================== INIT ============================== */
 function init(){
+async function forceRefreshApp(){
+  const sub = document.getElementById('settings-forcerefresh-sub');
+  if(sub) sub.textContent = 'Clearing cache…';
+  try{
+    // Unregister all service workers
+    if('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    // Delete all caches
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  } catch(err){
+    console.warn('Force refresh error', err);
+  }
+  // Reload fresh from network
+  window.location.reload(true);
+}
+
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed', err));
   }
