@@ -776,6 +776,8 @@ input{outline:none;}
         <input type="number" inputmode="decimal" class="sheet-input" id="txn-filter-max-amount" placeholder="Any" min="0" step="0.01">
       </div>
     </div>
+    <p class="field-label">GROUP</p>
+    <div class="pay-row" id="txn-filter-group-row"></div>
     <p class="field-label">SPLIT</p>
     <button type="button" class="pay-chip" id="txn-filter-split-toggle" style="width:100%;justify-content:center;">✂️ Split expenses only</button>
     <div class="segmented-tabs hidden" id="txn-filter-split-status-tabs" style="margin-top:10px;">
@@ -1744,6 +1746,7 @@ const state = {
   txnFilterType:'all',            // 'all' | 'expense' | 'income' — type filter on Transactions screen
   txnFilterSplitOnly:false,       // true = show only split expenses
   txnFilterSplitStatus:'unsettled', // 'unsettled' | 'all' — sub-filter within split-only view, only matters when txnFilterSplitOnly is true
+  txnFilterGroupIds:new Set(),       // group ids filtered IN on Transactions; empty = no restriction; 'UNGROUPED' is a sentinel for expenses with no group
   addMode:'expense',              // 'expense' | 'income' — current mode of the Add/Edit screen
   selectedIncomeCategoryId:null,  // selected income category while in income mode
   catUsageCounts:{},              // {categoryId: count} — fetched once per Add-screen open, used to sort the category grid by frequency
@@ -2345,6 +2348,12 @@ async function getFilteredTransactions(){
     list=list.filter(e => e.splitTotal!=null);
     if(state.txnFilterSplitStatus==='unsettled') list=list.filter(e => !e.splitSettled);
   }
+  if(state.txnFilterGroupIds.size>0){
+    list=list.filter(e=>{
+      if(state.txnFilterGroupIds.has('UNGROUPED') && !e.groupId) return true;
+      return e.groupId && state.txnFilterGroupIds.has(e.groupId);
+    });
+  }
   if(search){
     list=list.filter(e=>{
       if(isIncomeEntry(e)){
@@ -2362,10 +2371,10 @@ async function getFilteredTransactions(){
   return list;
 }
 function hasActiveTxnFilters(){
-  return state.txnFilterType!=='all' || state.txnFilterCategoryIds.size>0 || state.txnFilterPaymentIds.size>0 || !!state.txnFilterStartISO || !!state.txnFilterEndISO || state.txnFilterMinAmount!=null || state.txnFilterMaxAmount!=null || state.txnFilterSplitOnly;
+  return state.txnFilterType!=='all' || state.txnFilterCategoryIds.size>0 || state.txnFilterPaymentIds.size>0 || !!state.txnFilterStartISO || !!state.txnFilterEndISO || state.txnFilterMinAmount!=null || state.txnFilterMaxAmount!=null || state.txnFilterSplitOnly || state.txnFilterGroupIds.size>0;
 }
 function updateTxnFilterBtnState(){
-  const count = (state.txnFilterType!=='all'?1:0) + (state.txnFilterCategoryIds.size>0?1:0) + (state.txnFilterPaymentIds.size>0?1:0) + ((state.txnFilterStartISO||state.txnFilterEndISO)?1:0) + ((state.txnFilterMinAmount!=null||state.txnFilterMaxAmount!=null)?1:0) + (state.txnFilterSplitOnly?1:0);
+  const count = (state.txnFilterType!=='all'?1:0) + (state.txnFilterCategoryIds.size>0?1:0) + (state.txnFilterPaymentIds.size>0?1:0) + ((state.txnFilterStartISO||state.txnFilterEndISO)?1:0) + ((state.txnFilterMinAmount!=null||state.txnFilterMaxAmount!=null)?1:0) + (state.txnFilterSplitOnly?1:0) + (state.txnFilterGroupIds.size>0?1:0);
   const btn=document.getElementById('txn-filter-btn');
   btn.textContent = count>0 ? `Filter • ${count}` : 'Filter';
   btn.classList.toggle('active', count>0);
@@ -2460,6 +2469,22 @@ function renderTxnFilterPayRow(){
       </button>`);
   });
 }
+function renderTxnFilterGroupRow(){
+  const row=document.getElementById('txn-filter-group-row'); row.innerHTML='';
+  // "Ungrouped" sentinel chip first
+  const ungroupedSel=state.txnFilterGroupIds.has('UNGROUPED');
+  row.insertAdjacentHTML('beforeend', `
+    <button type="button" class="pay-chip" data-group="UNGROUPED" style="background:${ungroupedSel?'var(--grape)':'var(--surface)'};color:${ungroupedSel?'white':'var(--ink)'}">
+      No group
+    </button>`);
+  state.groups.forEach(g=>{
+    const sel=state.txnFilterGroupIds.has(g.id);
+    row.insertAdjacentHTML('beforeend', `
+      <button type="button" class="pay-chip" data-group="${g.id}" style="background:${sel?'var(--grape)':'var(--surface)'};color:${sel?'white':'var(--ink)'}">
+        ${esc(g.name)}
+      </button>`);
+  });
+}
 // Every toggle inside the sheet takes effect immediately (consistent with
 // search-as-you-type and Insights' instant period switching elsewhere in
 // the app) — there's no separate "Apply" step, so closing the sheet by any
@@ -2473,6 +2498,7 @@ async function onTxnFilterChange(){
 async function openTxnFilterSheet(){
   renderTxnFilterCatGrid();
   renderTxnFilterPayRow();
+  renderTxnFilterGroupRow();
   document.getElementById('txn-filter-start').value = state.txnFilterStartISO || '';
   document.getElementById('txn-filter-end').value = state.txnFilterEndISO || '';
   document.getElementById('txn-filter-min-amount').value = state.txnFilterMinAmount!=null ? state.txnFilterMinAmount : '';
@@ -2511,6 +2537,7 @@ async function clearTxnFilters(){
   state.txnFilterMaxAmount=null;
   state.txnFilterSplitOnly=false;
   state.txnFilterSplitStatus='unsettled';
+  state.txnFilterGroupIds=new Set();
   document.getElementById('txn-filter-start').value='';
   document.getElementById('txn-filter-end').value='';
   document.getElementById('txn-filter-min-amount').value='';
@@ -2522,6 +2549,7 @@ async function clearTxnFilters(){
   document.getElementById('txn-filter-cat-grid').classList.remove('hidden');
   renderTxnFilterCatGrid();
   renderTxnFilterPayRow();
+  renderTxnFilterGroupRow();
   syncSplitFilterUI();
   await onTxnFilterChange();
 }
@@ -5143,6 +5171,14 @@ document.getElementById('txn-filter-pay-row').addEventListener('click', (e) => {
   if(state.txnFilterPaymentIds.has(id)) state.txnFilterPaymentIds.delete(id);
   else state.txnFilterPaymentIds.add(id);
   renderTxnFilterPayRow();
+  onTxnFilterChange();
+});
+document.getElementById('txn-filter-group-row').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-group]'); if(!btn) return;
+  const id=btn.dataset.group;
+  if(state.txnFilterGroupIds.has(id)) state.txnFilterGroupIds.delete(id);
+  else state.txnFilterGroupIds.add(id);
+  renderTxnFilterGroupRow();
   onTxnFilterChange();
 });
 document.getElementById('txn-filter-start').addEventListener('change', (e) => {
