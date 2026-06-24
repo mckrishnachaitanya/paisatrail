@@ -49,6 +49,11 @@ input{outline:none;}
 .screen{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;overflow:hidden;
   opacity:1;transition:opacity .2s;z-index:10;}
 .screen.is-hidden{opacity:0;pointer-events:none;z-index:0;}
+/* Pin screen must sit above all overlays (edit-sheet-overlay z-index:900,
+   confirm-overlay z-index:800) so locking while a sheet is open doesn't
+   let the sheet bleed through the lock screen. Data in open sheets is
+   preserved — nothing is closed, pin screen just paints on top. */
+#pin-screen{z-index:1000;}
 .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
   /* isolation:isolate establishes a real stacking context here, containing
      any z-indexed descendant (e.g. .recent-row's z-index:1, meant only to
@@ -1757,8 +1762,20 @@ const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable
 
 /* ============================== SCREEN SYSTEM ============================== */
 const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen','recurring-screen','guide-screen'];
+// Screens that are always opened fresh — scroll should reset to top on
+// every open. Main tab screens (home, transactions, stats, settings) are
+// intentionally excluded: preserving their scroll position across navigation
+// is correct behaviour.
+const SCROLL_RESET_SCREENS = new Set([
+  'add-screen','recurring-screen','categories-screen','paymentmethods-screen',
+  'groups-screen','bulkdelete-screen','tagexpenses-screen','guide-screen'
+]);
 function showScreen(id){
   SCREENS.forEach(s => document.getElementById(s).classList.toggle('is-hidden', s!==id));
+  if(SCROLL_RESET_SCREENS.has(id)){
+    const scroll = document.querySelector('#'+id+' .scroll');
+    if(scroll) scroll.scrollTop = 0;
+  }
 }
 function getCurrentScreen(){
   return SCREENS.find(s => s!=='pin-screen' && s!=='add-screen' && !document.getElementById(s).classList.contains('is-hidden')) || 'home-screen';
