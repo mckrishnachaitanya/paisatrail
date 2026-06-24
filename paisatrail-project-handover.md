@@ -88,4 +88,5 @@ Single repo root, no wrapper folder: `index.html` (entire app), `manifest.json`,
    - **Forecast + income integration** — forecast tab currently projects expense spending only; add projected savings (income minus projected spend) once income logging is a consistent habit. Deliberately deferred.
    - **Multiple accounts/wallets** — cash, savings, credit card as separate tracked balances with a net worth view.
    - **Multi-device cloud sync** — needs a backend; pushed furthest out.
+   - **Excel/CSV export** — export filtered transaction data from the List tab and/or Insights tab. Deferred until real usage reveals what format, columns, and scope are actually needed (~4 months of data recommended before revisiting).
 2. Consolidate the two segmented-control implementations if either ever needs a style change.

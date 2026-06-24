@@ -2010,10 +2010,19 @@ function lockVault(){
 // Single entry point for showing the unlock screen — used by lockVault()
 // and cold-start init() — so the auto biometric attempt always fires
 // exactly once per lock, never skipped and never duplicated.
+// If the page is currently hidden (user switched away → auto-lock fired in
+// the background), Android's WebAuthn rejects the OS prompt immediately.
+// We defer the attempt until the page becomes visible again via the
+// visibilitychange handler below, using pendingAutoBio as the signal.
+let pendingAutoBio=false;
 function enterUnlockScreen(){
   initPINScreen('unlock');
   showScreen('pin-screen');
-  tryAutoBiometric();
+  if(document.hidden){
+    pendingAutoBio=true;
+  } else {
+    tryAutoBiometric();
+  }
 }
 document.addEventListener('touchstart', resetAutoLock, {passive:true});
 document.addEventListener('click', resetAutoLock);
@@ -2036,8 +2045,9 @@ function endPickerSuppression(){
 document.addEventListener('visibilitychange', ()=>{
   if(document.hidden){
     if(!suppressLockOnHide && state.unlocked) lockVault();
-  } else if(state.unlocked){
-    resetAutoLock();
+  } else {
+    if(pendingAutoBio){ pendingAutoBio=false; tryAutoBiometric(); }
+    if(state.unlocked) resetAutoLock();
   }
 });
 
