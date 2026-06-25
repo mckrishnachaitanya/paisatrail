@@ -2,6 +2,16 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "2026-06-25",
+      "date": "2026-06-25",
+      "highlights": [
+        "Income amounts are now masked by default — tap any ₹•••••• to reveal with your PIN, or use the 👁️ button to show/hide all at once.",
+        "Masking resets automatically when you lock the app or switch away.",
+        "Fixed: income entries on the Home screen can now be swiped left to delete, just like expenses.",
+        "Fixed: the filter sheet now hides Payment Method, Group, and Split options when filtering by Income (they don't apply to income entries)."
+      ]
+    },
+    {
       "version": "2026-06-24",
       "date": "2026-06-24",
       "highlights": [
