@@ -436,9 +436,8 @@ input{outline:none;}
    compositing layer that intercepts touch events on Android WebKit even with
    pointer-events:none, breaking all taps on the screen behind it. */
 #income-pin-overlay{position:fixed;inset:0;z-index:950;background:rgba(36,31,61,.7);
-  display:flex;align-items:flex-end;justify-content:center;
-  opacity:0;pointer-events:none;transition:opacity .2s;}
-#income-pin-overlay.show{opacity:1;pointer-events:auto;}
+  display:none;align-items:flex-end;justify-content:center;}
+#income-pin-overlay.show{display:flex;}
 .edit-sheet{width:100%;max-width:480px;max-height:86vh;min-height:0;background:var(--paper);
   border-radius:26px 26px 0 0;padding:10px 22px calc(20px + env(safe-area-inset-bottom,0px));
   display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
