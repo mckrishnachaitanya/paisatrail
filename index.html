@@ -432,12 +432,6 @@ input{outline:none;}
   backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;
   opacity:0;pointer-events:none;transition:opacity .2s;}
 .edit-sheet-overlay.show{opacity:1;pointer-events:auto;}
-/* Income PIN overlay: own rule, no backdrop-filter — backdrop-filter creates a GPU
-   compositing layer that intercepts touch events on Android WebKit even with
-   pointer-events:none, breaking all taps on the screen behind it. */
-#income-pin-overlay{position:fixed;inset:0;z-index:950;background:rgba(36,31,61,.7);
-  display:none;align-items:flex-end;justify-content:center;}
-#income-pin-overlay.show{display:flex;}
 .edit-sheet{width:100%;max-width:480px;max-height:86vh;min-height:0;background:var(--paper);
   border-radius:26px 26px 0 0;padding:10px 22px calc(20px + env(safe-area-inset-bottom,0px));
   display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
@@ -523,10 +517,7 @@ input{outline:none;}
           <p class="greeting">Hey there 👋</p>
           <p class="month-label" id="home-month-label">—</p>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button type="button" class="topbar-lock-btn" id="home-income-eye-btn" title="Toggle income visibility" style="display:none;">👁️</button>
-          <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
-        </div>
+        <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
       </div>
 
       <div class="home-tabs" id="home-tabs">
@@ -726,10 +717,7 @@ input{outline:none;}
     <div style="padding:0 20px 12px;">
       <div class="screen-topbar">
         <p class="topbar-title">Transactions</p>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button type="button" class="topbar-lock-btn" id="txn-income-eye-btn" title="Toggle income visibility" style="display:none;">👁️</button>
-          <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
-        </div>
+        <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
       </div>
       <div class="search-bar">
         <span>🔍</span>
@@ -1762,7 +1750,6 @@ const state = {
   txnFilterEndISO:null,           // Transactions filter upper date bound (inclusive), or null = unbounded
   txnFilterMinAmount:null,        // Transactions filter lower amount bound (inclusive), or null = unbounded
   txnFilterMaxAmount:null,        // Transactions filter upper amount bound (inclusive), or null = unbounded
-  incomeSessionUnlocked:false,    // true once user verifies PIN for income masking; resets on lock/background
   txnFilterType:'all',            // 'all' | 'expense' | 'income' — type filter on Transactions screen
   txnFilterSplitOnly:false,       // true = show only split expenses
   txnFilterSplitStatus:'unsettled', // 'unsettled' | 'all' — sub-filter within split-only view, only matters when txnFilterSplitOnly is true
@@ -2027,7 +2014,6 @@ function lockVault(){
   if(!state.unlocked) return;
   screenBeforeLock = SCREENS.find(s => s!=='pin-screen' && !document.getElementById(s).classList.contains('is-hidden')) || 'home-screen';
   state.unlocked=false;
-  state.incomeSessionUnlocked=false;
   clearTimeout(autoLockTimer);
   enterUnlockScreen();
 }
@@ -2069,86 +2055,11 @@ function endPickerSuppression(){
 document.addEventListener('visibilitychange', ()=>{
   if(document.hidden){
     if(!suppressLockOnHide && state.unlocked) lockVault();
-    state.incomeSessionUnlocked=false;
-    _revealedIncomeKeys=new Set();
   } else {
     if(pendingAutoBio){ pendingAutoBio=false; tryAutoBiometric(); }
     if(state.unlocked) resetAutoLock();
   }
 });
-
-/* ============================== INCOME MASKING ============================== */
-const INCOME_MASK='₹••••••';
-let _revealedIncomeKeys=new Set();
-
-function _updateEyeButtons(){
-  const masked=!state.incomeSessionUnlocked;
-  ['home-income-eye-btn','txn-income-eye-btn'].forEach(id=>{
-    const btn=document.getElementById(id);
-    if(btn) btn.textContent=masked?'👁️':'🙈';
-  });
-}
-
-function incomeMaskedText(realText,key){
-  if(state.incomeSessionUnlocked) return realText;
-  if(_revealedIncomeKeys.has(key)) return realText;
-  return INCOME_MASK;
-}
-
-// Tap a masked value: PIN on first reveal this session, direct reveal after
-async function requestIncomeReveal(key,onRevealed){
-  if(state.incomeSessionUnlocked || _revealedIncomeKeys.has(key)){
-    _revealedIncomeKeys.add(key); onRevealed(); return;
-  }
-  if(_revealedIncomeKeys.size>0){
-    // Already verified once this session — reveal directly
-    _revealedIncomeKeys.add(key); onRevealed(); return;
-  }
-  await promptIncomePin(key,onRevealed);
-}
-
-let _incomePinResolve=null;
-function promptIncomePin(key,onRevealed){
-  return new Promise(resolve=>{
-    _incomePinResolve=async(entered)=>{
-      _incomePinResolve=null;
-      const hash=await Crypto.hashPIN(entered);
-      if(hash!==Store.get('pt_pin')){
-        document.getElementById('income-pin-error').textContent='Wrong PIN';
-        setTimeout(()=>{ document.getElementById('income-pin-error').textContent=''; },1500);
-        // Reset dots for retry
-        const el=document.getElementById('income-pin-dots'); el.dataset.buf='';
-        _renderIncomePinDots('');
-        resolve(false); return;
-      }
-      _revealedIncomeKeys.add(key);
-      onRevealed();
-      resolve(true);
-    };
-    _showIncomePinSheet();
-  });
-}
-function _showIncomePinSheet(){
-  const el=document.getElementById('income-pin-dots');
-  el.dataset.buf=''; _renderIncomePinDots('');
-  document.getElementById('income-pin-error').textContent='';
-  document.getElementById('income-pin-overlay').classList.add('show');
-}
-function _closeIncomePinSheet(){
-  document.getElementById('income-pin-overlay').classList.remove('show');
-  _incomePinResolve=null;
-}
-function _renderIncomePinDots(buf){
-  document.querySelectorAll('#income-pin-dots .pin-dot').forEach((d,i)=>d.classList.toggle('filled',i<buf.length));
-}
-async function _handleIncomePinDigit(d){
-  const el=document.getElementById('income-pin-dots');
-  let buf=(el.dataset.buf||'')+d;
-  if(buf.length>6) return;
-  el.dataset.buf=buf; _renderIncomePinDots(buf);
-  if(buf.length<6) return;
-  if(_incomePinResolve) await _incomePinResolve(buf);
-}
 
 /* ============================== HOME RENDER ============================== */
 function buildDonutGradient(catTotals, total){
@@ -2222,33 +2133,11 @@ async function renderHomeOverviewPanel(){
   const incomeTotal=incomes.reduce((s,e)=>s+Number(e.amount),0);
   const net=incomeTotal - expenseTotal;
 
-  const incTotalReal=incomeTotal>0?`+${formatINR(incomeTotal)}`:'+₹0';
-  const netReal=(net>=0?'+':'')+formatINR(Math.abs(net));
-  const incEl=document.getElementById('home-income-total');
-  incEl.textContent=incomeTotal>0?incomeMaskedText(incTotalReal,'home-income-total'):'+₹0';
-  document.getElementById('home-expense-total').textContent=formatINR(expenseTotal);
+  document.getElementById('home-income-total').textContent = incomeTotal>0 ? `+${formatINR(incomeTotal)}` : '+₹0';
+  document.getElementById('home-expense-total').textContent = formatINR(expenseTotal);
   const netEl=document.getElementById('home-net-total');
-  netEl.textContent=incomeTotal>0?incomeMaskedText(netReal,'home-net-total'):netReal;
-  netEl.style.color=net>=0?'#7FFFEC':'#FFB4B4';
-
-  // Eye button: show only when income exists
-  const eyeBtn=document.getElementById('home-income-eye-btn');
-  eyeBtn.style.display=incomeTotal>0?'':'none';
-  _updateEyeButtons();
-
-  // Tap-to-reveal on individual masked values
-  if(incomeTotal>0){
-    [['home-income-total',incTotalReal],['home-net-total',netReal]].forEach(([elId,real])=>{
-      const el=document.getElementById(elId);
-      el.style.cursor='pointer';
-      el.onclick=async()=>{ await requestIncomeReveal(elId,()=>{ el.textContent=real; el.style.cursor=''; }); };
-    });
-  } else {
-    ['home-income-total','home-net-total'].forEach(elId=>{
-      const el=document.getElementById(elId);
-      el.style.cursor=''; el.onclick=null;
-    });
-  }
+  netEl.textContent = (net>=0?'+':'')+formatINR(Math.abs(net));
+  netEl.style.color = net>=0 ? '#7FFFEC' : '#FFB4B4';
   document.getElementById('home-month-label').textContent=today.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
   document.getElementById('home-count').textContent=`${expenses.length} expense${expenses.length===1?'':'s'} this month`;
 
@@ -2280,31 +2169,34 @@ async function renderHomeOverviewPanel(){
       const cat=isInc ? INCOME_CATEGORIES.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
       const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
-      const realAmtText=isInc ? `+${formatINR(e.amount)}` : `-${formatINR(e.amount)}`;
-      const amtText=isInc ? incomeMaskedText(realAmtText,`recent-${e.id}`) : realAmtText;
-      // All entries get swipe-to-delete (income bug fix)
-      list.insertAdjacentHTML('beforeend', `
-        <div class="swipe-wrap" data-id="${e.id}">
-          <div class="swipe-delete-bg">🗑️</div>
+      const amtText=isInc ? formatINR(e.amount) : `-${formatINR(e.amount)}`;
+      if(isInc){
+        // Income rows aren't swipe-deletable on Home (no undo pattern defined yet for income)
+        list.insertAdjacentHTML('beforeend', `
           <div class="recent-row" data-id="${e.id}">
-            <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:(isInc?'💰':'❔')}</div>
+            <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'💰'}</div>
             <div class="recent-info">
-              <p class="recent-title">${isInc?'':splitTitlePrefix(e)}${esc(e.note||(cat?cat.name:(isInc?'Income':'Expense')))}</p>
-              <span class="recent-pm">${isInc?(cat?esc(cat.name):'Income'):(pm?esc(pm.name):'—')}</span>
+              <p class="recent-title">${esc(e.note || (cat?cat.name:'Income'))}</p>
+              <span class="recent-pm">${cat?esc(cat.name):'Income'}</span>
             </div>
-            <span class="${amtClass}"${isInc?` data-ikey="recent-${e.id}" data-ireal="${esc(realAmtText)}"`:''} style="${isInc&&!state.incomeSessionUnlocked&&!_revealedIncomeKeys.has(`recent-${e.id}`)?' cursor:pointer;':''}">${amtText}</span>
-          </div>
-        </div>`);
+            <span class="${amtClass}">${amtText}</span>
+          </div>`);
+      } else {
+        list.insertAdjacentHTML('beforeend', `
+          <div class="swipe-wrap" data-id="${e.id}">
+            <div class="swipe-delete-bg">🗑️</div>
+            <div class="recent-row" data-id="${e.id}">
+              <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
+              <div class="recent-info">
+                <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:'Expense'))}</p>
+                <span class="recent-pm">${pm?esc(pm.name):'—'}</span>
+              </div>
+              <span class="${amtClass}">${amtText}</span>
+            </div>
+          </div>`);
+      }
     });
     addSwipeToDelete(list, handleHomeSwipeDelete);
-    // Tap-to-reveal masked income amounts
-    list.querySelectorAll('[data-ikey]').forEach(el=>{
-      const key=el.dataset.ikey; if(!key) return;
-      el.addEventListener('click',async(ev)=>{
-        ev.stopPropagation();
-        await requestIncomeReveal(key,()=>{ el.textContent=el.dataset.ireal; el.style.cursor=''; });
-      });
-    });
   }
 }
 
@@ -2531,8 +2423,7 @@ async function renderTransactions(){
       const cat=isInc ? INCOME_CATEGORIES.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
       const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
-      const realAmtText=isInc ? `+${formatINR(e.amount)}` : `-${formatINR(e.amount)}`;
-      const amtText=isInc ? incomeMaskedText(realAmtText,`txn-${e.id}`) : realAmtText;
+      const amtText=isInc ? formatINR(e.amount) : `-${formatINR(e.amount)}`;
       const defaultLabel=isInc ? 'Income' : 'Expense';
       const fallbackIcon=isInc ? '💰' : '❔';
       // When viewing the split filter, swap the usual payment-method
@@ -2551,26 +2442,13 @@ async function renderTransactions(){
             <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:defaultLabel))}</p>
             <span class="recent-pm">${subtitle}</span>
           </div>
-          <span class="${amtClass}"${isInc?` data-ikey="txn-${e.id}" data-ireal="${esc(realAmtText)}" style="cursor:pointer"`:''} >${amtText}</span>
+          <span class="${amtClass}">${amtText}</span>
           <button class="txn-delete" data-del="${e.id}">🗑️</button>
         </div>`);
     });
   }
   const typeLabel = state.txnFilterType==='income' ? 'income entries' : state.txnFilterType==='expense' ? 'expenses' : 'entries';
   document.getElementById('txn-filter-show-btn').textContent = `Show ${list.length} ${typeLabel}`;
-
-  // Tap-to-reveal masked income amounts in transactions list
-  container.querySelectorAll('[data-ikey]').forEach(el=>{
-    const key=el.dataset.ikey; if(!key) return;
-    el.addEventListener('click',async(ev)=>{
-      ev.stopPropagation();
-      await requestIncomeReveal(key,()=>{ el.textContent=el.dataset.ireal; el.style.cursor=''; });
-    });
-  });
-  // Eye button visibility
-  const hasInc=list.some(isIncomeEntry);
-  const txnEye=document.getElementById('txn-income-eye-btn');
-  if(txnEye){ txnEye.style.display=hasInc?'':'none'; _updateEyeButtons(); }
 }
 
 /* ============================== TRANSACTIONS FILTERS ============================== */
@@ -2640,7 +2518,6 @@ async function openTxnFilterSheet(){
   const showCatFilter = state.txnFilterType !== 'income';
   document.getElementById('txn-filter-cat-label').classList.toggle('hidden', !showCatFilter);
   document.getElementById('txn-filter-cat-grid').classList.toggle('hidden', !showCatFilter);
-  syncIncomeFilterSections();
   syncSplitFilterUI();
   await renderTransactions();
   document.getElementById('txn-filter-overlay').classList.add('show');
@@ -2653,18 +2530,6 @@ function syncSplitFilterUI(){
   document.querySelectorAll('#txn-filter-split-status-tabs .segmented-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.splitstatus === state.txnFilterSplitStatus);
   });
-}
-function syncIncomeFilterSections(){
-  const isIncome=state.txnFilterType==='income';
-  // Payment method, group, split are expense-only — hide when income filter active
-  document.querySelectorAll('#txn-filter-overlay .field-label').forEach(label=>{
-    const t=label.textContent.trim();
-    if(t==='PAYMENT METHOD'||t==='GROUP'||t==='SPLIT') label.classList.toggle('hidden',isIncome);
-  });
-  document.getElementById('txn-filter-pay-row').classList.toggle('hidden',isIncome);
-  document.getElementById('txn-filter-group-row').classList.toggle('hidden',isIncome);
-  document.getElementById('txn-filter-split-toggle').classList.toggle('hidden',isIncome);
-  if(isIncome) document.getElementById('txn-filter-split-status-tabs').classList.add('hidden');
 }
 function closeTxnFilterSheet(){
   document.getElementById('txn-filter-overlay').classList.remove('show');
@@ -5187,43 +5052,6 @@ document.getElementById('pin-del-btn').addEventListener('click', () => { state.p
 document.getElementById('pin-cancel-btn').addEventListener('click', cancelChangePIN);
 document.getElementById('pin-biometric-btn').addEventListener('click', tryAutoBiometric);
 
-// Income PIN overlay
-document.querySelectorAll('#income-pin-overlay .num-btn[data-income-pin]').forEach(b=>b.addEventListener('click',()=>_handleIncomePinDigit(b.dataset.incomePin)));
-document.getElementById('income-pin-del-btn').addEventListener('click',()=>{
-  const el=document.getElementById('income-pin-dots');
-  const buf=(el.dataset.buf||'').slice(0,-1);
-  el.dataset.buf=buf; _renderIncomePinDots(buf);
-});
-document.getElementById('income-pin-cancel-btn').addEventListener('click',_closeIncomePinSheet);
-
-// Eye buttons — reveal all / mask all toggle
-['home-income-eye-btn','txn-income-eye-btn'].forEach(id=>{
-  document.getElementById(id).addEventListener('click',async()=>{
-    if(state.incomeSessionUnlocked){
-      // Mask all
-      state.incomeSessionUnlocked=false;
-      _revealedIncomeKeys=new Set();
-      _updateEyeButtons();
-      renderHome();
-      renderTransactions();
-    } else if(_revealedIncomeKeys.size>0){
-      // Already verified PIN once — promote to full session unlock
-      state.incomeSessionUnlocked=true;
-      _updateEyeButtons();
-      renderHome();
-      renderTransactions();
-    } else {
-      // First time — prompt PIN then unlock session
-      await promptIncomePin('__eye__',()=>{
-        state.incomeSessionUnlocked=true;
-        _updateEyeButtons();
-        renderHome();
-        renderTransactions();
-      });
-    }
-  });
-});
-
 document.querySelectorAll('.fab-add').forEach(b => b.addEventListener('click', () => openAddScreen()));
 document.getElementById('add-close-btn').addEventListener('click', () => goToReturnScreen());
 document.getElementById('attach-viewer-close').addEventListener('click', closeAttachmentViewer);
@@ -5323,7 +5151,19 @@ document.getElementById('txn-filter-type-tabs').addEventListener('click', (e) =>
   const showCat=newType!=='income';
   document.getElementById('txn-filter-cat-label').classList.toggle('hidden', !showCat);
   document.getElementById('txn-filter-cat-grid').classList.toggle('hidden', !showCat);
-  syncIncomeFilterSections();
+  onTxnFilterChange();
+});
+
+// Filter sheet — TYPE toggle (All / Expenses / Income)
+document.getElementById('txn-filter-type-tabs').addEventListener('click', (e) => {
+  const btn=e.target.closest('.segmented-tab'); if(!btn) return;
+  const type=btn.dataset.filtertype; if(!type || type===state.txnFilterType) return;
+  state.txnFilterType=type;
+  document.querySelectorAll('#txn-filter-type-tabs .segmented-tab').forEach(b => b.classList.toggle('active', b.dataset.filtertype===type));
+  // Hide category filter when Income-only (income uses fixed categories, not user-defined ones)
+  const showCat = type !== 'income';
+  document.getElementById('txn-filter-cat-label').classList.toggle('hidden', !showCat);
+  document.getElementById('txn-filter-cat-grid').classList.toggle('hidden', !showCat);
   onTxnFilterChange();
 });
 document.getElementById('txn-filter-cat-grid').addEventListener('click', (e) => {
@@ -5749,13 +5589,6 @@ async function forceRefreshApp(){
   window.location.reload(true);
 }
 function init(){
-  // Emergency escape hatch: visiting the URL with ?reset clears all localStorage
-  // so a forgotten/corrupted PIN doesn't permanently lock the app.
-  // Data (IndexedDB) is preserved. Usage: append ?reset to the URL in browser.
-  if(location.search.includes('reset')){
-    localStorage.clear();
-    history.replaceState(null,'',location.pathname);
-  }
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed', err));
   }
@@ -5771,27 +5604,5 @@ function init(){
 }
 init();
 </script>
-
-<!-- ============================== INCOME PIN OVERLAY ============================== -->
-<div id="income-pin-overlay">
-  <div class="edit-sheet" style="padding-bottom:32px;">
-    <div class="edit-sheet-grip"></div>
-    <p class="edit-sheet-title" style="text-align:center;margin-bottom:18px;">Enter PIN to reveal</p>
-    <div class="pin-dots" id="income-pin-dots" data-buf="" style="justify-content:center;margin-bottom:12px;">
-      <div class="pin-dot"></div><div class="pin-dot"></div>
-      <div class="pin-dot"></div><div class="pin-dot"></div>
-      <div class="pin-dot"></div><div class="pin-dot"></div>
-    </div>
-    <p id="income-pin-error" style="text-align:center;color:var(--coral);font-size:13px;min-height:18px;margin-bottom:8px;"></p>
-    <div class="numpad" style="margin:0 auto;">
-      <button class="num-btn" data-income-pin="1">1</button><button class="num-btn" data-income-pin="2">2</button><button class="num-btn" data-income-pin="3">3</button>
-      <button class="num-btn" data-income-pin="4">4</button><button class="num-btn" data-income-pin="5">5</button><button class="num-btn" data-income-pin="6">6</button>
-      <button class="num-btn" data-income-pin="7">7</button><button class="num-btn" data-income-pin="8">8</button><button class="num-btn" data-income-pin="9">9</button>
-      <button class="num-btn empty"></button><button class="num-btn" data-income-pin="0">0</button>
-      <button class="num-btn del" id="income-pin-del-btn">⌫</button>
-    </div>
-    <button type="button" class="pin-cancel-btn" id="income-pin-cancel-btn" style="margin-top:14px;">Cancel</button>
-  </div>
-</div>
 </body>
 </html>
