@@ -5749,6 +5749,13 @@ async function forceRefreshApp(){
   window.location.reload(true);
 }
 function init(){
+  // Emergency escape hatch: visiting the URL with ?reset clears all localStorage
+  // so a forgotten/corrupted PIN doesn't permanently lock the app.
+  // Data (IndexedDB) is preserved. Usage: append ?reset to the URL in browser.
+  if(location.search.includes('reset')){
+    localStorage.clear();
+    history.replaceState(null,'',location.pathname);
+  }
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed', err));
   }
