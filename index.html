@@ -432,6 +432,12 @@ input{outline:none;}
   backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;
   opacity:0;pointer-events:none;transition:opacity .2s;}
 .edit-sheet-overlay.show{opacity:1;pointer-events:auto;}
+/* Income PIN overlay uses its own class to avoid backdrop-filter compositing layer
+   which causes touch interception on Android WebKit even with pointer-events:none */
+#income-pin-overlay{position:fixed;inset:0;z-index:950;background:rgba(36,31,61,.55);
+  display:flex;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;}
+#income-pin-overlay.show{opacity:1;pointer-events:auto;}
 .edit-sheet{width:100%;max-width:480px;max-height:86vh;min-height:0;background:var(--paper);
   border-radius:26px 26px 0 0;padding:10px 22px calc(20px + env(safe-area-inset-bottom,0px));
   display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
@@ -509,7 +515,7 @@ input{outline:none;}
 </div>
 
 <!-- ============================== INCOME PIN OVERLAY ============================== -->
-<div id="income-pin-overlay" class="edit-sheet-overlay" style="display:flex;align-items:flex-end;">
+<div id="income-pin-overlay">
   <div class="edit-sheet" style="padding-bottom:32px;">
     <div class="edit-sheet-grip"></div>
     <p class="edit-sheet-title" style="text-align:center;margin-bottom:18px;">Enter PIN to reveal</p>
