@@ -5,7 +5,7 @@
       "version": "2026-06-26",
       "date": "2026-06-26",
       "highlights": [
-        "Swipe left on any entry in the List tab to delete it — works for both expenses and income.",
+        "Swipe left on income entries on the Home screen to delete them — same as expenses.",
         "Filters now hide Payment method, Group, and Split sections when viewing income — those don’t apply to income entries."
       ]
     },
@@ -57,7 +57,7 @@
       "id": "transactions",
       "icon": "📋",
       "title": "Transactions",
-      "body": "Every expense and income entry you’ve ever logged, grouped by date. Search or filter by type, category, payment method, group, date, or amount — and swipe left on any entry to delete it, or tap it to edit."
+      "body": "Every expense and income entry you’ve ever logged, grouped by date. Search or filter by type, category, payment method, group, date, or amount — tap any entry to edit it, or tap the trash icon to delete."
     },
     {
       "id": "insights",

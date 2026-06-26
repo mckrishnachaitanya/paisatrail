@@ -2171,15 +2171,17 @@ async function renderHomeOverviewPanel(){
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
       const amtText=isInc ? formatINR(e.amount) : `-${formatINR(e.amount)}`;
       if(isInc){
-        // Income rows aren't swipe-deletable on Home (no undo pattern defined yet for income)
         list.insertAdjacentHTML('beforeend', `
-          <div class="recent-row" data-id="${e.id}">
-            <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'💰'}</div>
-            <div class="recent-info">
-              <p class="recent-title">${esc(e.note || (cat?cat.name:'Income'))}</p>
-              <span class="recent-pm">${cat?esc(cat.name):'Income'}</span>
+          <div class="swipe-wrap" data-id="${e.id}">
+            <div class="swipe-delete-bg">🗑️</div>
+            <div class="recent-row" data-id="${e.id}">
+              <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'💰'}</div>
+              <div class="recent-info">
+                <p class="recent-title">${esc(e.note || (cat?cat.name:'Income'))}</p>
+                <span class="recent-pm">${cat?esc(cat.name):'Income'}</span>
+              </div>
+              <span class="${amtClass}">${amtText}</span>
             </div>
-            <span class="${amtClass}">${amtText}</span>
           </div>`);
       } else {
         list.insertAdjacentHTML('beforeend', `
@@ -2436,19 +2438,16 @@ async function renderTransactions(){
         subtitle = `${formatINR(e.splitTotal)} total${withText}${e.splitSettled?' · Settled':''}`;
       }
       container.insertAdjacentHTML('beforeend', `
-        <div class="swipe-wrap" data-id="${e.id}">
-          <div class="swipe-delete-bg">🗑️</div>
-          <div class="recent-row" data-id="${e.id}">
-            <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:fallbackIcon}</div>
-            <div class="recent-info">
-              <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:defaultLabel))}</p>
-              <span class="recent-pm">${subtitle}</span>
-            </div>
-            <span class="${amtClass}">${amtText}</span>
+        <div class="recent-row" data-id="${e.id}">
+          <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:fallbackIcon}</div>
+          <div class="recent-info">
+            <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:defaultLabel))}</p>
+            <span class="recent-pm">${subtitle}</span>
           </div>
+          <span class="${amtClass}">${amtText}</span>
+          <button class="txn-delete" data-del="${e.id}">🗑️</button>
         </div>`);
     });
-    addSwipeToDelete(container, handleTxnDelete);
   }
   const typeLabel = state.txnFilterType==='income' ? 'income entries' : state.txnFilterType==='expense' ? 'expenses' : 'entries';
   document.getElementById('txn-filter-show-btn').textContent = `Show ${list.length} ${typeLabel}`;
@@ -5136,10 +5135,10 @@ document.getElementById('home-recent-list').addEventListener('click', (e) => {
   openEditFromId(row.dataset.id);
 });
 document.getElementById('txn-list').addEventListener('click', (e) => {
+  const delBtn=e.target.closest('.txn-delete');
+  if(delBtn){ handleTxnDelete(delBtn.dataset.del); return; }
   const row=e.target.closest('.recent-row');
-  if(!row) return;
-  if(row.classList.contains('swiped')){ closeSwipedRow(row); return; }
-  openEditFromId(row.dataset.id);
+  if(row) openEditFromId(row.dataset.id);
 });
 let txnSearchTimer;
 document.getElementById('txn-search').addEventListener('input', () => {
