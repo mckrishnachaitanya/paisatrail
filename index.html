@@ -4697,8 +4697,38 @@ function renderOptRow(){
   });
 }
 function toggleOptExpand(key){
-  state.activeOptKey = (state.activeOptKey===key) ? null : key;
+  const opening = state.activeOptKey !== key;
+  state.activeOptKey = opening ? key : null;
+  // Auto-enable the feature on first open so the user lands directly on the
+  // controls instead of a secondary "enable" button (eliminates double-tap).
+  // Attach has no enable state. Recurring skips auto-enable when this expense
+  // is already linked to a recurring rule (that panel shows an info message).
+  if(opening){
+    if(key==='warranty' && !state.warrantyEnabled){
+      state.warrantyEnabled=true;
+      state.warrantyDurationMonths=12;
+      const purchaseDate=document.getElementById('add-date').value || todayISO();
+      state.warrantyExpiry=addMonthsISO(purchaseDate,12);
+    } else if(key==='group' && !state.groupEnabled){
+      state.groupEnabled=true;
+    } else if(key==='split' && !state.splitEnabled){
+      state.splitEnabled=true;
+      const amt=parseFloat(document.getElementById('add-amount').value);
+      state.splitTotal = amt>0 ? amt : null;
+      state.splitPeople = null;
+      state.splitShareManual=false;
+    } else if(key==='recurring' && !state.recurringEnabled && !state.recurringLinkedId){
+      state.recurringEnabled=true;
+    }
+  }
   renderOptRow();
+  // Re-render the relevant area so it reflects the newly-enabled state.
+  if(opening){
+    if(key==='warranty') renderWarrantyArea();
+    else if(key==='group') renderGroupArea();
+    else if(key==='split') renderSplitArea();
+    else if(key==='recurring') renderRecurringArea();
+  }
 }
 document.addEventListener('click', (e)=>{
   const closeBtn=e.target.closest('[data-closeopt]');
