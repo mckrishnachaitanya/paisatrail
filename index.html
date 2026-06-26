@@ -2152,7 +2152,7 @@ async function renderHomeOverviewPanel(){
   document.getElementById('home-income-total').textContent = incomeTotal>0 ? `+${maskIncome(incomeTotal)}` : '+₹0';
   document.getElementById('home-expense-total').textContent = formatINR(expenseTotal);
   const netEl=document.getElementById('home-net-total');
-  netEl.textContent = (net>=0?'+':'')+formatINR(Math.abs(net));
+  netEl.textContent = state.incomeRevealed ? (net>=0?'+':'')+formatINR(Math.abs(net)) : '₹••••••';
   netEl.style.color = net>=0 ? '#7FFFEC' : '#FFB4B4';
   document.getElementById('home-month-label').textContent=today.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
   document.getElementById('home-count').textContent=`${expenses.length} expense${expenses.length===1?'':'s'} this month`;
