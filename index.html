@@ -752,7 +752,7 @@ input{outline:none;}
     </div>
     <p class="field-label" id="txn-filter-cat-label" style="margin-top:14px;">CATEGORY</p>
     <div class="cat-grid" id="txn-filter-cat-grid"></div>
-    <p class="field-label">PAYMENT METHOD</p>
+    <p class="field-label" id="txn-filter-pay-label">PAYMENT METHOD</p>
     <div class="pay-row" id="txn-filter-pay-row"></div>
     <p class="field-label">DATE RANGE</p>
     <div class="ins-custom-range" style="margin-top:0;">
@@ -776,9 +776,9 @@ input{outline:none;}
         <input type="number" inputmode="decimal" class="sheet-input" id="txn-filter-max-amount" placeholder="Any" min="0" step="0.01">
       </div>
     </div>
-    <p class="field-label">GROUP</p>
+    <p class="field-label" id="txn-filter-group-label">GROUP</p>
     <div class="pay-row" id="txn-filter-group-row"></div>
-    <p class="field-label">SPLIT</p>
+    <p class="field-label" id="txn-filter-split-label">SPLIT</p>
     <button type="button" class="pay-chip" id="txn-filter-split-toggle" style="width:100%;justify-content:center;">✂️ Split expenses only</button>
     <div class="segmented-tabs hidden" id="txn-filter-split-status-tabs" style="margin-top:10px;">
       <button type="button" class="segmented-tab active" data-splitstatus="unsettled">Unsettled</button>
@@ -2436,16 +2436,19 @@ async function renderTransactions(){
         subtitle = `${formatINR(e.splitTotal)} total${withText}${e.splitSettled?' · Settled':''}`;
       }
       container.insertAdjacentHTML('beforeend', `
-        <div class="recent-row" data-id="${e.id}">
-          <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:fallbackIcon}</div>
-          <div class="recent-info">
-            <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:defaultLabel))}</p>
-            <span class="recent-pm">${subtitle}</span>
+        <div class="swipe-wrap" data-id="${e.id}">
+          <div class="swipe-delete-bg">🗑️</div>
+          <div class="recent-row" data-id="${e.id}">
+            <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:fallbackIcon}</div>
+            <div class="recent-info">
+              <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:defaultLabel))}</p>
+              <span class="recent-pm">${subtitle}</span>
+            </div>
+            <span class="${amtClass}">${amtText}</span>
           </div>
-          <span class="${amtClass}">${amtText}</span>
-          <button class="txn-delete" data-del="${e.id}">🗑️</button>
         </div>`);
     });
+    addSwipeToDelete(container, handleTxnDelete);
   }
   const typeLabel = state.txnFilterType==='income' ? 'income entries' : state.txnFilterType==='expense' ? 'expenses' : 'entries';
   document.getElementById('txn-filter-show-btn').textContent = `Show ${list.length} ${typeLabel}`;
@@ -2518,9 +2521,19 @@ async function openTxnFilterSheet(){
   const showCatFilter = state.txnFilterType !== 'income';
   document.getElementById('txn-filter-cat-label').classList.toggle('hidden', !showCatFilter);
   document.getElementById('txn-filter-cat-grid').classList.toggle('hidden', !showCatFilter);
+  syncIncomeFilterSections();
   syncSplitFilterUI();
   await renderTransactions();
   document.getElementById('txn-filter-overlay').classList.add('show');
+}
+function syncIncomeFilterSections(){
+  // Payment method, Group, and Split filters are expense-only concepts;
+  // hide them (and clear their state) when Income-only is selected.
+  const isIncome = state.txnFilterType === 'income';
+  ['txn-filter-pay-label','txn-filter-pay-row',
+   'txn-filter-group-label','txn-filter-group-row',
+   'txn-filter-split-label','txn-filter-split-toggle','txn-filter-split-status-tabs'
+  ].forEach(id => document.getElementById(id).classList.toggle('hidden', isIncome));
 }
 function syncSplitFilterUI(){
   const toggle=document.getElementById('txn-filter-split-toggle');
@@ -5123,10 +5136,10 @@ document.getElementById('home-recent-list').addEventListener('click', (e) => {
   openEditFromId(row.dataset.id);
 });
 document.getElementById('txn-list').addEventListener('click', (e) => {
-  const delBtn=e.target.closest('.txn-delete');
-  if(delBtn){ handleTxnDelete(delBtn.dataset.del); return; }
   const row=e.target.closest('.recent-row');
-  if(row) openEditFromId(row.dataset.id);
+  if(!row) return;
+  if(row.classList.contains('swiped')){ closeSwipedRow(row); return; }
+  openEditFromId(row.dataset.id);
 });
 let txnSearchTimer;
 document.getElementById('txn-search').addEventListener('input', () => {
@@ -5147,23 +5160,17 @@ document.getElementById('txn-filter-type-tabs').addEventListener('click', (e) =>
   const newType=btn.dataset.filtertype; if(!newType || newType===state.txnFilterType) return;
   state.txnFilterType=newType;
   document.querySelectorAll('#txn-filter-type-tabs .segmented-tab').forEach(b => b.classList.toggle('active', b.dataset.filtertype===newType));
-  // Hide category filter when showing income-only (income has fixed categories)
+  // Hide category filter when Income-only (income has fixed categories)
   const showCat=newType!=='income';
   document.getElementById('txn-filter-cat-label').classList.toggle('hidden', !showCat);
   document.getElementById('txn-filter-cat-grid').classList.toggle('hidden', !showCat);
-  onTxnFilterChange();
-});
-
-// Filter sheet — TYPE toggle (All / Expenses / Income)
-document.getElementById('txn-filter-type-tabs').addEventListener('click', (e) => {
-  const btn=e.target.closest('.segmented-tab'); if(!btn) return;
-  const type=btn.dataset.filtertype; if(!type || type===state.txnFilterType) return;
-  state.txnFilterType=type;
-  document.querySelectorAll('#txn-filter-type-tabs .segmented-tab').forEach(b => b.classList.toggle('active', b.dataset.filtertype===type));
-  // Hide category filter when Income-only (income uses fixed categories, not user-defined ones)
-  const showCat = type !== 'income';
-  document.getElementById('txn-filter-cat-label').classList.toggle('hidden', !showCat);
-  document.getElementById('txn-filter-cat-grid').classList.toggle('hidden', !showCat);
+  // Clear expense-only filter state when switching to income
+  if(newType==='income'){
+    state.txnFilterPaymentIds.clear();
+    state.txnFilterGroupIds.clear();
+    if(state.txnFilterSplitOnly){ state.txnFilterSplitOnly=false; syncSplitFilterUI(); }
+  }
+  syncIncomeFilterSections();
   onTxnFilterChange();
 });
 document.getElementById('txn-filter-cat-grid').addEventListener('click', (e) => {

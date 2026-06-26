@@ -2,10 +2,18 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "2026-06-26",
+      "date": "2026-06-26",
+      "highlights": [
+        "Swipe left on any entry in the List tab to delete it — works for both expenses and income.",
+        "Filters now hide Payment method, Group, and Split sections when viewing income — those don’t apply to income entries."
+      ]
+    },
+    {
       "version": "2026-06-24",
       "date": "2026-06-24",
       "highlights": [
-        "Filter transactions by group directly from the List tab \u2014 including a 'No group' option for untagged expenses.",
+        "Filter transactions by group directly from the List tab — including a 'No group' option for untagged expenses.",
         "Fixed biometric unlock not triggering after switching away from the app and coming back."
       ]
     },
@@ -15,7 +23,7 @@
       "highlights": [
         "Budgets now warn you if you're on pace to go over your monthly limit, before it actually happens.",
         "New budgets suggest a starting amount based on your last 3 months of spending.",
-        "A reminder shows up on Home if you haven't backed up your data in a while \u2014 tap it to back up instantly.",
+        "A reminder shows up on Home if you haven't backed up your data in a while — tap it to back up instantly.",
         "New \"How this app works\" guide in Settings, explaining every tab and feature."
       ]
     }
@@ -23,57 +31,57 @@
   "sections": [
     {
       "id": "home-overview",
-      "icon": "\ud83c\udfe0",
-      "title": "Home \u2014 Overview",
+      "icon": "🏠",
+      "title": "Home — Overview",
       "body": "Your at-a-glance view of the month. See how much money came in, went out, and what's left over, plus your most recent expenses and a quick breakdown of what you've spent on by category."
     },
     {
       "id": "home-warranties",
-      "icon": "\ud83d\udee1\ufe0f",
-      "title": "Home \u2014 Warranties",
-      "body": "Tracks warranty coverage for things you've bought \u2014 phones, appliances, anything with a guarantee period. Mark an expense as \"under warranty\" when you add it, and this tab shows what's still covered and what's about to run out."
+      "icon": "🛡️",
+      "title": "Home — Warranties",
+      "body": "Tracks warranty coverage for things you've bought — phones, appliances, anything with a guarantee period. Mark an expense as \"under warranty\" when you add it, and this tab shows what's still covered and what's about to run out."
     },
     {
       "id": "home-forecast",
-      "icon": "\ud83d\udcc8",
-      "title": "Home \u2014 Forecast",
+      "icon": "📈",
+      "title": "Home — Forecast",
       "body": "A look ahead at what you're likely to spend for the rest of the month (or the next 30 days), based on what's already gone out, what's due to repeat, and your typical day-to-day spending."
     },
     {
       "id": "home-budgets",
-      "icon": "\ud83d\udcb0",
-      "title": "Home \u2014 Budgets",
-      "body": "Set a monthly spending limit \u2014 either overall or for a specific category \u2014 and track how close you are to it. You'll also see whether you're on pace to stay under or go over, based on how fast you're spending so far this month."
+      "icon": "💰",
+      "title": "Home — Budgets",
+      "body": "Set a monthly spending limit — either overall or for a specific category — and track how close you are to it. You'll also see whether you're on pace to stay under or go over, based on how fast you're spending so far this month."
     },
     {
       "id": "transactions",
-      "icon": "\ud83d\udccb",
+      "icon": "📋",
       "title": "Transactions",
-      "body": "Every expense and income entry you've ever logged, grouped by date. Search, filter by category, payment method, date, or amount, and tap any entry to edit or delete it."
+      "body": "Every expense and income entry you’ve ever logged, grouped by date. Search or filter by type, category, payment method, group, date, or amount — and swipe left on any entry to delete it, or tap it to edit."
     },
     {
       "id": "insights",
-      "icon": "\ud83d\udcca",
+      "icon": "📊",
       "title": "Insights",
-      "body": "Dig into your spending patterns \u2014 by category, by payment method, or by comparing one period to another, like this week vs last week, or this month vs last month."
+      "body": "Dig into your spending patterns — by category, by payment method, or by comparing one period to another, like this week vs last week, or this month vs last month."
     },
     {
       "id": "settings",
-      "icon": "\u2699\ufe0f",
+      "icon": "⚙️",
       "title": "Settings",
       "body": "Manage categories, payment methods, and groups; set up recurring expenses; back up or restore your data; and control your PIN and biometric unlock."
     },
     {
       "id": "split",
-      "icon": "\u2702\ufe0f",
+      "icon": "✂️",
       "title": "Split expenses",
-      "body": "When you split a bill with someone, log the full amount and how many ways it's split \u2014 the app works out your share automatically, and that share is what counts toward your budgets and totals. Mark it as settled once everyone's paid up."
+      "body": "When you split a bill with someone, log the full amount and how many ways it's split — the app works out your share automatically, and that share is what counts toward your budgets and totals. Mark it as settled once everyone's paid up."
     },
     {
       "id": "recurring",
-      "icon": "\ud83d\udd01",
+      "icon": "🔁",
       "title": "Recurring expenses",
-      "body": "For things that repeat \u2014 rent, subscriptions, EMIs \u2014 set it up once and the app logs it automatically going forward (weekly, monthly, or yearly), so you don't have to re-enter it every time."
+      "body": "For things that repeat — rent, subscriptions, EMIs — set it up once and the app logs it automatically going forward (weekly, monthly, or yearly), so you don't have to re-enter it every time."
     }
   ]
 }
