@@ -134,6 +134,10 @@ input{outline:none;}
 .topbar-lock-btn{width:36px;height:36px;border-radius:50%;background:var(--chip);
   display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
 .topbar-lock-btn:active{transform:scale(.92);}
+.topbar-icons{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.income-eye-btn{width:36px;height:36px;border-radius:50%;background:var(--chip);
+  display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.income-eye-btn:active{transform:scale(.92);}
 .topbar-close{font-size:20px;color:var(--muted);width:32px;height:32px;display:flex;
   align-items:center;justify-content:center;}
 
@@ -517,7 +521,10 @@ input{outline:none;}
           <p class="greeting">Hey there 👋</p>
           <p class="month-label" id="home-month-label">—</p>
         </div>
-        <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
+        <div class="topbar-icons">
+          <button type="button" class="income-eye-btn" id="home-eye-btn" title="Toggle income visibility">👁️</button>
+          <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
+        </div>
       </div>
 
       <div class="home-tabs" id="home-tabs">
@@ -717,7 +724,10 @@ input{outline:none;}
     <div style="padding:0 20px 12px;">
       <div class="screen-topbar">
         <p class="topbar-title">Transactions</p>
-        <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
+        <div class="topbar-icons">
+          <button type="button" class="income-eye-btn" id="txn-eye-btn" title="Toggle income visibility">👁️</button>
+          <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
+        </div>
       </div>
       <div class="search-bar">
         <span>🔍</span>
@@ -1313,6 +1323,7 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&am
 function genId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function todayISO(){ const d=new Date(); const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); }
 function formatINR(n){ const num=Number(n)||0; return '₹' + num.toLocaleString('en-IN',{maximumFractionDigits:2}); }
+function maskIncome(n){ return state.incomeRevealed ? formatINR(n) : '₹••••••'; }
 function splitTitlePrefix(e){ return (e.splitTotal!=null) ? '✂️ ' : ''; }
 function addMonthsISO(dateISO, months){
   const d=new Date((dateISO||todayISO())+'T00:00:00');
@@ -1767,6 +1778,7 @@ const state = {
   budgets:[],                     // in-memory cache of all budgets, mirrors state.recurringRules
   mgrBudgetCategoryId:null,       // categoryId selected while adding a new budget (null = the special "Overall" target); locked/unused once editing an existing budget
   budgetEditHistory:null,         // {lastMonthSpent, lastMonthActive, suggested, targetIsOverall} for whichever target is selected in the open budget sheet — null until fetched, refetched on target change
+  incomeRevealed:false,           // false = income amounts show ₹•••••• on Home and List; true = real amounts shown; resets to false on every lock/unlock
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
@@ -1987,6 +1999,8 @@ function cancelChangePIN(){
 let screenBeforeLock=null;
 async function unlockSuccess(){
   state.unlocked=true;
+  state.incomeRevealed=false;
+  updateEyeButtons();
   await DB.seedDefaults();
   state.categories=await DB.getAllCategories();
   state.paymentMethods=await DB.getAllPaymentMethods();
@@ -2014,6 +2028,8 @@ function lockVault(){
   if(!state.unlocked) return;
   screenBeforeLock = SCREENS.find(s => s!=='pin-screen' && !document.getElementById(s).classList.contains('is-hidden')) || 'home-screen';
   state.unlocked=false;
+  state.incomeRevealed=false;
+  updateEyeButtons();
   clearTimeout(autoLockTimer);
   enterUnlockScreen();
 }
@@ -2133,7 +2149,7 @@ async function renderHomeOverviewPanel(){
   const incomeTotal=incomes.reduce((s,e)=>s+Number(e.amount),0);
   const net=incomeTotal - expenseTotal;
 
-  document.getElementById('home-income-total').textContent = incomeTotal>0 ? `+${formatINR(incomeTotal)}` : '+₹0';
+  document.getElementById('home-income-total').textContent = incomeTotal>0 ? `+${maskIncome(incomeTotal)}` : '+₹0';
   document.getElementById('home-expense-total').textContent = formatINR(expenseTotal);
   const netEl=document.getElementById('home-net-total');
   netEl.textContent = (net>=0?'+':'')+formatINR(Math.abs(net));
@@ -2169,7 +2185,7 @@ async function renderHomeOverviewPanel(){
       const cat=isInc ? INCOME_CATEGORIES.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
       const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
-      const amtText=isInc ? formatINR(e.amount) : `-${formatINR(e.amount)}`;
+      const amtText=isInc ? maskIncome(e.amount) : `-${formatINR(e.amount)}`;
       if(isInc){
         list.insertAdjacentHTML('beforeend', `
           <div class="swipe-wrap" data-id="${e.id}">
@@ -2425,7 +2441,7 @@ async function renderTransactions(){
       const cat=isInc ? INCOME_CATEGORIES.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
       const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
-      const amtText=isInc ? formatINR(e.amount) : `-${formatINR(e.amount)}`;
+      const amtText=isInc ? maskIncome(e.amount) : `-${formatINR(e.amount)}`;
       const defaultLabel=isInc ? 'Income' : 'Expense';
       const fallbackIcon=isInc ? '💰' : '❔';
       // When viewing the split filter, swap the usual payment-method
@@ -5309,6 +5325,25 @@ document.getElementById('home-whatsnew-banner').addEventListener('click', openWh
 // Calls the same lockVault() the idle-auto-lock uses so behaviour is identical.
 ['home-lock-btn','txn-lock-btn','stats-lock-btn','settings-lock-btn'].forEach(id => {
   document.getElementById(id).addEventListener('click', lockVault);
+});
+
+// Income eye toggle — reveals/masks all income amounts on Home and List.
+// State resets to false (masked) on every lock/unlock.
+function updateEyeButtons(){
+  const icon = state.incomeRevealed ? '🙈' : '👁️';
+  const title = state.incomeRevealed ? 'Mask income' : 'Show income';
+  ['home-eye-btn','txn-eye-btn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if(btn){ btn.textContent=icon; btn.title=title; }
+  });
+}
+['home-eye-btn','txn-eye-btn'].forEach(id => {
+  document.getElementById(id).addEventListener('click', async ()=>{
+    state.incomeRevealed = !state.incomeRevealed;
+    updateEyeButtons();
+    await renderHomeOverviewPanel();
+    renderTransactions();
+  });
 });
 document.getElementById('settings-biometric-row').addEventListener('click', async ()=>{
   if(isBioEnabled()){

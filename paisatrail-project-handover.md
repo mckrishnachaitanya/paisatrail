@@ -1,92 +1,124 @@
 # PaisaTrail — Project Handover
 
-Personal expense tracker PWA. Re-paste this into Project knowledge at the start of each new session — it's written to let a fresh Claude conversation pick up without re-deriving prior decisions or re-discovering already-fixed bugs.
+Android-installable PWA. Single `index.html`, vanilla JS/CSS, IndexedDB, no framework/bundler. INR only. Hosted on GitHub Pages. Two users: Krishna (owner) and his brother.
 
-## 1. Project facts
-- Android-installable PWA, hosted on GitHub Pages. Vanilla HTML/CSS/JS only — no framework, no bundler, no build step, no external libraries. INR only.
-- **Status: V2 fully shipped and device-confirmed.** Split Expenses (V3's first feature), the Add/Edit screen's collapsed-options redesign, the category grid collapse, the Forecast "one-time expense" exclusion toggle, Budgets' pace/suggestion/recap planning additions, the Home backup-reminder banner, the App Guide, and What's New + Notifications have all been built across recent sessions and Krishna has now confirmed all of them working on-device. Most recent fixes (2026-06-26): swipe-to-delete on List tab income entries; income-mode filter sheet hides Payment method / Group / Split sections and clears their state; duplicate type-tab event listener removed. Real-device testing happens in separate conversations as Krishna uses the app day-to-day; treat it as an ongoing parallel process, not a gate before building more.
+---
 
-## 2. What's built
-- **PIN:** setup/unlock (6-digit), 5-fail lockout (30s), 2-min idle auto-lock, screen-restore on unlock, in-app Change PIN (reuses the unlock state machine — see §4). Biometric unlock (opt-in, WebAuthn) layers a faster front door on top — PIN remains the underlying credential and automatic fallback.
-- **Home:** Overview tab (3-stat cashflow card — Income/Expenses/Net, category donut, recent list, swipe-to-delete, warranty-expiring-soon banner) + Warranties tab + Forecast tab + Budgets tab.
-- **Add/Edit:** Expense/Income toggle, category grid (frequency-sorted, collapses to top 6 with a "+N more" chip once a user has 7+ categories — see below), payment chips, date, category-aware note placeholder, then a single "MORE OPTIONS" row of 5 compact chips (Warranty/Group/Split/Recurring/Attachments — see below) instead of 5 stacked full-width sections. Expense-only fields auto-hide in income mode.
-- **Transactions:** date-grouped, live search, Filters sheet (type, category, payment, group, date range, amount range, split — all live-apply, persist across nav), tap to edit, trash icon to delete. When Income-only type is selected in the filter sheet, Payment method / Group / Split sections are hidden and their state is cleared — those concepts don't exist on income entries.
-- **Insights:** Week/Month/Year/Custom period switch; Categories/Compare/Payment/Groups views (Groups is the one non-calendar-bound view — shows total + full expense list for a selected group).
-- **Settings:** Categories manager (71 icons across themed groups), Payment Methods manager, Groups manager (rename/delete/merge), Tag Past Expenses, Export/Import (JSON, full replace), Change PIN, bulk-delete-old-expenses, Recurring Expenses manager, Manual lock button (🔒, top-right of all 4 main screens).
-- **Recurring expenses:** "Make this recurring" toggle (Weekly/Monthly/Yearly, locked after creation) + Settings manager. Catch-up pass runs on every unlock, backfilling overdue occurrences with a batched toast. Recurring rules now carry a `groupId` field — set via a GROUP (OPTIONAL) chip row in the recurring edit sheet (existing groups only, no create-new flow there). `catchUpSingleRule` copies `groupId` from the rule onto every auto-generated expense so group tracking works without manual intervention. The recurring edit sheet category grid now collapses to top-6 (same logic as Add/Edit) — `openRecurringEdit` is synchronous; usage counts are fetched in the background via `.then()` and re-render the grid once resolved.
-- **Cash-Flow Forecasting:** Home tab, "Rest of this month" / "Next 30 days" toggle. Projects from actual spend so far + known recurring due + trailing-average estimate for everything else (configurable 30/90/180-day lookback). A per-expense "One-time expense" checkbox (`excludeFromForecast`, Add/Edit screen, inline row above MORE OPTIONS, expense-only) excludes that expense from the trailing-average calc specifically — it still counts normally everywhere else (spent-so-far, budgets, insights, totals). Forecast breakdown shows an "Excluded as one-time" line with the total + count when any are excluded in the active lookback window. Deferred: income integration (see §8).
-- **App Guide:** Settings → "How this app works" (`#settings-guide-btn`, under a new HELP section at the top) opens a dedicated screen of 9 expandable sections (native `<details>`/`<summary>`, independently toggleable — unlike Add/Edit's MORE OPTIONS row, this is for reading, not data entry, so no reason to force only one open) covering Home's 4 sub-tabs, Transactions, Insights, Settings, Split expenses, and Recurring expenses. Auto-shown once, automatically, right after first-ever PIN setup completes (`Store`'s `pt_guide_shown` flag prevents it firing again on subsequent unlocks); reachable anytime after via the Settings row. Content lives in **`app-guide.json`**, not inline in `index.html` — fetched once per session (`loadGuideContent()`, cached in memory) and precached by `sw.js` for offline use via the same generic cache-first branch that already serves `manifest.json`/icons, so adding/editing entries never touches `index.html` itself. `guideReturnScreen` tracks whether the close button should land back on Settings or Home depending on how it was opened.
-- **What's New + Notifications (device-confirmed working):** Built this session, reusing the App Guide's existing infrastructure end-to-end rather than adding new files or screens. `app-guide.json` gained a `releaseNotes` array (newest first, `{version, date, highlights}`) which doubles as the single source of truth for versioning — there's deliberately no separate `APP_VERSION` constant in `index.html`; Krishna announces something new purely by adding one entry to the JSON file. Settings has a new "Notifications" toggle (mirrors the Biometric unlock row exactly — same `.switch` pattern, same opt-in flow via `Notification.requestPermission()`). Home gets a mint-tinted `#home-whatsnew-banner` (third distinct tint alongside warranty's sunshine and backup's grape) whenever `releaseNotes[0].version` differs from the stored `pt_last_seen_version`. Tapping it opens the same Guide screen used for the regular help content, landing on a pinned, always-expanded "🆕 What's New" card (`#guide-whatsnew`, visually distinct from the collapsible reference `.guide-section` entries below it) showing just the latest entry's highlights — older entries aren't browsable, by design. Two deliberately different dismissal paths, confirmed both in an end-to-end Playwright run and on Krishna's brother's actual Android browser: with Notifications off, the banner is the only signal and persists across app-opens until actually viewed; with Notifications on, a one-time browser `Notification` fires on the app-open where a new version is first detected (`checkWhatsNewOnOpen()`, called from `unlockSuccess()`) and immediately marks the version seen, auto-clearing the banner too rather than leaving both nagging in parallel. First-ever install bootstraps silently (no banner/popup on day one — the App Guide's own auto-show already covers that moment) by recording the current version the first time `pt_last_seen_version` is read as `null`. No `sw.js` changes were needed — `app-guide.json` was already precached for the base App Guide feature, so this rode along for free.
-- **Backup reminder:** Home tab, grape-tinted banner above the warranty-soon banner (`#home-backup-banner`, mirrors `renderWarrantyBanner`'s pattern exactly). Shows "You haven't backed up your data yet" or "Last backed up X days ago" once 15+ days have passed since the last export (`BACKUP_NUDGE_DAYS`), tracked via `Store.set('pt_last_export', ...)` written inside `exportData()` itself — so it fires the same whether export was triggered from this banner or from Settings. Gated on there being at least one expense ever recorded, so a fresh install isn't nagged immediately. Tapping the banner calls `exportData()` directly (no confirm step, same one-tap download as Settings) and re-renders itself afterward so it disappears the moment the export succeeds.
-- **Budgets:** Home tab, per-category + optional Overall, progress-bar cards (mint → sunshine → coral as spend approaches/exceeds limit). Category locked after creation. Three planning-oriented additions this session: (1) **Pace/projection** — a line under each Home card from day 3 of the month onward, simple linear extrapolation (`spent/daysElapsed*daysInMonth`, no recurring lookahead), coral "⚠️ On pace for ₹X — ₹Y over" or mint "✓ On pace for ₹X". (2) **Suggested budget amount** — in the *new*-budget sheet only, a tappable grape hint below the limit field ("Suggested: ₹X (3-month avg) · tap to use") averaged across however many of the last 3 calendar months were "active" (had any app usage at all, to avoid understating the average for a newer install); hidden entirely if zero active months. (3) **Last-month recap** — a line below the limit field in *both* add and edit modes, live-recalculating on every keystroke against whatever's currently typed ("Last month: ₹X spent — ₹Y under/over this budget"), gated on last calendar month having had any app activity (not just this target) so it doesn't show misleading "₹0 spent, fully under" for a brand-new install. All three share one cached fetch per target (`getBudgetHistoryData`, refetched via `refreshBudgetEditInsights()` on sheet-open and on target-chip change) — the limit-input listener only re-renders text from that cache, no extra DB calls per keystroke.
-- **Income tracking:** Expense/Income toggle on Add screen. Stored in the same `expenses` store with `type:'income'` and `incomeCategoryId` (7 hardcoded categories). Pre-existing records with no `type` field are treated as expenses via `isExpenseEntry()`/`isIncomeEntry()` helpers, used in every DB query so income never pollutes budgets/forecast/warranty/insights/groups/split.
-- **Split expenses:** "Split" toggle on Add/Edit's options row. Total bill (separate field) + optional "Split between N people" chips (2–5) that auto-fill the Amount field as an equal share — editable any time for a custom share, which simply stops the equal-split auto-sync. "Split with" is freeform names. The Amount field stays "your share" throughout — that's what hits budgets/insights/forecast, identical to how every other expense is counted. A live "Your share / Others owe" readout sits in the card. A "Mark as settled" toggle appears only when *editing* an existing split (nothing to settle on a brand-new entry). Transactions Filter sheet has a "Split expenses only" toggle with an Unsettled/All sub-toggle (defaults to Unsettled) and a summary line ("N unsettled · ₹X pending from others"); row subtitles swap to show total + names + settled status while this filter is active. Home, Transactions, and Insights→Groups rows all prefix a ✂️ icon on split expense titles.
-- **Add/Edit collapsed options row (new this session):** Warranty/Group/Split/Recurring/Attachments were 5 stacked, always-expanded sections pushing Save below the fold for the common "amount → category → paid via → note → save" path. Now a single "MORE OPTIONS" row of 5 icon+label chips (`#add-opt-row`, `renderOptRow()`), order unchanged (Warranty, Group, Split, Recurring, Attach — Krishna's call, kept as-is). Tapping a chip expands that section's existing content inline below the row (`.opt-expand` wrapper around each `add-*-wrap` div); only one open at a time, tracked by `state.activeOptKey`. A small mint dot (`.opt-chip-dot`) appears on a chip whenever that section already holds data, even while collapsed, so collapsing a filled-in section never looks like the data vanished. Each section's own render function (`renderWarrantyArea` etc.) is otherwise unchanged — same ids, same logic — only the outer wrapper and a `renderOptRow()` call after each enable/disable were added. The wrap's own header (icon/title/✕-to-collapse) replaced each section's previously-duplicate inner header; a small "Turn off" text link (`.opt-card-remove`) at the bottom of each card now does what the old inner ✕ did (actually disables that feature), distinct from the wrap's ✕ which only collapses the card back into the row without touching its data. Save button was already structurally sticky (`.save-bar` is `flex-shrink:0` outside the `flex:1` `.scroll` container) — this change didn't need to touch that, it just shortened what's above it so Save now actually fits on-screen for the minimum-fields path without scrolling.
-- **Category grid collapse (device-confirmed working):** raised by Krishna as a UI concern — with enough user-created categories, the Add/Edit category grid (3-col, wraps to as many rows as needed) was pushing Paid Via/Note/MORE OPTIONS far down the screen before the user even reaches them. Fix: `renderCategoryGrid()`'s expense branch sorts `state.categories` by all-time usage frequency (`state.catUsageCounts`, an `{categoryId: count}` map built by `getCategoryUsageCounts()` — single cursor pass over all expenses via the existing `DB.getExpensesByDateRange('0000-01-01','9999-12-31')` + `isExpenseEntry()` pattern, fetched once in `openAddScreen()` and cached on state, *not* re-queried on every chip tap) and shows only the top 6 (2 rows) once there are more than 6 categories, with a dashed "+N more" chip (`.cat-chip-more`, `data-catmore`) as the 7th slot that expands to the full sorted grid in place when tapped (`state.catGridExpanded`, click-handled in the same `#add-category-grid` listener as real chips). `state.catGridExpanded` resets to `false` on every `openAddScreen()` call — same "always start collapsed" pattern as `activeOptKey` — except one guard: if the expense being *edited* has a category outside the top 6 (a rarely-used one), the grid auto-expands on open so the already-selected category is never hidden from view. Income mode untouched — `INCOME_CATEGORIES` is a fixed 7-item hardcoded list that can't grow, so it was never the problem. The Insights → Compare category grid (`#ins-compare-cat-grid`) has the same growth shape but wasn't touched — Krishna's concern was specifically the Add/Edit flow; worth applying the same pattern there later if it becomes annoying.
-- Soft-delete-with-undo everywhere; all expense-derived views refresh together after any delete/undo.
+## 1. What's built (all device-confirmed)
 
-**Krishna's call: dark mode dropped entirely** (not getting built).
+**Security:** 6-digit PIN, 5-fail lockout (30s), 2-min idle auto-lock, biometric (WebAuthn, opt-in) as a faster front door — PIN is always the underlying credential and fallback. `enterUnlockScreen()` is the single entry point for unlock mode; never call `initPINScreen` + `showScreen` directly or biometric auto-fire breaks.
 
-## 3. Data model
-- **Expenses:** id, type ('expense'|'income', absent on legacy rows = expense), amount, categoryId, paymentMethod (stores the *id*), date, note, attachmentIds[], recurringId (nullable), groupId (nullable), warrantyExpiry (nullable), warrantyDurationMonths (nullable), incomeCategoryId (income only), splitTotal (nullable — presence = split is on; full bill amount), splitWith (string, freeform names), splitSettled (bool), excludeFromForecast (bool, expense-only — absent/false on legacy rows), createdAt.
-- **Categories:** id, name, icon, color, isDefault. **Payment methods:** id, name, icon. **Groups:** id, name only.
-- **Recurring:** id, name, amount, categoryId, paymentMethod, frequency ('weekly'|'monthly'|'yearly'), startDate, endDate (nullable), nextDueISO, active, createdAt.
-- **Budgets:** id, categoryId (nullable = Overall), monthlyLimit, createdAt. At most one per categoryId, at most one with categoryId=null.
+**Income masking (2026-06-26):** Income amounts show `₹••••••` by default on Home and List tab. 👁️ eye icon next to 🔒 on both screens toggles reveal/mask globally. `state.incomeRevealed` resets to `false` on every lock and unlock. `maskIncome(n)` is the helper — used in `renderHomeOverviewPanel()` and `renderTransactions()`; never use `formatINR()` directly for income amounts in those views.
+
+**Home:** Overview (cashflow card — Income/Expenses/Net, donut, recent list), Warranties, Forecast, Budgets tabs.
+
+**Add/Edit:** Expense/Income toggle. Category grid (frequency-sorted, collapses to top 6 + "+N more" chip when >6 categories; `state.catUsageCounts` fetched once per screen open, never inside `renderCategoryGrid()`). MORE OPTIONS row: 5 chips (Warranty/Group/Split/Recurring/Attach), one open at a time (`state.activeOptKey`), mint dot when section has data. Expense-only fields auto-hide in income mode.
+
+**Transactions:** Date-grouped, live search, filter sheet (type/category/payment/group/date/amount/split — live-apply, persist). Income-only filter hides Payment/Group/Split sections and clears their state.
+
+**Insights:** Week/Month/Year/Custom; Categories/Compare/Payment/Groups views.
+
+**Settings:** Category manager (71 icons), Payment methods, Groups (rename/delete/merge), Tag Past Expenses, Export/Import (JSON, full replace), Change PIN, Bulk delete, Recurring manager, Notifications toggle, manual 🔒 on all 4 main screens.
+
+**Recurring:** Weekly/Monthly/Yearly, locked after creation. Catch-up runs on every unlock (`RECURRING_CATCHUP_CAP=24`). Rules carry `groupId`; catch-up copies it onto generated expenses. `openRecurringEdit` is synchronous — usage counts fetched via `.then()` in background.
+
+**Forecast:** "Rest of month" / "Next 30 days". Spend-so-far + known recurring + trailing average (30/90/180-day lookback). `excludeFromForecast` flag on individual expenses excludes from trailing average only. Requires `FORECAST_MIN_EXPENSE_COUNT=5` + `FORECAST_MIN_DISTINCT_DAYS=7`. Income integration deferred.
+
+**Budgets:** Per-category + Overall. Progress bars (mint→sunshine→coral). Pace line from day 3 (linear extrapolation). Suggested amount (3-month avg, new-budget only). Last-month recap (add + edit). All share one cached fetch per target (`getBudgetHistoryData`).
+
+**App Guide:** `app-guide.json` (not inline) — fetched once, cached in memory, precached by SW. 9 expandable sections. Auto-shown once after first PIN setup. `guideReturnScreen` tracks back destination.
+
+**What's New:** `releaseNotes` array in `app-guide.json` (newest first, `{version, date, highlights}`) — single source of truth for versioning, no `APP_VERSION` const in `index.html`. Mint banner on Home when version changes. Optional one-time browser notification. `pt_last_seen_version` written only when user opens What's New — not when notification fires.
+
+**Other:** Backup nudge banner (grape, 15-day threshold, `pt_last_export` written inside `exportData()`). Soft-delete with undo everywhere. Split expenses (amount = user's share; `splitTotal`/`splitWith`/`splitSettled` are metadata only). Attachments (base64, chunked at 0x8000). Export excludes PIN; import is full replace; `schemaVersion=4`.
+
+**Dropped:** Dark mode — not getting built.
+
+---
+
+## 2. Data model
+
+- **Expenses:** id, type (`'expense'|'income'`, absent = expense), amount, categoryId, paymentMethod (id), date, note, attachmentIds[], recurringId, groupId, warrantyExpiry, warrantyDurationMonths, incomeCategoryId (income only), splitTotal, splitWith, splitSettled, excludeFromForecast, createdAt.
+- **Categories:** id, name, icon, color, isDefault. **Payment methods:** id, name, icon. **Groups:** id, name.
+- **Recurring:** id, name, amount, categoryId, paymentMethod, frequency, startDate, endDate, nextDueISO, active, createdAt.
+- **Budgets:** id, categoryId (null = Overall), monthlyLimit, createdAt.
 - **Attachments:** id, expenseId, type, fileName, mimeType, data (ArrayBuffer).
 
-## 4. Architecture & gotchas to know before touching code
-- IndexedDB, no Dexie. `DB_VERSION=4`. Stores: expenses (indexed on date/categoryId/paymentMethod), categories, paymentMethods, groups, recurring, budgets, attachments.
-- **No index on `expenses.groupId`, `expenses.recurringId`, or split fields** — any "every expense matching X" query pulls the full date-range cursor and filters in JS.
-- Split expenses store `amount` as the user's own share — exactly like every other expense — so budgets/forecast/insights/warranty need **zero changes** to stay correct; they were never told splits exist. `splitTotal`/`splitWith`/`splitSettled` are purely additive metadata read only by the Add/Edit split card and the Transactions split filter.
-- The split card's equal-split sync (`state.splitShareManual`) only writes to the Amount field while `false`; the moment the user types directly into Amount (or hand-edits a different people-count), it flips `true` and the card stops overwriting their number. Re-opening an *existing* split expense for edit always starts with this flag `true` — the saved share is treated as already-final, not subject to silent recalculation from a freshly-clicked people chip.
-- "Mark as settled" is intentionally edit-only (`!!state.editingExpenseId` gate in `renderSplitArea`) — there's nothing meaningful to settle on an expense that hasn't been saved yet.
-- **Add/Edit's collapsed options row:** `ADD_OPT_DEFS` is the single source of truth for the 5 chips (icon, label, target wrap id, `hasData()` check) — adding a 6th optional section means adding one entry here plus its own `add-*-wrap` div in HTML, not touching `renderOptRow()` itself. `hasData()` must check the *real* persisted state, not just the session's enabled-flag — Attach checks `pendingAttachments.length + existingAttachmentIds.length` (not just pending) and Recurring checks `recurringEnabled || recurringLinkedId` (not just the toggle), because both sections can show data through a path other than the in-session toggle. Every place a section's enabled-state flips (the "+add" button and the "Turn off" link) must call `renderOptRow()` afterward or the chip's dot goes stale — this isn't automatic. `state.activeOptKey` resets to `null` in `openAddScreen()` on every open, including edit — sections always start collapsed even when they already hold data; the dot is what signals "this has something in it," not an auto-expand.
-- The outer `.opt-expand` wrap (icon/title/✕-to-collapse) and each section's own card content are deliberately decoupled from "disable this feature" — the wrap's ✕ only hides the card again (data untouched), while the in-card "Turn off" link (`.opt-card-remove`) is what actually clears that section's state. Don't merge these two actions; collapsing and disabling are different things a user might want.
-- **Category grid collapse:** `state.catUsageCounts` is fetched once per `openAddScreen()` call (a single cursor pass, not one DB query per category) and read synchronously by every subsequent `renderCategoryGrid()` re-render within that screen visit — don't call `getCategoryUsageCounts()` from inside `renderCategoryGrid()` itself, it's a hot path (every chip tap re-renders for selection styling) and would turn one fetch into many plus introduce async/sync ordering bugs. If a 6th "+N more"-adjacent collapse threshold ever needs to change, it's the single `COLLAPSE_AT` const inside `renderCategoryGrid()`'s expense branch.
-- Recurring date math always re-derives the target day fresh from the rule's `startDate` (`advanceRecurringDate`/`clampToValidDate`) — frequency and start date are locked read-only once a rule exists.
-- Catch-up (`runRecurringCatchUpAll`) runs on every unlock, capped at `RECURRING_CATCHUP_CAP=24` per rule per pass.
-- No data encryption — PIN + idle-lock only; biometric is a faster front door, not encryption at rest.
-- Forecasting (`projectRecurringTotal`) is a pure read-only simulation, never writes to IndexedDB. `estimateDailyOtherSpend` excludes recurring-linked, soft-deleted, income, and `excludeFromForecast`-flagged expenses, and requires `FORECAST_MIN_EXPENSE_COUNT=5` + `FORECAST_MIN_DISTINCT_DAYS=7` before trusting the average. (Bug fixed this session: it was missing the `isExpenseEntry()` check that `spentSoFar` already had, so income entries were silently inflating the average — fixed by adding `&& isExpenseEntry(e)` to its query filter.)
-- Budgets' spent-so-far *includes* recurring-generated expenses (different from Forecast's exclusion — no double-count risk here, it's genuinely real spend).
-- Budget pace (`computeBudgetPace`) is deliberately simpler than Forecast's projection — pure linear extrapolation off spend-so-far, no recurring lookahead, suppressed before day 3 of the month. `getBudgetHistoryData` (suggested amount + last-month recap) is a separate, cheap on-demand fetch scoped to a 3-month window, only called when the budget edit sheet is open — neither of these touches the Forecast engine's trailing-average machinery, by design, to keep the two features independently reasoned-about.
-- The backup-nudge banner's `pt_last_export` timestamp is written once, inside `exportData()` itself — not duplicated at each call site — so Settings' export button and the Home banner's tap both update the same clock automatically. No separate "dismiss/snooze" affordance was added (unlike the reference vault's nudge, which has one) — kept to exactly what was described: a message plus tap-to-export, nothing more — so it'll keep nagging on every Home visit past 15 days until an export actually happens. Worth flagging to Krishna if that turns out to feel naggy in practice.
-- **Screen transitions are opacity-only, not transform.** Each screen (`home-screen`, `add-screen`, etc.) carries its own full copy of `.bottom-nav`/`.fab-add`. The transition used to pair `opacity` with `transform:translateY(10px)→0` on `.screen`/`.screen.is-hidden`. Changed to opacity-only during the FAB bug investigation below — turned out to be the wrong theory, kept anyway as a harmless simplification; the screen system lost its subtle slide-up entrance motion as a side effect, now a plain fade.
-- **+ button "getting overlapped" — root cause confirmed.** Krishna reported (with screenshots) the FAB occasionally showing as overlapped/double. Two earlier theories (screen-transition timing, GPU compositing glitch) were both wrong and the fixes attempted for them were ineffective. Confirmed root cause via a debug build that recolored `.recent-row` neon green: a sliver of green visibly cut across the FAB's dome (the part poking above `.bottom-nav` via `margin-top:-26px`). Mechanism: `.recent-row` has `position:relative;z-index:1` (meant only to sit above its own swipe-to-delete background within `.swipe-wrap`), but neither `.swipe-wrap` nor `.scroll` establish their own stacking context (`position:relative` alone, without a z-index, doesn't) — so that `z-index:1` escapes all the way up to `.screen` (the nearest real stacking context) and wins against `.bottom-nav`, which never had an explicit z-index of its own. Confirmed (and reproduced in an automated Playwright test, `document.elementFromPoint` at the dome seam) that with the fix the FAB always wins that contest. One caveat that couldn't be automated: under a static/settled scroll position `.scroll`'s own overflow clipping already prevents `.recent-row` from geometrically reaching that pixel at all, regardless of z-index — so the actual visible bug most likely only ever shows up during a real touchscreen momentum-scroll / elastic overscroll bounce (content transiently rendering slightly past its clip boundary), which headless/static testing can't replicate. The fix closes the part that's provable and controllable from CSS — if a transient geometric leak occurs on a real device, the card can no longer win the paint order as a result. Fix: `.scroll{isolation:isolate;}` (contains any z-indexed descendant so it can't escape to compete with siblings outside `.scroll`) + `.bottom-nav{z-index:5;}` (explicit precedence as a backstop). If the FAB issue still shows up after deploying this, it points to something beyond stacking order (worth checking `.scroll`'s overflow clipping behavior specifically during overscroll on the affected device).
-- Export/Import: single JSON, attachments base64-encoded (chunked at 0x8000 bytes). PIN excluded from exports. Import is a full **replace**. `schemaVersion` is 4 now (bumped this session for the new split fields) — older backups still import fine, just restoring nothing for fields/stores that predate them.
-- Deleting a category/payment-method/group **unlinks**, never cascades (except the last remaining category/payment method, blocked outright).
-- Groups, and split's "new group" equivalent (there isn't one — split has no separate entity, just fields on the expense), are created lazily — groups specifically are never written to IndexedDB until the action using them is confirmed, to avoid orphans.
-- **`esc()` is for `innerHTML` only** — never before a `.textContent` assignment, it double-escapes.
-- Several confirm-and-close functions close their overlay **before** their awaited DB write finishes — don't treat "overlay closed" as proof the DB/state actually updated.
-- View-state (search, filters, Insights period/view, `state.homeTab`) persists across navigation by convention.
-- Two near-identical segmented-control implementations exist (`.home-tabs`, `.segmented-tabs`) — reuse one, don't add a third.
-- `renderTransactions()` is the single source for both the visible list and the filter sheet's "Show N" button, guarded by `txnRenderSeq` against stale async overwrites.
-- `enterUnlockScreen()` is the single entry point for showing the PIN screen in unlock mode — route through this, not `initPINScreen('unlock')` + `showScreen('pin-screen')` directly, or biometric auto-fire breaks.
+`isExpenseEntry()` / `isIncomeEntry()` guards every DB query — income must never reach budgets/forecast/warranty/insights/groups/split.
 
-## 5. Testing
-- Playwright + Chromium is available in the build sandbox — use for real headless-browser smoke tests on every feature, not just static syntax/ID checks.
-- **PIN is 6 digits**, not 4 — a test that enters 4 digits will hang on the confirm step waiting for more input.
-- **Scope every nav/FAB selector**: `.screen:not(.is-hidden) [data-nav="x"]`, never a bare `[data-nav="x"]` (duplicated once per main screen).
-- Close any open overlay/sheet before clicking elements underneath it — an open filter sheet intercepts pointer events on the list behind it.
-- Poll the actual resulting DOM/state directly after an action, not an intermediate signal.
-- When testing the catch-up engine in isolation, deactivate rules created earlier in the same test run first.
-- When testing forecasts: a same-day-created rule's `nextDueISO` is already next period — don't assert it appears in "Rest of this month" the same day.
-- When testing Budgets: the budget-picker grid prepends "Overall" as chip #1, so categories sit one slot later there than in Add/Edit's grid. Pace/suggestion/recap are all date-relative — seed cross-month test data with real `Date` objects (`new Date(y, m-1, d)` etc.) rather than hardcoded ISO strings, or the active-month/days-elapsed checks won't line up with whatever day the test actually runs on.
-- When testing Add/Edit's optional sections: a section's actual content (e.g. `#split-total-input`) doesn't exist in the DOM until both (1) its chip is tapped to expand the wrap, AND (2) its own internal "add" button (e.g. `#split-add-btn`) is clicked to move past that section's own collapsed-state button — these are two separate taps, not one.
-- Headless Chromium has a broken live `Notification.permission` getter — `requestPermission()` resolves `'granted'` but the getter still reports `'denied'` regardless (a sandbox limitation, not an app bug). Stub the getter directly when testing the Notifications toggle/flow in this environment; real-device testing isn't affected.
-- **`.pay-row` inside `.edit-sheet` flex column:** `.pay-row` uses `overflow-x:auto` which causes it to collapse to zero height when inside a `display:flex;flex-direction:column` parent that is height-constrained. Fix: `flex-shrink:0` on `.pay-row`. Never remove this — it is load-bearing for all chip rows in every edit sheet.
+---
 
-## 6. Design system
-Palette: paper `#FFFCF7` · ink `#241F3D` · sunshine `#FFC23C` · coral `#FF6B5B` · mint `#2EC4B6` · grape `#8657E0` · canvas `#2A1F4D`. Fonts: Fredoka (display) · Plus Jakarta Sans (body) · Space Mono (amounts). Motif: perforated/stamp edge under amount displays.
+## 3. Architecture gotchas
 
-## 7. File structure
-Single repo root, no wrapper folder: `index.html` (entire app), `manifest.json`, `sw.js`, `icons/icon.svg`, `app-guide.json` (App Guide's content, externalized so editing help text never touches `index.html` — see §2).
-- **`sw.js` caching strategy (updated this session):** `index.html` itself (matched via `event.request.mode==='navigate'` or a path ending in `/index.html` or `/`) is **stale-while-revalidate** — the cached copy answers every load instantly, while a background `fetch('./index.html', {cache:'no-store'})` quietly refreshes the cache for the *next* launch. This means a new deploy reaches users automatically (one extra app-open after Krishna pushes, no manual step) — `CACHE_NAME` no longer needs to be bumped just because `index.html` changed. Every other precached asset (`manifest.json`, `icons/icon.svg`) is still plain cache-first, so `CACHE_NAME` (currently `'paisatrail-v3'`) still needs a manual bump if either of *those* ever changes — they're rare enough that this is fine to leave manual. The `{cache:'no-store'}` option on both the install-time precache and the revalidation fetch is load-bearing — without it, the browser's own HTTP cache (a layer below CacheStorage) can quietly hand back stale bytes and silently defeat the whole mechanism; this was caught by an actual failing Playwright run (background revalidation appeared to do nothing) before being fixed, not assumed safe upfront.
-- Krishna's expense data lives in IndexedDB, a separate storage bucket from anything `sw.js` touches — no deploy, cache update, or `CACHE_NAME` bump ever risks it. Only an explicit "Clear Storage" (not "Clear Cache") in the device's browser/app settings would wipe it.
+**Android WebKit overlay trap:** Never hide an overlay with `opacity:0; pointer-events:none` — it creates a GPU compositing layer that intercepts all touch events across the entire screen even with `pointer-events:none`. Always use `display:none`. For masking values, prefer a conditional string (like `maskIncome()`) over any overlay element.
 
-## 8. Next up
-1. **V3 backlog (rough priority order):**
-   - **Forecast + income integration** — forecast tab currently projects expense spending only; add projected savings (income minus projected spend) once income logging is a consistent habit. Deliberately deferred.
-   - **Multiple accounts/wallets** — cash, savings, credit card as separate tracked balances with a net worth view.
-   - **Multi-device cloud sync** — needs a backend; pushed furthest out.
-   - **Excel/CSV export** — export filtered transaction data from the List tab and/or Insights tab. Deferred until real usage reveals what format, columns, and scope are actually needed (~4 months of data recommended before revisiting).
-2. Consolidate the two segmented-control implementations if either ever needs a style change.
+**`async` microtask breaks:** Making a function `async` introduces microtask breaks after `await` that can silently halt execution before later render calls. Prefer synchronous functions with `.then()` for non-blocking fetches (pattern used in `openRecurringEdit`).
+
+**`flex-shrink:0` on `.pay-row`:** Load-bearing. `.pay-row` uses `overflow-x:auto` and collapses to zero height inside a flex-column parent without this. Never remove.
+
+**`.scroll{isolation:isolate}` + `.bottom-nav{z-index:5}`:** Keeps `.recent-row`'s `z-index:1` contained so it can't compete with the FAB at screen level during scroll. Both rules are load-bearing.
+
+**`esc()` for `innerHTML` only** — never before `.textContent`, it double-escapes.
+
+**`pt_last_seen_version`** written only when user opens What's New, not when notification fires — otherwise the Home banner never shows.
+
+**Biometric prompt** must fire after `visibilitychange` with page visible — firing while hidden causes Android's WebAuthn API to silently reject.
+
+**No index** on `expenses.groupId`, `recurringId`, or split fields — queries pull full cursor and filter in JS.
+
+**`renderTransactions()`** is the single source for the list and filter sheet's "Show N" button; guarded by `txnRenderSeq` against stale async overwrites.
+
+**`ADD_OPT_DEFS`** is the single source of truth for MORE OPTIONS chips. Adding a 6th section = one new entry here + a new `add-*-wrap` div. Every state flip must call `renderOptRow()` or the dot goes stale.
+
+**`sw.js`:** `index.html` is stale-while-revalidate (no `CACHE_NAME` bump needed when only `index.html` changes). Other assets are cache-first; bump `CACHE_NAME` (`'paisatrail-v3'`) if `manifest.json` or icons change. `{cache:'no-store'}` on fetch calls is load-bearing — without it the browser's HTTP cache defeats the mechanism.
+
+**Screen transitions:** Opacity-only (no transform). Each screen has its own `.bottom-nav`/`.fab-add` copy.
+
+**Groups** are written to IndexedDB only on Save — never on intermediate UI steps, to avoid orphans.
+
+**Budget history** is intentionally not a dedicated view — edit sheet context + Insights already cover it.
+
+---
+
+## 4. Testing
+
+Playwright + Chromium available in sandbox. Key patterns:
+- Pre-seed PIN via `context.addInitScript` — SHA-256 hash of PIN stored as `pt_pin` in localStorage. PIN buttons are `.num-btn[data-n="N"]` (6-digit).
+- Scope nav/FAB selectors: `.screen:not(.is-hidden) [data-nav="x"]` — duplicated once per main screen.
+- Income categories render into `#add-category-grid` (same element as expense categories) only after switching to income mode — wait for `[data-incomecat]` chips.
+- Close any open sheet before clicking elements behind it.
+- `Notification.permission` getter is broken in headless Chromium — stub it for notification tests.
+- Catch-up engine tests: deactivate earlier rules before asserting new ones.
+- Forecast/budget tests: seed data with real `Date` objects, not hardcoded ISO strings — logic is date-relative.
+
+---
+
+## 5. Design system
+
+Palette: paper `#FFFCF7` · ink `#241F3D` · sunshine `#FFC23C` · coral `#FF6B5B` · mint `#2EC4B6` · grape `#8657E0` · canvas `#2A1F4D`. Fonts: Fredoka (display) · Plus Jakarta Sans (body) · Space Mono (amounts).
+
+---
+
+## 6. File structure
+
+`index.html` (entire app) · `manifest.json` · `sw.js` · `icons/icon.svg` · `app-guide.json` (guide content + release notes — edit this, never `index.html`, for help text or version announcements).
+
+---
+
+## 7. Standing rules
+
+- **Discuss before build** — share honest assessment and wait for explicit confirmation before writing code. Answering questions is not a green light.
+- **Every shipping session** must add a `releaseNotes` entry to `app-guide.json` (newest first) and update relevant guide section text.
+- **Validation after every edit:** extract `<script>` block → `node --check`; Python div-balance check. Playwright smoke tests, then delete test file before handoff.
+- **Deliver** `index.html` + `paisatrail-project-handover.md` together via `present_files`.
+- **Grammar:** correct Krishna's grammatical/vocabulary errors in conversation; ignore typos.
+
+---
+
+## 8. Backlog
+
+1. Forecast + income integration (deferred — wait for consistent income logging habit)
+2. Multiple accounts/wallets
+3. Multi-device cloud sync (needs backend — furthest out)
+4. Excel/CSV export (deferred ~4 months — let real usage clarify format/scope)
+5. Consolidate two segmented-control implementations (`.home-tabs` / `.segmented-tabs`)

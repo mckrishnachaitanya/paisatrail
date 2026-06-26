@@ -2,6 +2,15 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "2.9",
+      "date": "2026-06-26",
+      "highlights": [
+        "Income masking: income amounts are hidden as ₹•••••• by default on Home and Transactions",
+        "Tap the 👁️ eye icon (next to the lock button) on Home or Transactions to reveal or hide all income amounts",
+        "Masking resets automatically every time you lock or unlock the app"
+      ]
+    },
+    {
       "version": "2026-06-26",
       "date": "2026-06-26",
       "highlights": [
