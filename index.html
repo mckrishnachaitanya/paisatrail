@@ -1330,7 +1330,7 @@ input{outline:none;}
 </div>
 
 <!-- ============================== ACCOUNT EDIT SHEET ============================== -->
-<div id="account-edit-overlay" class="edit-sheet-overlay">
+<div id="account-edit-overlay" class="edit-sheet-overlay" style="z-index:901;">
   <div class="edit-sheet">
     <div class="edit-sheet-grip"></div>
     <div class="edit-sheet-head">
@@ -1358,6 +1358,7 @@ input{outline:none;}
     <div class="edit-sheet-grip"></div>
     <div class="edit-sheet-head">
       <p class="edit-sheet-title">Accounts</p>
+      <button type="button" id="accounts-view-eye-btn" class="income-eye-btn" title="Toggle visibility">👁️</button>
       <button type="button" class="topbar-close" id="accounts-view-close-btn">✕</button>
     </div>
     <div id="accounts-view-list" style="margin-top:10px;"></div>
@@ -5913,12 +5914,12 @@ document.getElementById('home-whatsnew-banner').addEventListener('click', openWh
 function updateEyeButtons(){
   const icon = state.incomeRevealed ? '🙈' : '👁️';
   const title = state.incomeRevealed ? 'Mask income' : 'Show income';
-  ['home-eye-btn','txn-eye-btn','stats-eye-btn'].forEach(id => {
+  ['home-eye-btn','txn-eye-btn','stats-eye-btn','accounts-view-eye-btn'].forEach(id => {
     const btn = document.getElementById(id);
     if(btn){ btn.textContent=icon; btn.title=title; }
   });
 }
-['home-eye-btn','txn-eye-btn','stats-eye-btn'].forEach(id => {
+['home-eye-btn','txn-eye-btn','stats-eye-btn','accounts-view-eye-btn'].forEach(id => {
   document.getElementById(id).addEventListener('click', async ()=>{
     state.incomeRevealed = !state.incomeRevealed;
     updateEyeButtons();
