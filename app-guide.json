@@ -2,6 +2,34 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.7",
+      "date": "2026-06-27",
+      "highlights": [
+        "Account balances now computed live from your actual transactions — expenses debit, income credits, transfers move money between accounts",
+        "Home banners now show one at a time in priority order: warranty expiry first, then What's New, then backup nudge",
+        "New 'Get started' checklist on Home for fresh installs — guides you through cycle day, recurring income, and accounts setup; dismissible anytime"
+      ]
+    },
+    {
+      "version": "3.6",
+      "date": "2026-06-27",
+      "highlights": [
+        "Transfers: move money between your accounts (e.g. pay CC bill from savings) — third option on the Add screen alongside Expense and Income",
+        "Transfers show From → To accounts with ⇄ icon in the List tab; find them via the new Transfers filter",
+        "Transfers are excluded from budgets, forecasts, and insights — they don't affect your spending totals",
+        "Same-account validation prevents accidentally creating a self-transfer"
+      ]
+    },
+    {
+      "version": "3.5",
+      "date": "2026-06-27",
+      "highlights": [
+        "Forecast savings projection: see projected income vs projected spend and estimated savings for the cycle — appears when you have recurring income rules set up",
+        "Income amounts in the savings card respect the same eye toggle masking as everywhere else",
+        "No recurring income rules yet? A nudge in the Forecast tab links directly to Recurring transactions setup"
+      ]
+    },
+    {
       "version": "3.4",
       "date": "2026-06-27",
       "highlights": [
