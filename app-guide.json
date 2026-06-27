@@ -2,6 +2,16 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.3",
+      "date": "2026-06-27",
+      "highlights": [
+        "Accounts & Wallets (Phase 1): track bank account balances and credit card outstanding — enable from Settings → Finance",
+        "Guided setup on first enable: add your savings accounts and credit cards with opening balances",
+        "View all account balances and net worth via the 🏦 icon on the Insights screen — balances respect the same income masking toggle",
+        "Disable at any time — your data is preserved and restored when you re-enable"
+      ]
+    },
+    {
       "version": "3.2",
       "date": "2026-06-27",
       "highlights": [

@@ -805,7 +805,11 @@ input{outline:none;}
     <div style="padding:0 20px 12px;">
       <div class="screen-topbar">
         <p class="topbar-title">Insights</p>
-        <button type="button" class="topbar-lock-btn" id="stats-lock-btn" title="Lock app">🔒</button>
+        <div class="topbar-icons">
+          <button type="button" class="income-eye-btn hidden" id="stats-accounts-btn" title="View accounts">🏦</button>
+          <button type="button" class="income-eye-btn" id="stats-eye-btn" title="Toggle income visibility">👁️</button>
+          <button type="button" class="topbar-lock-btn" id="stats-lock-btn" title="Lock app">🔒</button>
+        </div>
       </div>
 
       <div class="segmented-tabs" id="ins-period-type-tabs">
@@ -882,6 +886,22 @@ input{outline:none;}
                    background:var(--surface);text-align:center;">
         </div>
       </div>
+      <button type="button" class="settings-row" id="settings-accounts-toggle-row" style="margin-top:8px;">
+        <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">🏦</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Accounts &amp; Wallets</p>
+          <span class="settings-row-sub" id="settings-accounts-sub">Track bank balances and credit card outstanding</span>
+        </div>
+        <div class="switch" id="settings-accounts-switch"><div class="switch-thumb"></div></div>
+      </button>
+      <button type="button" class="settings-row hidden" id="settings-manage-accounts-btn" style="margin-top:8px;">
+        <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">💼</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Manage accounts</p>
+          <span class="settings-row-sub">Add, edit, or remove your bank and credit card accounts</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>
       <p class="field-label">HELP</p>
       <button type="button" class="settings-row" id="settings-guide-btn" style="margin-bottom:8px;">
         <span class="settings-row-icon" style="background:rgba(255,194,60,.14);">💡</span>
@@ -1290,6 +1310,88 @@ input{outline:none;}
   </div>
 </div>
 
+<!-- ============================== ACCOUNTS ONBOARDING SHEET ============================== -->
+<!-- Shown once when user first enables Accounts in Settings. Guides them through
+     creating at least one account before the feature activates. -->
+<div id="accounts-onboarding-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title">Set up accounts</p>
+      <button type="button" class="topbar-close" id="accounts-onboarding-close-btn">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin:10px 0 18px;line-height:1.6;">
+      Add your bank accounts and credit cards. You can always add more later from Settings.
+    </p>
+    <div id="accounts-onboarding-list" style="margin-bottom:12px;"></div>
+    <button type="button" class="warranty-toggle-btn" id="accounts-onboarding-add-btn">+ Add account</button>
+    <button type="button" class="save-btn" id="accounts-onboarding-done-btn" style="margin-top:14px;">Done</button>
+  </div>
+</div>
+
+<!-- ============================== ACCOUNT EDIT SHEET ============================== -->
+<div id="account-edit-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title" id="account-edit-title">Add account</p>
+      <button type="button" class="topbar-close" id="account-edit-close-btn">✕</button>
+    </div>
+    <p class="field-label" style="margin-top:14px;">NAME</p>
+    <input type="text" class="sheet-input" id="account-edit-name" placeholder="e.g. SBI Savings" maxlength="32">
+    <p class="field-label">TYPE</p>
+    <div class="segmented-tabs" id="account-type-tabs" style="margin-bottom:0;">
+      <button type="button" class="segmented-tab active" data-accttype="savings">Savings</button>
+      <button type="button" class="segmented-tab" data-accttype="cc">Credit Card</button>
+    </div>
+    <p class="field-label" style="margin-top:14px;" id="account-balance-label">CURRENT BALANCE</p>
+    <input type="number" inputmode="decimal" class="sheet-input" id="account-edit-balance" placeholder="0" min="0" step="0.01">
+    <p class="field-label" id="account-balance-hint" style="color:var(--muted);font-size:11px;margin-top:4px;font-weight:400;letter-spacing:0;">Enter your current account balance</p>
+    <button type="button" class="save-btn" id="account-edit-save-btn" style="margin-top:18px;">Save account</button>
+    <button type="button" class="text-danger-btn hidden" id="account-edit-delete-btn">Delete account</button>
+  </div>
+</div>
+
+<!-- ============================== ACCOUNTS VIEW SHEET (Insights 🏦) ============================== -->
+<div id="accounts-view-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title">Accounts</p>
+      <button type="button" class="topbar-close" id="accounts-view-close-btn">✕</button>
+    </div>
+    <div id="accounts-view-list" style="margin-top:10px;"></div>
+    <div id="accounts-view-networth" style="border-top:1px solid var(--border);margin-top:8px;padding-top:16px;display:flex;justify-content:space-between;align-items:center;">
+      <p style="font-size:14px;font-weight:700;color:var(--ink);">Net Worth</p>
+      <p id="accounts-view-networth-value" style="font-family:var(--font-mono);font-size:16px;font-weight:700;"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== RE-ENABLE WARNING OVERLAY ============================== -->
+<div id="accounts-reenable-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">⚠️</div>
+    <p class="confirm-sheet-title">Balances may be out of sync</p>
+    <p class="confirm-sheet-sub">Expenses logged while accounts were disabled weren't tracked. Your account balances may need to be updated manually.</p>
+    <button type="button" class="save-btn" id="accounts-reenable-confirm-btn">Got it, continue</button>
+    <button type="button" class="confirm-sheet-cancel" id="accounts-reenable-cancel-btn">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================== MANAGE ACCOUNTS OVERLAY ============================== -->
+<div id="manage-accounts-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title">Manage accounts</p>
+      <button type="button" class="topbar-close" id="manage-accounts-close-btn">✕</button>
+    </div>
+    <div id="manage-accounts-list" style="margin-top:14px;"></div>
+    <button type="button" class="warranty-toggle-btn" id="manage-accounts-add-btn" style="margin-top:12px;">+ Add account</button>
+  </div>
+</div>
+
 <!-- ============================== MANAGE DELETE CONFIRM (shared by Categories, Payment methods, Groups, Recurring & Budgets) ============================== -->
 <div id="manage-confirm-overlay" class="confirm-overlay">
   <div class="confirm-sheet">
@@ -1453,7 +1555,7 @@ async function tryAutoBiometric(){
 }
 
 /* ============================== DATA LAYER (IndexedDB) ============================== */
-const DB_NAME='PaisaTrailDB', DB_VERSION=4;
+const DB_NAME='PaisaTrailDB', DB_VERSION=5;
 let _dbInstance=null;
 
 function openDB(){
@@ -1474,6 +1576,7 @@ function openDB(){
       if(!db.objectStoreNames.contains('groups')) db.createObjectStore('groups',{keyPath:'id'});
       if(!db.objectStoreNames.contains('recurring')) db.createObjectStore('recurring',{keyPath:'id'});
       if(!db.objectStoreNames.contains('budgets')) db.createObjectStore('budgets',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('accounts')) db.createObjectStore('accounts',{keyPath:'id'});
     };
     req.onsuccess=(e)=>{ _dbInstance=e.target.result; resolve(_dbInstance); };
     req.onerror=(e)=>reject(e.target.error);
@@ -1669,9 +1772,9 @@ const DB = {
   // Used only by Import — wipes and rewrites every store in one
   // transaction, so a failure partway rolls everything back instead of
   // leaving a half-imported mix of old and new data.
-  async replaceAllData({expenses, categories, paymentMethods, groups, attachments, recurring, budgets}){
+  async replaceAllData({expenses, categories, paymentMethods, groups, attachments, recurring, budgets, accounts}){
     const db=await openDB();
-    const tx=db.transaction(['expenses','categories','paymentMethods','groups','attachments','recurring','budgets'],'readwrite');
+    const tx=db.transaction(['expenses','categories','paymentMethods','groups','attachments','recurring','budgets','accounts'],'readwrite');
     const stores={
       expenses: tx.objectStore('expenses'),
       categories: tx.objectStore('categories'),
@@ -1680,6 +1783,7 @@ const DB = {
       attachments: tx.objectStore('attachments'),
       recurring: tx.objectStore('recurring'),
       budgets: tx.objectStore('budgets'),
+      accounts: tx.objectStore('accounts'),
     };
     Object.values(stores).forEach(s => s.clear());
     (categories||[]).forEach(c => stores.categories.put(c));
@@ -1689,6 +1793,27 @@ const DB = {
     (attachments||[]).forEach(a => stores.attachments.put(a));
     (recurring||[]).forEach(r => stores.recurring.put(r));
     (budgets||[]).forEach(b => stores.budgets.put(b));
+    (accounts||[]).forEach(a => stores.accounts.put(a));
+    await txDone(tx);
+  },
+  async getAllAccounts(){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('accounts','readonly').objectStore('accounts').getAll();
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
+  async putAccount(account){
+    const db=await openDB();
+    const tx=db.transaction('accounts','readwrite');
+    tx.objectStore('accounts').put(account);
+    await txDone(tx);
+  },
+  async deleteAccount(id){
+    const db=await openDB();
+    const tx=db.transaction('accounts','readwrite');
+    tx.objectStore('accounts').delete(id);
     await txDone(tx);
   },
   async seedDefaults(){
@@ -1807,6 +1932,10 @@ const state = {
   mgrBudgetCategoryId:null,       // categoryId selected while adding a new budget (null = the special "Overall" target); locked/unused once editing an existing budget
   budgetEditHistory:null,         // {lastMonthSpent, lastMonthActive, suggested, targetIsOverall} for whichever target is selected in the open budget sheet — null until fetched, refetched on target change
   incomeRevealed:false,           // false = income amounts show ₹•••••• on Home and List; true = real amounts shown; resets to false on every lock/unlock
+  accounts:[],                    // in-memory cache of all accounts; empty when accounts feature is disabled
+  accountsEnabled:false,          // mirrors pt_accounts_enabled localStorage key; false = accounts feature hidden throughout app
+  acctEditingId:null,             // id of account being edited in the account edit sheet; null when adding new
+  acctOnboardingStep:0,           // 0 = not in onboarding; used to track multi-step first-enable flow
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
@@ -2035,7 +2164,11 @@ async function unlockSuccess(){
   state.groups=await DB.getAllGroups();
   state.recurringRules=await DB.getAllRecurring();
   state.budgets=await DB.getAllBudgets();
-  await runRecurringCatchUpAll(); // before navigating, so the screen about to render already reflects anything just generated
+  state.accountsEnabled=Store.get('pt_accounts_enabled')==='1';
+  state.accounts=state.accountsEnabled ? await DB.getAllAccounts() : [];
+  renderAccountsSettingsRow();
+  renderAccountsInsightsBtn();
+  await runRecurringCatchUpAll();
   await checkWhatsNewOnOpen();
   const target = screenBeforeLock || 'home-screen';
   showScreen(target);
@@ -3292,9 +3425,9 @@ function base64ToArrayBuffer(base64){
 
 async function exportData(){
   try{
-    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw, recurring, budgets] = await Promise.all([
+    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw, recurring, budgets, accounts] = await Promise.all([
       DB.getAllCategories(), DB.getAllPaymentMethods(), DB.getAllGroups(),
-      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(), DB.getAllBudgets(),
+      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(), DB.getAllBudgets(), DB.getAllAccounts(),
     ]);
     const expenses=expensesRaw.filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
     // Attachments carry raw ArrayBuffer data, which JSON can't hold
@@ -3308,8 +3441,8 @@ async function exportData(){
     // not device security, and restoring an old PIN hash onto a different
     // session would be confusing at best.
     const payload={
-      app:'PaisaTrail', schemaVersion:4, exportedAt:new Date().toISOString(),
-      categories, paymentMethods, groups, expenses, attachments, recurring, budgets,
+      app:'PaisaTrail', schemaVersion:5, exportedAt:new Date().toISOString(),
+      categories, paymentMethods, groups, expenses, attachments, recurring, budgets, accounts,
     };
     const blob=new Blob([JSON.stringify(payload)], {type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -3383,6 +3516,7 @@ async function confirmImport(){
       attachments,
       recurring: (data.recurring||[]).filter(r => r && r.id),
       budgets: (data.budgets||[]).filter(b => b && b.id),
+      accounts: (data.accounts||[]).filter(a => a && a.id),
     });
     // Reload every in-memory cache from what's actually on disk now,
     // rather than trusting the file's arrays directly post-filtering.
@@ -3391,6 +3525,7 @@ async function confirmImport(){
     state.groups=await DB.getAllGroups();
     state.recurringRules=await DB.getAllRecurring();
     state.budgets=await DB.getAllBudgets();
+    state.accounts=state.accountsEnabled ? await DB.getAllAccounts() : [];
     state.txnFilterCategoryIds=new Set();
     state.txnFilterPaymentIds=new Set();
     state.txnFilterStartISO=null; state.txnFilterEndISO=null;
@@ -4255,6 +4390,248 @@ function requestDeleteBudget(){
   const info=budgetDisplayInfo(budget);
   closeBudgetEdit();
   openManageDeleteConfirm('budget', id, info.name);
+}
+
+/* ============================== ACCOUNTS & WALLETS ============================== */
+// pt_accounts_enabled: '1' = feature on, '0'/absent = feature off.
+// pt_accounts_had_data: '1' = user has previously set up accounts (used to detect re-enable).
+
+function isAccountsEnabled(){ return state.accountsEnabled; }
+
+// Called when Settings accounts toggle is tapped.
+async function handleAccountsToggle(){
+  if(state.accountsEnabled){
+    // Disable — keep data, just hide the feature
+    state.accountsEnabled=false;
+    Store.set('pt_accounts_enabled','0');
+    renderAccountsSettingsRow();
+    renderAccountsInsightsBtn();
+    toast('Accounts disabled — your data is kept');
+  } else {
+    // Enable — check if user had prior data (re-enable) or first time
+    const hadData = Store.get('pt_accounts_had_data')==='1';
+    if(hadData && state.accounts.length===0){
+      // Reload accounts from DB first
+      state.accounts = await DB.getAllAccounts();
+    }
+    if(hadData && state.accounts.length>0){
+      // Re-enable: show out-of-sync warning
+      document.getElementById('accounts-reenable-overlay').classList.add('show');
+    } else {
+      // First time: show onboarding
+      openAccountsOnboarding();
+    }
+  }
+}
+
+function renderAccountsSettingsRow(){
+  const sw=document.getElementById('settings-accounts-switch');
+  sw.classList.toggle('on', state.accountsEnabled);
+  document.getElementById('settings-manage-accounts-btn').classList.toggle('hidden', !state.accountsEnabled);
+}
+
+function renderAccountsInsightsBtn(){
+  const btn=document.getElementById('stats-accounts-btn');
+  if(btn) btn.classList.toggle('hidden', !state.accountsEnabled);
+}
+
+// ---- Onboarding ----
+function openAccountsOnboarding(){
+  renderAccountsOnboardingList();
+  document.getElementById('accounts-onboarding-overlay').classList.add('show');
+}
+function closeAccountsOnboarding(){
+  document.getElementById('accounts-onboarding-overlay').classList.remove('show');
+}
+function renderAccountsOnboardingList(){
+  const list=document.getElementById('accounts-onboarding-list'); list.innerHTML='';
+  state.accounts.forEach(a=>{
+    const icon = a.type==='cc' ? '💳' : '🏦';
+    const balLabel = a.type==='cc' ? 'Outstanding' : 'Balance';
+    list.insertAdjacentHTML('beforeend', `
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:12px 14px;background:var(--surface);border-radius:14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:20px;">${icon}</span>
+          <div>
+            <p style="font-size:13px;font-weight:600;color:var(--ink);">${esc(a.name)}</p>
+            <p style="font-size:11px;color:var(--muted);">${balLabel}: ${formatINR(a.openingBalance||0)}</p>
+          </div>
+        </div>
+        <button type="button" data-onboardedit="${a.id}"
+          style="font-size:13px;color:var(--grape);font-weight:700;background:none;border:none;cursor:pointer;">Edit</button>
+      </div>`);
+  });
+  list.querySelectorAll('[data-onboardedit]').forEach(btn=>{
+    btn.onclick=()=>openAccountEdit(btn.dataset.onboardedit, 'onboarding');
+  });
+}
+async function finishAccountsOnboarding(){
+  if(state.accounts.length===0){ toast('Add at least one account to continue'); return; }
+  state.accountsEnabled=true;
+  Store.set('pt_accounts_enabled','1');
+  Store.set('pt_accounts_had_data','1');
+  closeAccountsOnboarding();
+  renderAccountsSettingsRow();
+  renderAccountsInsightsBtn();
+  toast('Accounts enabled');
+}
+
+// ---- Account edit sheet ----
+// source: 'onboarding' | 'settings' — where to return after save/close
+function openAccountEdit(id, source='settings'){
+  state.acctEditingId = id || null;
+  state.acctEditSource = source;
+  const existing = id ? state.accounts.find(a=>a.id===id) : null;
+  const type = existing ? existing.type : 'savings';
+  document.getElementById('account-edit-title').textContent = existing ? 'Edit account' : 'Add account';
+  document.getElementById('account-edit-name').value = existing ? existing.name : '';
+  document.getElementById('account-edit-balance').value = existing ? (existing.openingBalance||0) : '';
+  // Type tabs
+  document.getElementById('account-type-tabs').querySelectorAll('[data-accttype]').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.accttype===type);
+  });
+  // Lock type for existing (same reason as recurring frequency)
+  const tabs=document.getElementById('account-type-tabs');
+  tabs.style.pointerEvents = existing ? 'none' : '';
+  tabs.style.opacity = existing ? '0.5' : '';
+  applyAccountTypeLabels(type);
+  document.getElementById('account-edit-delete-btn').classList.toggle('hidden', !existing);
+  document.getElementById('account-edit-overlay').classList.add('show');
+}
+function closeAccountEdit(){
+  document.getElementById('account-edit-overlay').classList.remove('show');
+  state.acctEditingId=null;
+}
+function getAccountEditType(){
+  const active=document.querySelector('#account-type-tabs [data-accttype].active');
+  return active ? active.dataset.accttype : 'savings';
+}
+function applyAccountTypeLabels(type){
+  const isCc = type==='cc';
+  document.getElementById('account-balance-label').textContent = isCc ? 'CURRENT OUTSTANDING' : 'CURRENT BALANCE';
+  document.getElementById('account-balance-hint').textContent = isCc
+    ? 'Enter how much you currently owe on this card'
+    : 'Enter your current account balance';
+}
+async function saveAccountEdit(){
+  const name=document.getElementById('account-edit-name').value.trim();
+  const balance=parseFloat(document.getElementById('account-edit-balance').value)||0;
+  const type=getAccountEditType();
+  if(!name){ toast('Give the account a name'); return; }
+  const existing = state.acctEditingId ? state.accounts.find(a=>a.id===state.acctEditingId) : null;
+  if(existing){
+    existing.name=name; existing.openingBalance=balance;
+    await DB.putAccount(existing);
+  } else {
+    const account={ id:genId(), name, type, openingBalance:balance, createdAt:Date.now() };
+    await DB.putAccount(account);
+    state.accounts.push(account);
+  }
+  closeAccountEdit();
+  if(state.acctEditSource==='onboarding'){
+    renderAccountsOnboardingList();
+  } else {
+    renderManageAccountsList();
+  }
+  toast(existing ? 'Account updated' : 'Account added');
+}
+async function deleteAccountEdit(){
+  const id=state.acctEditingId; if(!id) return;
+  const acct=state.accounts.find(a=>a.id===id);
+  if(!acct) return;
+  await DB.deleteAccount(id);
+  state.accounts=state.accounts.filter(a=>a.id!==id);
+  closeAccountEdit();
+  if(state.acctEditSource==='onboarding'){
+    renderAccountsOnboardingList();
+  } else {
+    renderManageAccountsList();
+  }
+  toast('Account deleted');
+}
+
+// ---- Manage accounts (from Settings) ----
+function openManageAccountsScreen(){
+  renderManageAccountsList();
+  document.getElementById('manage-accounts-overlay').classList.add('show');
+}
+function closeManageAccountsScreen(){
+  document.getElementById('manage-accounts-overlay').classList.remove('show');
+}
+function renderManageAccountsList(){
+  const list=document.getElementById('manage-accounts-list'); if(!list) return;
+  list.innerHTML='';
+  if(state.accounts.length===0){
+    list.innerHTML='<p class="empty-hint">No accounts yet — add one below.</p>';
+    return;
+  }
+  state.accounts.forEach(a=>{
+    const icon = a.type==='cc' ? '💳' : '🏦';
+    const balLabel = a.type==='cc' ? 'Outstanding' : 'Balance';
+    const color = a.type==='cc' ? 'var(--coral)' : 'var(--ink)';
+    list.insertAdjacentHTML('beforeend', `
+      <button type="button" class="settings-row" data-acctid="${a.id}" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:${a.type==='cc'?'rgba(255,107,91,.14)':'rgba(46,196,182,.14)'};">${icon}</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">${esc(a.name)}</p>
+          <span class="settings-row-sub">${balLabel}: ${formatINR(a.openingBalance||0)}</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>`);
+  });
+  list.querySelectorAll('[data-acctid]').forEach(btn=>{
+    btn.onclick=()=>openAccountEdit(btn.dataset.acctid, 'settings');
+  });
+}
+
+// ---- Accounts view sheet (Insights 🏦) ----
+function openAccountsViewSheet(){
+  renderAccountsViewSheet();
+  document.getElementById('accounts-view-overlay').classList.add('show');
+}
+function closeAccountsViewSheet(){
+  document.getElementById('accounts-view-overlay').classList.remove('show');
+}
+function renderAccountsViewSheet(){
+  const list=document.getElementById('accounts-view-list'); list.innerHTML='';
+  if(state.accounts.length===0){
+    list.innerHTML='<p class="empty-hint">No accounts set up yet.</p>';
+    document.getElementById('accounts-view-networth').style.display='none';
+    return;
+  }
+  document.getElementById('accounts-view-networth').style.display='';
+  let netWorth=0;
+  state.accounts.forEach(a=>{
+    const isCc=a.type==='cc';
+    const bal=a.openingBalance||0;
+    netWorth += isCc ? -bal : bal;
+    const icon = isCc ? '💳' : '🏦';
+    const balLabel = isCc ? 'outstanding' : 'balance';
+    const balColor = isCc ? 'var(--coral)' : 'var(--ink)';
+    const maskedBal = state.incomeRevealed ? formatINR(bal) : '₹••••••';
+    list.insertAdjacentHTML('beforeend', `
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:14px 16px;background:var(--surface);border-radius:16px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:40px;height:40px;border-radius:12px;flex-shrink:0;
+                      background:${isCc?'rgba(255,107,91,.14)':'rgba(46,196,182,.14)'};
+                      display:flex;align-items:center;justify-content:center;font-size:18px;">${icon}</div>
+          <div>
+            <p style="font-size:14px;font-weight:600;color:var(--ink);">${esc(a.name)}</p>
+            <p style="font-size:11px;color:var(--muted);margin-top:2px;">${isCc?'Credit Card':'Savings Account'}</p>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <p style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${balColor};">${maskedBal}</p>
+          <p style="font-size:10px;color:var(--muted);margin-top:2px;">${balLabel}</p>
+        </div>
+      </div>`);
+  });
+  const nwEl=document.getElementById('accounts-view-networth-value');
+  const maskedNW = state.incomeRevealed ? formatINR(Math.abs(netWorth)) : '₹••••••';
+  nwEl.textContent = state.incomeRevealed ? ((netWorth>=0?'':'-')+maskedNW) : maskedNW;
+  nwEl.style.color = netWorth>=0 ? 'var(--mint)' : 'var(--coral)';
 }
 
 /* ============================== INSIGHTS ============================== */
@@ -5536,19 +5913,21 @@ document.getElementById('home-whatsnew-banner').addEventListener('click', openWh
 function updateEyeButtons(){
   const icon = state.incomeRevealed ? '🙈' : '👁️';
   const title = state.incomeRevealed ? 'Mask income' : 'Show income';
-  ['home-eye-btn','txn-eye-btn'].forEach(id => {
+  ['home-eye-btn','txn-eye-btn','stats-eye-btn'].forEach(id => {
     const btn = document.getElementById(id);
     if(btn){ btn.textContent=icon; btn.title=title; }
   });
 }
-['home-eye-btn','txn-eye-btn'].forEach(id => {
+['home-eye-btn','txn-eye-btn','stats-eye-btn'].forEach(id => {
   document.getElementById(id).addEventListener('click', async ()=>{
     state.incomeRevealed = !state.incomeRevealed;
     updateEyeButtons();
     await renderHomeOverviewPanel();
     renderTransactions();
+    if(document.getElementById('accounts-view-overlay').classList.contains('show')) renderAccountsViewSheet();
   });
 });
+document.getElementById('stats-accounts-btn').addEventListener('click', openAccountsViewSheet);
 document.getElementById('settings-biometric-row').addEventListener('click', async ()=>{
   if(isBioEnabled()){
     disableBiometric();
@@ -5849,6 +6228,62 @@ async function forceRefreshApp(){
   }
   window.location.reload(true);
 }
+// ---- Accounts event listeners ----
+document.getElementById('settings-accounts-toggle-row').addEventListener('click', handleAccountsToggle);
+document.getElementById('settings-manage-accounts-btn').addEventListener('click', openManageAccountsScreen);
+
+// Onboarding sheet
+document.getElementById('accounts-onboarding-close-btn').addEventListener('click', ()=>{
+  closeAccountsOnboarding();
+  // User closed without finishing — don't enable
+});
+document.getElementById('accounts-onboarding-overlay').addEventListener('click', (e)=>{
+  if(e.target.id==='accounts-onboarding-overlay') closeAccountsOnboarding();
+});
+document.getElementById('accounts-onboarding-add-btn').addEventListener('click', ()=> openAccountEdit(null,'onboarding'));
+document.getElementById('accounts-onboarding-done-btn').addEventListener('click', finishAccountsOnboarding);
+
+// Account edit sheet
+document.getElementById('account-edit-close-btn').addEventListener('click', closeAccountEdit);
+document.getElementById('account-edit-overlay').addEventListener('click', (e)=>{
+  if(e.target.id==='account-edit-overlay') closeAccountEdit();
+});
+document.getElementById('account-type-tabs').addEventListener('click', (e)=>{
+  const btn=e.target.closest('[data-accttype]'); if(!btn) return;
+  document.getElementById('account-type-tabs').querySelectorAll('[data-accttype]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.accttype===btn.dataset.accttype);
+  });
+  applyAccountTypeLabels(btn.dataset.accttype);
+});
+document.getElementById('account-edit-save-btn').addEventListener('click', saveAccountEdit);
+document.getElementById('account-edit-delete-btn').addEventListener('click', deleteAccountEdit);
+
+// Manage accounts overlay
+document.getElementById('manage-accounts-close-btn').addEventListener('click', closeManageAccountsScreen);
+document.getElementById('manage-accounts-overlay').addEventListener('click', (e)=>{
+  if(e.target.id==='manage-accounts-overlay') closeManageAccountsScreen();
+});
+document.getElementById('manage-accounts-add-btn').addEventListener('click', ()=> openAccountEdit(null,'settings'));
+
+// Accounts view sheet (Insights)
+document.getElementById('accounts-view-close-btn').addEventListener('click', closeAccountsViewSheet);
+document.getElementById('accounts-view-overlay').addEventListener('click', (e)=>{
+  if(e.target.id==='accounts-view-overlay') closeAccountsViewSheet();
+});
+
+// Re-enable warning
+document.getElementById('accounts-reenable-confirm-btn').addEventListener('click', async ()=>{
+  document.getElementById('accounts-reenable-overlay').classList.remove('show');
+  state.accountsEnabled=true;
+  Store.set('pt_accounts_enabled','1');
+  renderAccountsSettingsRow();
+  renderAccountsInsightsBtn();
+  toast('Accounts re-enabled');
+});
+document.getElementById('accounts-reenable-cancel-btn').addEventListener('click', ()=>{
+  document.getElementById('accounts-reenable-overlay').classList.remove('show');
+});
+
 function init(){
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed', err));
@@ -5863,6 +6298,12 @@ function init(){
   renderBiometricRow();
   renderNotifRow();
   document.getElementById('settings-cycle-day').value=getCycleDay();
+  // Accounts UI state — read from localStorage directly since unlockSuccess
+  // hasn't run yet at init time; unlockSuccess will set state.accountsEnabled.
+  const acctEnabled = Store.get('pt_accounts_enabled')==='1';
+  document.getElementById('settings-accounts-switch').classList.toggle('on', acctEnabled);
+  document.getElementById('settings-manage-accounts-btn').classList.toggle('hidden', !acctEnabled);
+  document.getElementById('stats-accounts-btn').classList.toggle('hidden', !acctEnabled);
 }
 init();
 </script>
