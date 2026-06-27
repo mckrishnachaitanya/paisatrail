@@ -1358,8 +1358,10 @@ input{outline:none;}
     <div class="edit-sheet-grip"></div>
     <div class="edit-sheet-head">
       <p class="edit-sheet-title">Accounts</p>
-      <button type="button" id="accounts-view-eye-btn" class="income-eye-btn" title="Toggle visibility">👁️</button>
-      <button type="button" class="topbar-close" id="accounts-view-close-btn">✕</button>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button type="button" id="accounts-view-eye-btn" class="income-eye-btn" title="Toggle visibility">👁️</button>
+        <button type="button" class="topbar-close" id="accounts-view-close-btn">✕</button>
+      </div>
     </div>
     <div id="accounts-view-list" style="margin-top:10px;"></div>
     <div id="accounts-view-networth" style="border-top:1px solid var(--border);margin-top:8px;padding-top:16px;display:flex;justify-content:space-between;align-items:center;">
@@ -3668,11 +3670,24 @@ async function checkWhatsNewOnOpen(){
   if(lastSeen===latest.version) return;
   if(isNotifEnabled() && isNotifAvailable() && Notification.permission==='granted'){
     try{
-      new Notification('PaisaTrail updated', { body: latest.highlights[0] || "Tap to see what's new", icon:'./icons/icon.svg' });
+      // Android Chrome requires SW-based notifications; new Notification() is
+      // silently ignored on mobile. Try SW first, fall back to direct API for
+      // desktop browsers that don't have an active SW registration.
+      if('serviceWorker' in navigator){
+        const reg = await navigator.serviceWorker.getRegistration();
+        if(reg){
+          await reg.showNotification('PaisaTrail updated', {
+            body: latest.highlights[0] || "Tap to see what's new",
+            icon: './icons/icon.svg',
+            badge: './icons/icon.svg',
+          });
+        } else {
+          new Notification('PaisaTrail updated', { body: latest.highlights[0] || "Tap to see what's new", icon:'./icons/icon.svg' });
+        }
+      } else {
+        new Notification('PaisaTrail updated', { body: latest.highlights[0] || "Tap to see what's new", icon:'./icons/icon.svg' });
+      }
     } catch(err){}
-    // Do NOT mark version seen here — only mark it when the user actually
-    // opens the What's New screen. This keeps the Home banner visible as a
-    // persistent fallback in case the OS notification goes unnoticed.
   }
 }
 
