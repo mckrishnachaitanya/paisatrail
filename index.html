@@ -867,7 +867,22 @@ input{outline:none;}
         <p class="topbar-title">Settings</p>
         <button type="button" class="topbar-lock-btn" id="settings-lock-btn" title="Lock app">🔒</button>
       </div>
-      <p class="field-label" style="margin-top:0;">HELP</p>
+      <p class="field-label" style="margin-top:0;">FINANCE</p>
+      <div class="settings-row" style="cursor:default;">
+        <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">📅</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">My month starts on</p>
+          <span class="settings-row-sub">Aligns budgets, forecasts &amp; insights to your salary cycle</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <span style="font-size:13px;color:var(--muted);">Day</span>
+          <input type="number" id="settings-cycle-day" min="1" max="28" value="1"
+            style="width:48px;padding:6px 8px;border:1.5px solid var(--border);border-radius:10px;
+                   font-size:14px;font-weight:700;font-family:var(--font-mono);color:var(--ink);
+                   background:var(--surface);text-align:center;">
+        </div>
+      </div>
+      <p class="field-label">HELP</p>
       <button type="button" class="settings-row" id="settings-guide-btn" style="margin-bottom:8px;">
         <span class="settings-row-icon" style="background:rgba(255,194,60,.14);">💡</span>
         <div class="settings-row-info">
@@ -1735,8 +1750,8 @@ const state = {
   bdManualSelected:new Set(), // ids ticked in manual bulk-delete mode
   bdPendingBatch:[],     // the expense objects currently shown in the confirm dialog, awaiting Delete/Cancel
   insPeriodType:'month',     // 'week'|'month'|'year'|'custom' — persists across navigation, like state.homeTab
-  insStartISO:monthBounds(todayISO()).startISO, // current period's bounds (inclusive) — only recomputed when the user steps/changes type, never reset on nav
-  insEndISO:monthBounds(todayISO()).endISO,
+  insStartISO:cycleBounds(todayISO()).startISO, // current period's bounds (inclusive) — only recomputed when the user steps/changes type, never reset on nav
+  insEndISO:cycleBounds(todayISO()).endISO,
   insView:'categories',      // 'categories'|'compare'|'payment'|'groups' — which Insights sub-view is showing; persists across navigation
   insCompareCategoryId:null, // selected category for Compare — lazily defaults to the first category the first time Compare is viewed, then persists
   insSelectedGroupId:null,   // selected group for the Groups view — persists once chosen, no lazy default (there may be no groups yet)
@@ -3904,11 +3919,10 @@ async function renderHomeForecastPanel(){
   const isMonth=state.forecastWindow==='month';
   let windowEndISO, remainingDays, spentSoFar=0;
   if(isMonth){
-    const now=new Date();
-    windowEndISO=dateToISO(new Date(now.getFullYear(), now.getMonth()+1, 0));
+    const bounds=cycleBounds(today);
+    windowEndISO=bounds.endISO;
     remainingDays=Math.max(0, Math.round((new Date(windowEndISO+'T00:00:00') - new Date(today+'T00:00:00'))/86400000));
-    const monthStartISO=dateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
-    spentSoFar=(await DB.getExpensesByDateRange(monthStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
+    spentSoFar=(await DB.getExpensesByDateRange(bounds.startISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
   } else {
     windowEndISO=dateToISO(addDays(new Date(today+'T00:00:00'), FORECAST_ROLLING_WINDOW_DAYS));
     remainingDays=FORECAST_ROLLING_WINDOW_DAYS;
@@ -3954,10 +3968,9 @@ async function renderHomeForecastPanel(){
 
 /* ============================== BUDGETS ============================== */
 async function getMonthToDateExpenses(){
-  const now=new Date();
-  const monthStartISO=dateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
   const today=todayISO();
-  return (await DB.getExpensesByDateRange(monthStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+  const cycleStartISO=cycleBounds(today).startISO;
+  return (await DB.getExpensesByDateRange(cycleStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
 }
 // Unlike Forecast's "estimated other spending," budgets intentionally
 // include recurring-generated expenses in the spent total — a recurring
@@ -3975,11 +3988,15 @@ function budgetSpentAmount(budget, monthExpenses){
 // make the rate wildly noisy before there's enough signal.
 function computeBudgetPace(spent, limit){
   if(!(limit>0)) return null;
-  const now=new Date();
-  const daysElapsed=now.getDate();
+  const today=todayISO();
+  const bounds=cycleBounds(today);
+  const cycleStart=new Date(bounds.startISO+'T00:00:00');
+  const cycleEnd=new Date(bounds.endISO+'T00:00:00');
+  const todayDate=new Date(today+'T00:00:00');
+  const daysElapsed=Math.round((todayDate-cycleStart)/86400000)+1;
   if(daysElapsed<3) return null;
-  const daysInMonth=new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-  const projected=(spent/daysElapsed)*daysInMonth;
+  const daysInCycle=Math.round((cycleEnd-cycleStart)/86400000)+1;
+  const projected=(spent/daysElapsed)*daysInCycle;
   return { projected, over: projected>limit };
 }
 // Targets you can still set a NEW budget for — every category without one
@@ -4009,13 +4026,12 @@ function budgetDisplayInfo(budget){
 // the Insights section below — safe since these are hoisted function
 // declarations in the same scope.
 function monthsAgoBounds(n){
-  const now=new Date();
-  return monthBounds(dateToISO(new Date(now.getFullYear(), now.getMonth()-n, 1)));
+  return cyclesAgoBounds(n);
 }
-// Pulls last month's actual spend for a target (for the edit sheet's
+// Pulls last cycle's actual spend for a target (for the edit sheet's
 // "last month" recap) plus a suggested monthly limit averaged across
-// however many of the last 3 calendar months were actually "active" (had
-// ANY app usage) — averaging in silent pre-app months would understate the
+// however many of the last 3 cycles were actually "active" (had
+// ANY app usage) — averaging in silent pre-app cycles would understate the
 // suggestion for a newer install. targetCategoryId is null for "Overall".
 async function getBudgetHistoryData(targetCategoryId){
   const m1=monthsAgoBounds(1), m2=monthsAgoBounds(2), m3=monthsAgoBounds(3);
@@ -4184,13 +4200,56 @@ function monthBounds(refISO){
   const end=new Date(d.getFullYear(), d.getMonth()+1, 0); // day 0 = last day of the previous month
   return { startISO: dateToISO(start), endISO: dateToISO(end) };
 }
+// Returns the user's financial cycle start day (1–28), defaulting to 1.
+// Stored in localStorage as pt_cycle_day. When 1, behaviour is identical
+// to calendar month — so existing users see zero change until they opt in.
+function getCycleDay(){
+  const v=parseInt(localStorage.getItem('pt_cycle_day')||'1',10);
+  return (v>=1 && v<=28) ? v : 1;
+}
+// Computes the financial cycle bounds (start/end ISO dates) that contain
+// the given reference date, using the user's configured cycle start day.
+// Example: cycle day 26, today = 10 Jun → cycle is 26 May – 25 Jun.
+// When cycle day is 1, output is identical to monthBounds().
+function cycleBounds(refISO){
+  const cycleDay=getCycleDay();
+  if(cycleDay===1) return monthBounds(refISO);
+  const ref=new Date(refISO+'T00:00:00');
+  const refDay=ref.getDate();
+  let startYear=ref.getFullYear(), startMonth=ref.getMonth();
+  // If today is before the cycle start day, the cycle started last month
+  if(refDay < cycleDay) {
+    startMonth -= 1;
+    if(startMonth < 0){ startMonth=11; startYear--; }
+  }
+  const lastDayOfStartMonth=new Date(startYear, startMonth+1, 0).getDate();
+  const clampedStart=Math.min(cycleDay, lastDayOfStartMonth);
+  const cycleStart=new Date(startYear, startMonth, clampedStart);
+  // End is one day before next cycle start
+  let endYear=startYear, endMonth=startMonth+1;
+  if(endMonth>11){ endMonth=0; endYear++; }
+  const lastDayOfEndMonth=new Date(endYear, endMonth+1, 0).getDate();
+  const clampedEnd=Math.min(cycleDay, lastDayOfEndMonth);
+  const cycleEnd=new Date(endYear, endMonth, clampedEnd-1);
+  return { startISO: dateToISO(cycleStart), endISO: dateToISO(cycleEnd) };
+}
+// Same as monthsAgoBounds but uses cycleBounds. n=1 → previous cycle, etc.
+function cyclesAgoBounds(n){
+  const today=new Date();
+  const cycleDay=getCycleDay();
+  // Step back n months from current cycle start
+  const cur=cycleBounds(todayISO());
+  const ref=new Date(cur.startISO+'T00:00:00');
+  ref.setMonth(ref.getMonth()-n);
+  return cycleBounds(dateToISO(ref));
+}
 function yearBounds(refISO){
   const d=new Date(refISO+'T00:00:00');
   return { startISO: dateToISO(new Date(d.getFullYear(),0,1)), endISO: dateToISO(new Date(d.getFullYear(),11,31)) };
 }
 function stepPeriod(type, startISO, dir){
   if(type==='week') return weekBounds(dateToISO(addDays(new Date(startISO+'T00:00:00'), 7*dir)));
-  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()+dir); return monthBounds(dateToISO(d)); }
+  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()+dir); return cycleBounds(dateToISO(d)); }
   if(type==='year'){ const d=new Date(startISO+'T00:00:00'); d.setFullYear(d.getFullYear()+dir); return yearBounds(dateToISO(d)); }
   return null;
 }
@@ -4198,7 +4257,7 @@ function stepPeriod(type, startISO, dir){
 // fall back to the same number of days immediately before the chosen range.
 function previousPeriodBounds(type, startISO, endISO){
   if(type==='week') return weekBounds(dateToISO(addDays(new Date(startISO+'T00:00:00'), -7)));
-  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()-1); return monthBounds(dateToISO(d)); }
+  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()-1); return cycleBounds(dateToISO(d)); }
   if(type==='year'){ const d=new Date(startISO+'T00:00:00'); d.setFullYear(d.getFullYear()-1); return yearBounds(dateToISO(d)); }
   const start=new Date(startISO+'T00:00:00'), end=new Date(endISO+'T00:00:00');
   const lengthDays=Math.round((end-start)/86400000)+1;
@@ -4207,7 +4266,13 @@ function previousPeriodBounds(type, startISO, endISO){
 }
 function formatPeriodLabel(type, startISO, endISO){
   if(type==='custom' && (!startISO || !endISO)) return 'Pick a date range';
-  if(type==='month') return new Date(startISO+'T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  if(type==='month'){
+    // When cycle day is 1, show familiar "June 2026" label.
+    // When cycle day ≠ 1, show "26 May – 25 Jun" so the non-calendar range is clear.
+    if(getCycleDay()===1) return new Date(startISO+'T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+    const s=new Date(startISO+'T00:00:00'), e=new Date(endISO+'T00:00:00');
+    return `${s.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}`;
+  }
   if(type==='year') return new Date(startISO+'T00:00:00').getFullYear().toString();
   const s=new Date(startISO+'T00:00:00'), e=new Date(endISO+'T00:00:00');
   return `${s.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}`;
@@ -4248,7 +4313,7 @@ function applyInsightsPeriodTypeUI(){
 function setInsightsPeriodType(type){
   state.insPeriodType=type;
   if(type==='week'){ const b=weekBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
-  else if(type==='month'){ const b=monthBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
+  else if(type==='month'){ const b=cycleBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
   else if(type==='year'){ const b=yearBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
   else { state.insStartISO=null; state.insEndISO=null; document.getElementById('ins-custom-start').value=''; document.getElementById('ins-custom-end').value=''; }
   applyInsightsPeriodTypeUI();
@@ -5358,6 +5423,22 @@ document.getElementById('import-confirm-btn').addEventListener('click', confirmI
 document.getElementById('settings-changepin-btn').addEventListener('click', startChangePIN);
 document.getElementById('settings-guide-btn').addEventListener('click', () => openGuideScreen('settings-screen'));
 document.getElementById('settings-forcerefresh-btn').addEventListener('click', forceRefreshApp);
+// Cycle day — save on change, clamp to 1–28, refresh all cycle-dependent views
+document.getElementById('settings-cycle-day').addEventListener('change', () => {
+  let v=parseInt(document.getElementById('settings-cycle-day').value, 10);
+  if(isNaN(v)||v<1) v=1;
+  if(v>28) v=28;
+  document.getElementById('settings-cycle-day').value=v;
+  localStorage.setItem('pt_cycle_day', String(v));
+  // Re-anchor Insights month period to the new cycle bounds
+  if(state.insPeriodType==='month'){
+    const b=cycleBounds(todayISO());
+    state.insStartISO=b.startISO; state.insEndISO=b.endISO;
+  }
+  renderInsights();
+  renderHomeBudgetsPanel();
+  toast('Cycle start day updated');
+});
 document.getElementById('guide-close-btn').addEventListener('click', closeGuideScreen);
 document.getElementById('settings-notif-row').addEventListener('click', async () => {
   if(isNotifEnabled()){
@@ -5693,6 +5774,7 @@ function init(){
   }
   renderBiometricRow();
   renderNotifRow();
+  document.getElementById('settings-cycle-day').value=getCycleDay();
 }
 init();
 </script>
