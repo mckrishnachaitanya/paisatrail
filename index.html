@@ -648,6 +648,12 @@ input{outline:none;}
       <p class="field-label">CATEGORY</p>
       <div class="cat-grid" id="add-category-grid"></div>
 
+      <!-- Account pill strip — only rendered when accounts are enabled -->
+      <div id="add-account-section" class="hidden">
+        <p class="field-label">FROM ACCOUNT</p>
+        <div class="pay-row" id="add-account-row" style="flex-wrap:wrap;gap:8px;"></div>
+      </div>
+
       <div id="add-payment-section">
         <p class="field-label">PAID VIA</p>
         <div class="pay-row" id="add-payment-row"></div>
@@ -1282,6 +1288,10 @@ input{outline:none;}
     <input type="date" class="date-input" id="recurring-edit-end">
     <p class="field-label">GROUP (OPTIONAL)</p>
     <div class="pay-row" id="recurring-edit-group-row"></div>
+    <div id="recurring-edit-account-section" class="hidden">
+      <p class="field-label">ACCOUNT (OPTIONAL)</p>
+      <div class="pay-row" id="recurring-edit-account-row" style="flex-wrap:wrap;gap:8px;"></div>
+    </div>
     <button type="button" class="save-btn" id="recurring-edit-save-btn" style="margin-top:18px;">Save recurring transaction</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-pause-btn" style="color:var(--grape);">Pause</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-delete-btn">Delete</button>
@@ -1347,6 +1357,9 @@ input{outline:none;}
     <p class="field-label" style="margin-top:14px;" id="account-balance-label">CURRENT BALANCE</p>
     <input type="number" inputmode="decimal" class="sheet-input" id="account-edit-balance" placeholder="0" min="0" step="0.01">
     <p class="field-label" id="account-balance-hint" style="color:var(--muted);font-size:11px;margin-top:4px;font-weight:400;letter-spacing:0;">Enter your current account balance</p>
+    <p class="field-label" style="margin-top:14px;">PAYMENT METHODS</p>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Which payment methods are used for this account?</p>
+    <div class="pay-row" id="account-edit-pm-row" style="flex-wrap:wrap;gap:8px;"></div>
     <button type="button" class="save-btn" id="account-edit-save-btn" style="margin-top:18px;">Save account</button>
     <button type="button" class="text-danger-btn hidden" id="account-edit-delete-btn">Delete account</button>
   </div>
@@ -1382,6 +1395,37 @@ input{outline:none;}
   </div>
 </div>
 
+<!-- ============================== ADD METHOD TO ACCOUNT PROMPT ============================== -->
+<div id="acct-addpm-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">💳</div>
+    <p class="confirm-sheet-title" id="acct-addpm-title">Add to account?</p>
+    <p class="confirm-sheet-sub" id="acct-addpm-sub"></p>
+    <button type="button" class="save-btn" id="acct-addpm-confirm-btn">Add to account</button>
+    <button type="button" class="confirm-sheet-cancel" id="acct-addpm-cancel-btn">Keep as one-off</button>
+  </div>
+</div>
+
+<!-- ============================== BULK ACCOUNT ASSIGN ============================== -->
+<div class="screen is-hidden" id="bulkaccount-screen">
+  <div class="topbar">
+    <p class="topbar-title">Assign accounts</p>
+    <button class="topbar-close" id="bulkaccount-close-btn">✕</button>
+  </div>
+  <div class="scroll">
+    <div style="padding:0 20px 28px;">
+      <p style="font-size:13px;color:var(--muted);margin:10px 0 14px;line-height:1.6;">
+        Select an account, then tick the transactions to assign to it.
+      </p>
+      <p class="field-label" style="margin-top:0;">ASSIGN TO ACCOUNT</p>
+      <div class="pay-row" id="bulkaccount-acct-row" style="flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+      <p class="field-label">TRANSACTIONS</p>
+      <div id="bulkaccount-list"></div>
+      <button type="button" class="save-btn hidden" id="bulkaccount-apply-btn" style="margin-top:14px;">Assign to account</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============================== MANAGE ACCOUNTS OVERLAY ============================== -->
 <div id="manage-accounts-overlay" class="edit-sheet-overlay">
   <div class="edit-sheet">
@@ -1392,6 +1436,7 @@ input{outline:none;}
     </div>
     <div id="manage-accounts-list" style="margin-top:14px;"></div>
     <button type="button" class="warranty-toggle-btn" id="manage-accounts-add-btn" style="margin-top:12px;">+ Add account</button>
+    <button type="button" class="warranty-toggle-btn" id="manage-accounts-bulkassign-btn" style="margin-top:8px;">Bulk assign past transactions</button>
   </div>
 </div>
 
@@ -1931,6 +1976,7 @@ const state = {
   mgrRecurringCatGridExpanded:false, // false = collapsed to top 6; true = all categories shown
   mgrRecurringType:'expense',     // 'expense'|'income' — type of recurring rule being added/edited
   mgrRecurringIncomeCategoryId:null, // selected income category when mgrRecurringType==='income'
+  mgrRecurringAccountId:null,     // selected account id for recurring rule; null = no account assigned
   budgets:[],                     // in-memory cache of all budgets, mirrors state.recurringRules
   mgrBudgetCategoryId:null,       // categoryId selected while adding a new budget (null = the special "Overall" target); locked/unused once editing an existing budget
   budgetEditHistory:null,         // {lastMonthSpent, lastMonthActive, suggested, targetIsOverall} for whichever target is selected in the open budget sheet — null until fetched, refetched on target change
@@ -1938,19 +1984,22 @@ const state = {
   accounts:[],                    // in-memory cache of all accounts; empty when accounts feature is disabled
   accountsEnabled:false,          // mirrors pt_accounts_enabled localStorage key; false = accounts feature hidden throughout app
   acctEditingId:null,             // id of account being edited in the account edit sheet; null when adding new
-  acctOnboardingStep:0,           // 0 = not in onboarding; used to track multi-step first-enable flow
+  acctEditSource:null,            // 'onboarding'|'settings' — where to return after account edit save/close
+  acctEditPaymentIds:new Set(),   // payment method ids associated with the account being edited
+  acctOnboardingStep:0,           // 0 = not in onboarding
+  selectedAccountId:null,         // selected account on Add screen; null when accounts disabled
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
 /* ============================== SCREEN SYSTEM ============================== */
-const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen','recurring-screen','guide-screen'];
+const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen','recurring-screen','guide-screen','bulkaccount-screen'];
 // Screens that are always opened fresh — scroll should reset to top on
 // every open. Main tab screens (home, transactions, stats, settings) are
 // intentionally excluded: preserving their scroll position across navigation
 // is correct behaviour.
 const SCROLL_RESET_SCREENS = new Set([
   'add-screen','recurring-screen','categories-screen','paymentmethods-screen',
-  'groups-screen','bulkdelete-screen','tagexpenses-screen','guide-screen'
+  'groups-screen','bulkdelete-screen','tagexpenses-screen','guide-screen','bulkaccount-screen'
 ]);
 function showScreen(id){
   SCREENS.forEach(s => document.getElementById(s).classList.toggle('is-hidden', s!==id));
@@ -3738,10 +3787,12 @@ async function catchUpSingleRule(rule){
       incomeCategoryId: rule.incomeCategoryId || INCOME_CATEGORIES[0].id,
       categoryId: null,
       paymentMethod:rule.paymentMethod,
+      accountId: rule.accountId||null,
       date:rule.nextDueISO, note:rule.name, attachmentIds:[], recurringId:rule.id,
       groupId:rule.groupId||null, warrantyExpiry:null, warrantyDurationMonths:null, createdAt:Date.now(),
     } : {
       id:genId(), amount:rule.amount, categoryId:rule.categoryId, paymentMethod:rule.paymentMethod,
+      accountId: rule.accountId||null,
       date:rule.nextDueISO, note:rule.name, attachmentIds:[], recurringId:rule.id, groupId:rule.groupId||null,
       warrantyExpiry:null, warrantyDurationMonths:null, createdAt:Date.now(),
     };
@@ -3933,7 +3984,6 @@ function renderRecurringEditFreqRow(){
 }
 function renderRecurringEditGroupRow(){
   const row=document.getElementById('recurring-edit-group-row'); row.innerHTML='';
-  // "None" chip
   const noneSelected = !state.mgrRecurringGroupId;
   row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-rgrp="none" style="background:${noneSelected?'var(--grape)':'var(--surface)'};color:${noneSelected?'white':'var(--ink)'}">None</button>`);
   state.groups.forEach(g=>{
@@ -3945,6 +3995,23 @@ function renderRecurringEditGroupRow(){
       state.mgrRecurringGroupId = btn.dataset.rgrp==='none' ? null : btn.dataset.rgrp;
       renderRecurringEditGroupRow();
     };
+  });
+}
+function renderRecurringEditAccountRow(){
+  const section=document.getElementById('recurring-edit-account-section');
+  if(!state.accountsEnabled || state.accounts.length===0){ section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  const row=document.getElementById('recurring-edit-account-row'); row.innerHTML='';
+  // None chip
+  const noneSelected=!state.mgrRecurringAccountId;
+  row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-racct="none" style="background:${noneSelected?'var(--grape)':'var(--surface)'};color:${noneSelected?'white':'var(--ink)'}">None</button>`);
+  state.accounts.forEach(a=>{
+    const selected=state.mgrRecurringAccountId===a.id;
+    const icon=a.type==='cc'?'💳':'🏦';
+    row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-racct="${a.id}" style="background:${selected?'var(--grape)':'var(--surface)'};color:${selected?'white':'var(--ink)'}"><span>${icon}</span>${esc(a.name)}</button>`);
+  });
+  row.querySelectorAll('[data-racct]').forEach(btn=>{
+    btn.onclick=()=>{ state.mgrRecurringAccountId=btn.dataset.racct==='none'?null:btn.dataset.racct; renderRecurringEditAccountRow(); };
   });
 }
 function openRecurringEdit(id){
@@ -3973,12 +4040,14 @@ function openRecurringEdit(id){
   state.mgrRecurringPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
   state.mgrRecurringFrequency = existing ? existing.frequency : 'monthly';
   state.mgrRecurringGroupId = existing ? (existing.groupId || null) : null;
+  state.mgrRecurringAccountId = existing ? (existing.accountId || null) : null;
   state.mgrRecurringCatGridExpanded = false;
   // Use cached usage counts if available; fetch async in background to update sort order
   getCategoryUsageCounts().then(counts=>{ state.catUsageCounts=counts; renderRecurringEditCatGrid(); }).catch(()=>{});
   renderRecurringEditCatGrid();
   renderRecurringEditPayRow();
   renderRecurringEditGroupRow();
+  renderRecurringEditAccountRow();
 
   // Frequency and start date only make sense to set once, at creation —
   // changing either after occurrences already exist would scramble the
@@ -4019,6 +4088,7 @@ async function saveRecurringEdit(){
     existing.incomeCategoryId=isIncome ? state.mgrRecurringIncomeCategoryId : null;
     existing.paymentMethod=state.mgrRecurringPaymentId;
     existing.endDate=endDate; existing.groupId=state.mgrRecurringGroupId||null;
+    existing.accountId=state.mgrRecurringAccountId||null;
     if(existing.endDate && existing.nextDueISO>existing.endDate) existing.active=false;
     await DB.putRecurring(existing);
     closeRecurringEdit();
@@ -4034,6 +4104,7 @@ async function saveRecurringEdit(){
       paymentMethod:state.mgrRecurringPaymentId,
       frequency:state.mgrRecurringFrequency, startDate, endDate, nextDueISO:startDate, active:true, createdAt:Date.now(),
       groupId:state.mgrRecurringGroupId||null,
+      accountId:state.mgrRecurringAccountId||null,
     };
     await DB.putRecurring(rule);
     state.recurringRules.push(rule);
@@ -4494,12 +4565,33 @@ async function finishAccountsOnboarding(){
 }
 
 // ---- Account edit sheet ----
+function renderAccountEditPmRow(){
+  const row=document.getElementById('account-edit-pm-row'); row.innerHTML='';
+  state.paymentMethods.forEach(pm=>{
+    const selected=state.acctEditPaymentIds.has(pm.id);
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    row.insertAdjacentHTML('beforeend', `
+      <button type="button" class="pay-chip" data-acctpm="${pm.id}" style="background:${bg};color:${color}">
+        <span>${pm.icon}</span>${esc(pm.name)}
+      </button>`);
+  });
+  row.querySelectorAll('[data-acctpm]').forEach(btn=>{
+    btn.onclick=()=>{
+      const pmId=btn.dataset.acctpm;
+      if(state.acctEditPaymentIds.has(pmId)) state.acctEditPaymentIds.delete(pmId);
+      else state.acctEditPaymentIds.add(pmId);
+      renderAccountEditPmRow();
+    };
+  });
+}
 // source: 'onboarding' | 'settings' — where to return after save/close
 function openAccountEdit(id, source='settings'){
   state.acctEditingId = id || null;
   state.acctEditSource = source;
   const existing = id ? state.accounts.find(a=>a.id===id) : null;
   const type = existing ? existing.type : 'savings';
+  state.acctEditPaymentIds = new Set(existing ? (existing.paymentMethodIds||[]) : []);
   document.getElementById('account-edit-title').textContent = existing ? 'Edit account' : 'Add account';
   document.getElementById('account-edit-name').value = existing ? existing.name : '';
   document.getElementById('account-edit-balance').value = existing ? (existing.openingBalance||0) : '';
@@ -4513,6 +4605,7 @@ function openAccountEdit(id, source='settings'){
   tabs.style.opacity = existing ? '0.5' : '';
   applyAccountTypeLabels(type);
   document.getElementById('account-edit-delete-btn').classList.toggle('hidden', !existing);
+  renderAccountEditPmRow();
   document.getElementById('account-edit-overlay').classList.add('show');
 }
 function closeAccountEdit(){
@@ -4538,9 +4631,10 @@ async function saveAccountEdit(){
   const existing = state.acctEditingId ? state.accounts.find(a=>a.id===state.acctEditingId) : null;
   if(existing){
     existing.name=name; existing.openingBalance=balance;
+    existing.paymentMethodIds=[...state.acctEditPaymentIds];
     await DB.putAccount(existing);
   } else {
-    const account={ id:genId(), name, type, openingBalance:balance, createdAt:Date.now() };
+    const account={ id:genId(), name, type, openingBalance:balance, paymentMethodIds:[...state.acctEditPaymentIds], createdAt:Date.now() };
     await DB.putAccount(account);
     state.accounts.push(account);
   }
@@ -4648,6 +4742,89 @@ function renderAccountsViewSheet(){
   const maskedNW = state.incomeRevealed ? formatINR(Math.abs(netWorth)) : '₹••••••';
   nwEl.textContent = state.incomeRevealed ? ((netWorth>=0?'':'-')+maskedNW) : maskedNW;
   nwEl.style.color = netWorth>=0 ? 'var(--mint)' : 'var(--coral)';
+}
+
+// ---- Bulk account assign ----
+let _bulkAcctSelectedAccountId=null;
+let _bulkAcctSelected=new Set();
+
+async function openBulkAccountScreen(){
+  _bulkAcctSelectedAccountId = state.accounts.length>0 ? state.accounts[0].id : null;
+  _bulkAcctSelected=new Set();
+  closeManageAccountsScreen();
+  renderBulkAccountAcctRow();
+  await renderBulkAccountList();
+  showScreen('bulkaccount-screen');
+}
+function renderBulkAccountAcctRow(){
+  const row=document.getElementById('bulkaccount-acct-row'); row.innerHTML='';
+  state.accounts.forEach(a=>{
+    const selected=_bulkAcctSelectedAccountId===a.id;
+    const icon=a.type==='cc'?'💳':'🏦';
+    row.insertAdjacentHTML('beforeend',`
+      <button type="button" class="pay-chip" data-bacct="${a.id}"
+        style="background:${selected?'var(--grape)':'var(--surface)'};color:${selected?'white':'var(--ink)'}">
+        <span>${icon}</span>${esc(a.name)}
+      </button>`);
+  });
+  row.querySelectorAll('[data-bacct]').forEach(btn=>{
+    btn.onclick=()=>{
+      _bulkAcctSelectedAccountId=btn.dataset.bacct;
+      _bulkAcctSelected=new Set();
+      renderBulkAccountAcctRow();
+      renderBulkAccountList();
+    };
+  });
+}
+async function renderBulkAccountList(){
+  const list=document.getElementById('bulkaccount-list'); list.innerHTML='';
+  const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31'))
+    .filter(e=>!pendingDeletes[e.id] && !e.accountId)
+    .sort((a,b)=>b.date.localeCompare(a.date));
+  if(all.length===0){
+    list.innerHTML='<p class="empty-hint">All transactions already have an account assigned.</p>';
+    document.getElementById('bulkaccount-apply-btn').classList.add('hidden');
+    return;
+  }
+  all.forEach(e=>{
+    const isInc=isIncomeEntry(e);
+    const cat=isInc ? INCOME_CATEGORIES.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
+    const dateLabel=new Date(e.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+    const checked=_bulkAcctSelected.has(e.id);
+    list.insertAdjacentHTML('beforeend',`
+      <div class="recent-row" data-bulkacctid="${e.id}" style="cursor:pointer;padding:10px 0;">
+        <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:(isInc?'💰':'✨')}</div>
+        <div class="recent-info">
+          <p class="recent-title">${esc(e.note||'Untitled')}</p>
+          <span class="recent-pm">${esc(dateLabel)}</span>
+        </div>
+        <span class="recent-amt" style="color:${isInc?'var(--mint)':'var(--ink)'};">${isInc?'+':''}${formatINR(e.amount)}</span>
+        <input type="checkbox" ${checked?'checked':''} style="margin-left:10px;width:18px;height:18px;flex-shrink:0;" data-bulkacctcheck="${e.id}">
+      </div>`);
+  });
+  list.querySelectorAll('[data-bulkacctid]').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const id=row.dataset.bulkacctid;
+      if(_bulkAcctSelected.has(id)) _bulkAcctSelected.delete(id);
+      else _bulkAcctSelected.add(id);
+      const cb=row.querySelector('[data-bulkacctcheck]');
+      if(cb) cb.checked=_bulkAcctSelected.has(id);
+      document.getElementById('bulkaccount-apply-btn').classList.toggle('hidden', _bulkAcctSelected.size===0);
+    });
+  });
+  document.getElementById('bulkaccount-apply-btn').classList.toggle('hidden', _bulkAcctSelected.size===0);
+}
+async function applyBulkAccountAssign(){
+  if(!_bulkAcctSelectedAccountId || _bulkAcctSelected.size===0) return;
+  const ids=[..._bulkAcctSelected];
+  for(const id of ids){
+    const exp=await DB.getExpense(id);
+    if(exp){ exp.accountId=_bulkAcctSelectedAccountId; await DB.addExpense(exp); }
+  }
+  const count=ids.length;
+  _bulkAcctSelected=new Set();
+  await renderBulkAccountList();
+  toast(`${count} transaction${count===1?'':'s'} assigned`);
 }
 
 /* ============================== INSIGHTS ============================== */
@@ -5004,6 +5181,7 @@ function renderAddModeUI(){
   const isIncome = state.addMode === 'income';
   document.getElementById('add-expense-only-fields').classList.toggle('hidden', isIncome);
   document.getElementById('add-payment-section').classList.toggle('hidden', isIncome);
+  renderAccountPillStrip();
   renderCategoryGrid();
   updateNotePlaceholder();
   renderPaymentChips();
@@ -5114,9 +5292,47 @@ function updateNotePlaceholder(){
   const cat=state.categories.find(c=>c.id===state.selectedCategoryId);
   document.getElementById('add-note').placeholder = (cat && NOTE_PLACEHOLDERS[cat.name]) || 'What was this for?';
 }
+function renderAccountPillStrip(){
+  const section=document.getElementById('add-account-section');
+  if(!state.accountsEnabled || state.accounts.length===0){ section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  const row=document.getElementById('add-account-row'); row.innerHTML='';
+  state.accounts.forEach(a=>{
+    const selected=state.selectedAccountId===a.id;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    const icon = a.type==='cc' ? '💳' : '🏦';
+    row.insertAdjacentHTML('beforeend', `
+      <button type="button" class="pay-chip" data-acctpill="${a.id}" style="background:${bg};color:${color}">
+        <span>${icon}</span>${esc(a.name)}
+      </button>`);
+  });
+  row.querySelectorAll('[data-acctpill]').forEach(btn=>{
+    btn.onclick=()=>{
+      state.selectedAccountId=btn.dataset.acctpill;
+      renderAccountPillStrip();
+      renderPaymentChips(); // re-filter payment methods to selected account
+    };
+  });
+}
 function renderPaymentChips(){
   const row=document.getElementById('add-payment-row'); row.innerHTML='';
-  state.paymentMethods.forEach(pm=>{
+  // When accounts enabled and an account is selected, filter to that account's methods.
+  // If the account has no methods assigned yet, show all (graceful fallback).
+  let methods = state.paymentMethods;
+  if(state.accountsEnabled && state.selectedAccountId){
+    const acct=state.accounts.find(a=>a.id===state.selectedAccountId);
+    if(acct && acct.paymentMethodIds && acct.paymentMethodIds.length>0){
+      const ids=new Set(acct.paymentMethodIds);
+      const filtered=state.paymentMethods.filter(pm=>ids.has(pm.id));
+      if(filtered.length>0) methods=filtered;
+    }
+  }
+  // If currently selected payment method is not in filtered list, reset to first available
+  if(state.selectedPaymentId && !methods.find(pm=>pm.id===state.selectedPaymentId)){
+    state.selectedPaymentId = methods[0] ? methods[0].id : null;
+  }
+  methods.forEach(pm=>{
     const selected=state.selectedPaymentId===pm.id;
     const bg = selected ? 'var(--grape)' : 'var(--surface)';
     const color = selected ? 'white' : 'var(--ink)';
@@ -5497,6 +5713,14 @@ async function openAddScreen(existing){
   state.catGridExpanded = false; // always start collapsed — same pattern as MORE OPTIONS below
   state.catUsageCounts = await getCategoryUsageCounts();
   state.selectedPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
+  // Account — default to last used (pt_last_account), or first account if no prior selection
+  if(state.accountsEnabled && state.accounts.length>0){
+    const lastAcct=Store.get('pt_last_account');
+    const validLast=lastAcct && state.accounts.find(a=>a.id===lastAcct);
+    state.selectedAccountId = existing ? (existing.accountId||null) : (validLast ? lastAcct : state.accounts[0].id);
+  } else {
+    state.selectedAccountId=null;
+  }
   state.pendingAttachments = [];
   state.existingAttachmentIds = existing ? ((existing.attachmentIds && existing.attachmentIds.length) ? existing.attachmentIds.slice() : (existing.attachmentId ? [existing.attachmentId] : [])) : [];
   state.existingAttachments = null;
@@ -5549,10 +5773,12 @@ async function saveExpense(){
     const income={
       id, type:'income', amount,
       incomeCategoryId: state.selectedIncomeCategoryId,
+      accountId: state.accountsEnabled ? (state.selectedAccountId||null) : null,
       date, note, attachmentIds:[],
       createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
     };
     await DB.addExpense(income);
+    if(state.accountsEnabled && state.selectedAccountId) Store.set('pt_last_account', state.selectedAccountId);
     toast(isEdit ? 'Income updated ✓' : 'Income saved ✓');
     goToReturnScreen();
     return;
@@ -5639,7 +5865,8 @@ async function saveExpense(){
 
   const expense={
     id, type:'expense', amount, categoryId: state.selectedCategoryId,
-    paymentMethod: state.selectedPaymentId, // stores the payment method's id, despite the field name
+    paymentMethod: state.selectedPaymentId,
+    accountId: state.accountsEnabled ? (state.selectedAccountId||null) : null,
     date, note, attachmentIds, recurringId, groupId,
     warrantyExpiry: state.warrantyEnabled ? state.warrantyExpiry : null,
     warrantyDurationMonths: state.warrantyEnabled ? state.warrantyDurationMonths : null,
@@ -5649,7 +5876,30 @@ async function saveExpense(){
     excludeFromForecast: state.excludeFromForecast,
     createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
   };
-  await DB.addExpense(expense); // put() — works for both create and update since the id matches
+  await DB.addExpense(expense);
+
+  // Persist last used account for next Add screen open
+  if(state.accountsEnabled && state.selectedAccountId){
+    Store.set('pt_last_account', state.selectedAccountId);
+  }
+
+  // If the selected payment method is not in the selected account's methods,
+  // prompt to add it — non-blocking, save already happened above.
+  if(state.accountsEnabled && state.selectedAccountId && state.selectedPaymentId){
+    const acct=state.accounts.find(a=>a.id===state.selectedAccountId);
+    const pm=state.paymentMethods.find(p=>p.id===state.selectedPaymentId);
+    if(acct && pm && !(acct.paymentMethodIds||[]).includes(state.selectedPaymentId)){
+      state._pendingAcctPmAccountId=acct.id;
+      state._pendingAcctPmMethodId=pm.id;
+      document.getElementById('acct-addpm-title').textContent=`Add "${pm.name}" to ${acct.name}?`;
+      document.getElementById('acct-addpm-sub').textContent=`This payment method isn't linked to ${acct.name} yet. Add it so it appears automatically next time?`;
+      document.getElementById('acct-addpm-overlay').classList.add('show');
+      // Don't wait — return now so the toast and navigation happen immediately
+      toast(isEdit ? 'Expense updated ✓' : 'Expense saved ✓');
+      goToReturnScreen();
+      return;
+    }
+  }
 
   toast(isEdit ? 'Expense updated ✓' : 'Expense saved ✓');
   goToReturnScreen();
@@ -6280,6 +6530,30 @@ document.getElementById('manage-accounts-overlay').addEventListener('click', (e)
   if(e.target.id==='manage-accounts-overlay') closeManageAccountsScreen();
 });
 document.getElementById('manage-accounts-add-btn').addEventListener('click', ()=> openAccountEdit(null,'settings'));
+document.getElementById('manage-accounts-bulkassign-btn').addEventListener('click', openBulkAccountScreen);
+
+// Bulk account assign screen
+document.getElementById('bulkaccount-close-btn').addEventListener('click', ()=> showScreen('settings-screen'));
+document.getElementById('bulkaccount-apply-btn').addEventListener('click', applyBulkAccountAssign);
+
+// Unknown payment method → add to account prompt
+document.getElementById('acct-addpm-confirm-btn').addEventListener('click', async ()=>{
+  document.getElementById('acct-addpm-overlay').classList.remove('show');
+  const acct=state.accounts.find(a=>a.id===state._pendingAcctPmAccountId);
+  const pmId=state._pendingAcctPmMethodId;
+  if(acct && pmId){
+    if(!acct.paymentMethodIds) acct.paymentMethodIds=[];
+    if(!acct.paymentMethodIds.includes(pmId)){
+      acct.paymentMethodIds.push(pmId);
+      await DB.putAccount(acct);
+    }
+  }
+  state._pendingAcctPmAccountId=null; state._pendingAcctPmMethodId=null;
+});
+document.getElementById('acct-addpm-cancel-btn').addEventListener('click', ()=>{
+  document.getElementById('acct-addpm-overlay').classList.remove('show');
+  state._pendingAcctPmAccountId=null; state._pendingAcctPmMethodId=null;
+});
 
 // Accounts view sheet (Insights)
 document.getElementById('accounts-view-close-btn').addEventListener('click', closeAccountsViewSheet);

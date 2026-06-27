@@ -2,6 +2,17 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.4",
+      "date": "2026-06-27",
+      "highlights": [
+        "Accounts Phase 2: select which account to charge when adding an expense — payment methods filter automatically to the selected account's associated methods",
+        "Associate payment methods with accounts during setup or from Manage accounts — UPI from SBI vs UPI from HDFC CC are now distinct",
+        "Unrecognised payment method prompts you to add it to the account for next time",
+        "Bulk assign past transactions to accounts from Settings → Manage accounts",
+        "Recurring rules now support an optional account field"
+      ]
+    },
+    {
       "version": "3.3",
       "date": "2026-06-27",
       "highlights": [
