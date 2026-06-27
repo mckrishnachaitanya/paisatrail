@@ -4240,11 +4240,10 @@ function applyInsightsPeriodTypeUI(){
   document.querySelectorAll('#ins-period-type-tabs .segmented-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.instype===state.insPeriodType);
   });
-  const isGroups = state.insView==='groups';
-  document.getElementById('ins-period-type-tabs').classList.toggle('hidden', isGroups);
   const isCustom = state.insPeriodType==='custom';
-  document.getElementById('ins-period-stepper').classList.toggle('hidden', isGroups || isCustom);
-  document.getElementById('ins-custom-range').classList.toggle('hidden', isGroups || !isCustom);
+  document.getElementById('ins-period-type-tabs').classList.toggle('hidden', false);
+  document.getElementById('ins-period-stepper').classList.toggle('hidden', isCustom);
+  document.getElementById('ins-custom-range').classList.toggle('hidden', !isCustom);
 }
 function setInsightsPeriodType(type){
   state.insPeriodType=type;
@@ -4406,27 +4405,49 @@ async function renderInsightsGroupsPanel(){
 
   let resultHTML='<p class="empty-hint">Pick a group above.</p>';
   if(state.insSelectedGroupId){
-    const group=state.groups.find(g=>g.id===state.insSelectedGroupId);
-    const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31'))
-      .filter(e => !pendingDeletes[e.id] && e.groupId===state.insSelectedGroupId)
-      .sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
-    if(all.length===0){
-      resultHTML=`<p class="empty-hint">No expenses tagged to ${esc(group?group.name:'this group')} yet.</p>`;
+    // Custom range guard
+    if(state.insPeriodType==='custom' && (!state.insStartISO || !state.insEndISO)){
+      resultHTML='<p class="empty-hint">Pick a from and to date above.</p>';
+    } else if(state.insPeriodType==='custom' && state.insStartISO>state.insEndISO){
+      resultHTML='<p class="empty-hint">The from date is after the to date.</p>';
     } else {
-      const total=all.reduce((s,e)=>s+Number(e.amount),0);
-      const rowsHTML=all.map(e=>{
-        const cat=state.categories.find(c=>c.id===e.categoryId);
-        const dateLabel=new Date(e.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
-        return `
-          <div class="recent-row">
-            <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
-            <div class="recent-info">
-              <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:'Expense'))}</p>
-            </div>
-            <span class="recent-amt">-${formatINR(e.amount)}</span>
-          </div>`;
-      }).join('');
-      resultHTML = `<p class="spend-count" style="margin:0 0 12px;color:var(--muted);">${formatINR(total)} total · ${all.length} expense${all.length===1?'':'s'}</p>${rowsHTML}`;
+      const group=state.groups.find(g=>g.id===state.insSelectedGroupId);
+      // Current period expenses for this group
+      const curAll=(await DB.getExpensesByDateRange(state.insStartISO, state.insEndISO))
+        .filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && e.groupId===state.insSelectedGroupId)
+        .sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
+      // Previous period total for delta
+      const prevBounds=previousPeriodBounds(state.insPeriodType, state.insStartISO, state.insEndISO);
+      const prevAll=(await DB.getExpensesByDateRange(prevBounds.startISO, prevBounds.endISO))
+        .filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && e.groupId===state.insSelectedGroupId);
+      const curTotal=curAll.reduce((s,e)=>s+Number(e.amount),0);
+      const prevTotal=prevAll.reduce((s,e)=>s+Number(e.amount),0);
+      const delta=formatDelta(curTotal, prevTotal);
+
+      if(curAll.length===0 && prevTotal===0){
+        resultHTML=`<p class="empty-hint">No expenses tagged to ${esc(group?group.name:'this group')} in this period.</p>`;
+      } else {
+        const rowsHTML=curAll.map(e=>{
+          const cat=state.categories.find(c=>c.id===e.categoryId);
+          const dateLabel=new Date(e.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+          return `
+            <div class="recent-row">
+              <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
+              <div class="recent-info">
+                <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:'Expense'))}</p>
+                <span class="recent-meta">${dateLabel}${cat?' · '+esc(cat.name):''}</span>
+              </div>
+              <span class="recent-amt">-${formatINR(e.amount)}</span>
+            </div>`;
+        }).join('');
+        const emptyPeriod = curAll.length===0 ? '<p class="empty-hint" style="margin-top:8px;">No expenses this period.</p>' : rowsHTML;
+        resultHTML = `
+          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+            <p class="spend-count" style="margin:0;color:var(--muted);">${formatINR(curTotal)} this period · ${curAll.length} expense${curAll.length===1?'':'s'}</p>
+          </div>
+          <p class="ins-delta ${delta.cls}" style="font-size:13px;margin-bottom:12px;">${delta.label} ${esc(previousPeriodPhrase(state.insPeriodType))}</p>
+          ${emptyPeriod}`;
+      }
     }
   }
   container.innerHTML = `<div class="pay-row" id="ins-groups-chip-row">${chipsHTML}</div><div style="margin-top:14px;">${resultHTML}</div>`;

@@ -2,6 +2,15 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.0",
+      "date": "2026-06-27",
+      "highlights": [
+        "Groups view in Insights now supports period-based tracking — pick Week, Month, Year, or Custom to see group spending for that period",
+        "Previous-period delta (▲/▼ %) shown for groups, same as Categories and Payment views",
+        "Expense list in Groups view scopes to the selected period, with date and category shown per row"
+      ]
+    },
+    {
       "version": "2.9",
       "date": "2026-06-26",
       "highlights": [
@@ -72,7 +81,7 @@
       "id": "insights",
       "icon": "📊",
       "title": "Insights",
-      "body": "Dig into your spending patterns — by category, by payment method, or by comparing one period to another, like this week vs last week, or this month vs last month."
+      "body": "Dig into your spending patterns — by category, by payment method, by group, or by comparing one period to another, like this week vs last week, or this month vs last month. All four views (Categories, Compare, Payment, Groups) share the same Week / Month / Year / Custom period selector and stepper, so you can scope any view to any period and step through history."
     },
     {
       "id": "settings",
