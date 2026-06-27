@@ -2,6 +2,15 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.2",
+      "date": "2026-06-27",
+      "highlights": [
+        "Recurring income: salary, rent received, freelance — log income rules that generate automatically, same as recurring expenses",
+        "Recurring transactions manager renamed from 'Recurring expenses' — now handles both income and expense rules",
+        "Income rules show an INCOME badge in the recurring list and generate correctly typed income entries"
+      ]
+    },
+    {
       "version": "3.1",
       "date": "2026-06-27",
       "highlights": [

@@ -934,8 +934,8 @@ input{outline:none;}
       <button type="button" class="settings-row" id="settings-recurring-btn">
         <span class="settings-row-icon" style="background:rgba(255,143,179,.14);">🔁</span>
         <div class="settings-row-info">
-          <p class="settings-row-title">Recurring expenses</p>
-          <span class="settings-row-sub">Rent, subscriptions, EMIs — logged automatically</span>
+          <p class="settings-row-title">Recurring transactions</p>
+          <span class="settings-row-sub">Salary, rent, subscriptions, EMIs — logged automatically</span>
         </div>
         <span class="settings-row-chevron">›</span>
       </button>
@@ -1131,13 +1131,13 @@ input{outline:none;}
 <!-- ============================== RECURRING EXPENSES ============================== -->
 <div class="screen is-hidden" id="recurring-screen">
   <div class="topbar">
-    <p class="topbar-title">Recurring expenses</p>
+    <p class="topbar-title">Recurring transactions</p>
     <button class="topbar-close" id="recurring-close-btn">✕</button>
   </div>
   <div class="scroll">
     <div style="padding:0 20px 28px;">
       <div id="recurring-list"></div>
-      <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="recurring-screen-add-btn">+ Add recurring expense</button>
+      <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="recurring-screen-add-btn">+ Add recurring transaction</button>
     </div>
   </div>
 </div>
@@ -1229,15 +1229,26 @@ input{outline:none;}
   <div class="edit-sheet">
     <div class="edit-sheet-grip"></div>
     <div class="edit-sheet-head">
-      <p class="edit-sheet-title" id="recurring-edit-title">Add recurring expense</p>
+      <p class="edit-sheet-title" id="recurring-edit-title">Add recurring transaction</p>
       <button type="button" class="topbar-close" id="recurring-edit-close-btn">✕</button>
+    </div>
+    <!-- Type toggle — expense vs income; locked to read-only when editing existing rule -->
+    <div id="recurring-type-toggle-wrap" style="margin-top:14px;">
+      <div class="segmented-tabs" id="recurring-type-tabs" style="margin-bottom:0;">
+        <button type="button" class="segmented-tab active" data-rtype="expense">Expense</button>
+        <button type="button" class="segmented-tab" data-rtype="income">Income</button>
+      </div>
     </div>
     <p class="field-label" style="margin-top:14px;">NAME</p>
     <input type="text" class="sheet-input" id="recurring-edit-name" placeholder="e.g. Netflix" maxlength="40">
     <p class="field-label">AMOUNT</p>
     <input type="number" inputmode="decimal" class="sheet-input" id="recurring-edit-amount" placeholder="0" min="0" step="0.01">
-    <p class="field-label">CATEGORY</p>
+    <!-- Expense category grid (shown when type=expense) -->
+    <p class="field-label" id="recurring-edit-cat-label">CATEGORY</p>
     <div class="cat-grid" id="recurring-edit-cat-grid"></div>
+    <!-- Income category grid (shown when type=income) -->
+    <p class="field-label hidden" id="recurring-edit-incomecat-label">INCOME TYPE</p>
+    <div class="cat-grid hidden" id="recurring-edit-incomecat-grid"></div>
     <p class="field-label">PAID VIA</p>
     <div class="pay-row" id="recurring-edit-pay-row"></div>
     <div id="recurring-edit-new-only">
@@ -1251,7 +1262,7 @@ input{outline:none;}
     <input type="date" class="date-input" id="recurring-edit-end">
     <p class="field-label">GROUP (OPTIONAL)</p>
     <div class="pay-row" id="recurring-edit-group-row"></div>
-    <button type="button" class="save-btn" id="recurring-edit-save-btn" style="margin-top:18px;">Save recurring expense</button>
+    <button type="button" class="save-btn" id="recurring-edit-save-btn" style="margin-top:18px;">Save recurring transaction</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-pause-btn" style="color:var(--grape);">Pause</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-delete-btn">Delete</button>
   </div>
@@ -1790,6 +1801,8 @@ const state = {
   mgrRecurringFrequency:'monthly',// selected frequency — only editable when adding a new rule, read-only display once created
   mgrRecurringGroupId:null,       // selected group while adding/editing a recurring rule (null = no group)
   mgrRecurringCatGridExpanded:false, // false = collapsed to top 6; true = all categories shown
+  mgrRecurringType:'expense',     // 'expense'|'income' — type of recurring rule being added/edited
+  mgrRecurringIncomeCategoryId:null, // selected income category when mgrRecurringType==='income'
   budgets:[],                     // in-memory cache of all budgets, mirrors state.recurringRules
   mgrBudgetCategoryId:null,       // categoryId selected while adding a new budget (null = the special "Overall" target); locked/unused once editing an existing budget
   budgetEditHistory:null,         // {lastMonthSpent, lastMonthActive, suggested, targetIsOverall} for whichever target is selected in the open budget sheet — null until fetched, refetched on target change
@@ -2902,7 +2915,7 @@ async function openManageDeleteConfirm(type, id, name){
     let count, label;
     if(type==='category'){ count=await DB.countExpensesByCategory(id); label='category'; }
     else if(type==='paymentMethod'){ count=await DB.countExpensesByPaymentMethod(id); label='payment method'; }
-    else if(type==='recurring'){ count=(await getExpensesByRecurringId(id)).length; label='recurring expense'; }
+    else if(type==='recurring'){ count=(await getExpensesByRecurringId(id)).length; label='recurring transaction'; }
     else { count=(await getExpensesByGroupId(id)).length; label='group'; }
     document.getElementById('manage-confirm-sub').textContent = count>0
       ? `${count} expense${count===1?'':'s'} ${count===1?'uses':'use'} this ${label} — they won't be deleted, just unlinked from it.`
@@ -3566,14 +3579,23 @@ async function catchUpSingleRule(rule){
   const generated=[];
   const today=todayISO();
   let count=0;
+  const isIncomeRule = rule.type === 'income';
   while(rule.active && rule.nextDueISO<=today && count<RECURRING_CATCHUP_CAP){
-    const expense={
+    const entry = isIncomeRule ? {
+      id:genId(), amount:rule.amount,
+      type:'income',
+      incomeCategoryId: rule.incomeCategoryId || INCOME_CATEGORIES[0].id,
+      categoryId: null,
+      paymentMethod:rule.paymentMethod,
+      date:rule.nextDueISO, note:rule.name, attachmentIds:[], recurringId:rule.id,
+      groupId:rule.groupId||null, warrantyExpiry:null, warrantyDurationMonths:null, createdAt:Date.now(),
+    } : {
       id:genId(), amount:rule.amount, categoryId:rule.categoryId, paymentMethod:rule.paymentMethod,
       date:rule.nextDueISO, note:rule.name, attachmentIds:[], recurringId:rule.id, groupId:rule.groupId||null,
       warrantyExpiry:null, warrantyDurationMonths:null, createdAt:Date.now(),
     };
-    await DB.addExpense(expense);
-    generated.push({name:rule.name});
+    await DB.addExpense(entry);
+    generated.push({name:rule.name, isIncome:isIncomeRule});
     rule.nextDueISO=advanceRecurringDate(rule, rule.nextDueISO);
     if(rule.endDate && rule.nextDueISO>rule.endDate) rule.active=false;
     count++;
@@ -3589,9 +3611,9 @@ async function catchUpSingleRule(rule){
 function buildCatchUpToastMessage(generated){
   const total=generated.length;
   const uniqueNames=[...new Set(generated.map(g=>g.name))];
-  if(total===1) return `${generated[0].name} added automatically`;
+  if(total===1) return `${generated[0].name} ${generated[0].isIncome?'income':'expense'} added automatically`;
   if(total===2 && uniqueNames.length===2) return `${uniqueNames[0]} and ${uniqueNames[1]} added automatically`;
-  return `${total} recurring expenses added automatically`;
+  return `${total} recurring transactions added automatically`;
 }
 // Runs on every unlock (see unlockSuccess) so a multi-day-idle phone catches
 // up the moment it's opened, not on some background schedule this offline
@@ -3616,7 +3638,7 @@ function renderRecurringArea(){
   if(state.recurringLinkedId){
     area.innerHTML=`
       <div class="warranty-card">
-        <p class="empty-hint" style="padding:0;text-align:left;">This expense was generated by a recurring rule. Manage it from Settings → Recurring expenses.</p>
+        <p class="empty-hint" style="padding:0;text-align:left;">This expense was generated by a recurring rule. Manage it from Settings → Recurring transactions.</p>
       </div>`;
     return;
   }
@@ -3662,20 +3684,25 @@ function openRecurringScreen(){
 function renderRecurringScreen(){
   const list=document.getElementById('recurring-list'); list.innerHTML='';
   if(state.recurringRules.length===0){
-    list.innerHTML='<p class="empty-hint">No recurring expenses yet — add one here, or toggle "Make this recurring" when adding a new expense.</p>';
+    list.innerHTML='<p class="empty-hint">No recurring transactions yet — add one here, or toggle "Make this recurring" when adding a new expense.</p>';
     return;
   }
   state.recurringRules.forEach(r=>{
-    const cat=state.categories.find(c=>c.id===r.categoryId);
+    const isIncomeRule = r.type === 'income';
+    const cat = isIncomeRule
+      ? INCOME_CATEGORIES.find(c=>c.id===r.incomeCategoryId)
+      : state.categories.find(c=>c.id===r.categoryId);
     const dateLabel=new Date(r.nextDueISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
     const subLine = r.active
-      ? `${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Next ${dateLabel}`
+      ? `${isIncomeRule?'+':''}${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Next ${dateLabel}`
       : `${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Paused`;
+    const iconBg = cat ? cat.color+'22' : '#9088A822';
+    const icon = cat ? cat.icon : (isIncomeRule ? '💰' : '🔁');
     list.insertAdjacentHTML('beforeend', `
       <button type="button" class="settings-row" data-recurringid="${r.id}" style="margin-bottom:8px;">
-        <span class="settings-row-icon" style="background:${cat?cat.color:'#9088A8'}22;">${cat?cat.icon:'🔁'}</span>
+        <span class="settings-row-icon" style="background:${iconBg};">${icon}</span>
         <div class="settings-row-info">
-          <p class="settings-row-title">${esc(r.name)}</p>
+          <p class="settings-row-title">${esc(r.name)}${isIncomeRule?' <span style="font-size:10px;background:rgba(46,196,182,.15);color:var(--mint);padding:1px 6px;border-radius:6px;font-weight:700;vertical-align:middle;">INCOME</span>':''}</p>
           <span class="settings-row-sub">${esc(subLine)}</span>
         </div>
         <span class="settings-row-chevron">›</span>
@@ -3683,6 +3710,13 @@ function renderRecurringScreen(){
   });
 }
 function renderRecurringEditCatGrid(){
+  const isIncome = state.mgrRecurringType === 'income';
+  // Toggle which grid/label is visible
+  document.getElementById('recurring-edit-cat-label').classList.toggle('hidden', isIncome);
+  document.getElementById('recurring-edit-cat-grid').classList.toggle('hidden', isIncome);
+  document.getElementById('recurring-edit-incomecat-label').classList.toggle('hidden', !isIncome);
+  document.getElementById('recurring-edit-incomecat-grid').classList.toggle('hidden', !isIncome);
+  if(isIncome){ renderRecurringEditIncomeCatGrid(); return; }
   const grid=document.getElementById('recurring-edit-cat-grid'); grid.innerHTML='';
   const COLLAPSE_AT=6;
   const counts=state.catUsageCounts || {};
@@ -3708,6 +3742,22 @@ function renderRecurringEditCatGrid(){
         <span class="cat-emoji">⋯</span><span class="cat-name">${sorted.length-visible.length} more</span>
       </button>`);
   }
+}
+function renderRecurringEditIncomeCatGrid(){
+  const grid=document.getElementById('recurring-edit-incomecat-grid'); grid.innerHTML='';
+  INCOME_CATEGORIES.forEach(cat=>{
+    const selected=state.mgrRecurringIncomeCategoryId===cat.id;
+    const bg = selected ? cat.color+'26' : 'var(--surface)';
+    const border = selected ? cat.color : 'transparent';
+    grid.insertAdjacentHTML('beforeend', `
+      <button type="button" class="cat-chip" data-rincomecat="${cat.id}" style="background:${bg};border-color:${border}">
+        <span class="cat-emoji">${cat.icon}</span><span class="cat-name">${esc(cat.name)}</span>
+      </button>`);
+  });
+  // Bind clicks inline since income cat grid is rendered fresh each time
+  grid.querySelectorAll('[data-rincomecat]').forEach(btn=>{
+    btn.onclick=()=>{ state.mgrRecurringIncomeCategoryId=btn.dataset.rincomecat; renderRecurringEditIncomeCatGrid(); };
+  });
 }
 function renderRecurringEditPayRow(){
   const row=document.getElementById('recurring-edit-pay-row'); row.innerHTML='';
@@ -3750,7 +3800,21 @@ function openRecurringEdit(id){
   state.mgrEditingType='recurring';
   state.mgrEditingId=id;
   const existing=id ? state.recurringRules.find(r=>r.id===id) : null;
-  document.getElementById('recurring-edit-title').textContent = existing ? 'Edit recurring expense' : 'Add recurring expense';
+  // Type — locked to read-only once a rule exists (changing type would invalidate
+  // all past auto-generated entries). New rules default to expense.
+  state.mgrRecurringType = existing ? (existing.type || 'expense') : 'expense';
+  state.mgrRecurringIncomeCategoryId = existing ? (existing.incomeCategoryId || INCOME_CATEGORIES[0].id) : INCOME_CATEGORIES[0].id;
+  // Apply type toggle UI — tabs disabled when editing existing rule
+  const typeTabs = document.getElementById('recurring-type-tabs');
+  typeTabs.querySelectorAll('[data-rtype]').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.rtype===state.mgrRecurringType);
+  });
+  typeTabs.style.pointerEvents = existing ? 'none' : '';
+  typeTabs.style.opacity = existing ? '0.5' : '';
+  const isIncome = state.mgrRecurringType === 'income';
+  document.getElementById('recurring-edit-title').textContent = existing
+    ? (isIncome ? 'Edit recurring income' : 'Edit recurring expense')
+    : 'Add recurring transaction';
   document.getElementById('recurring-edit-name').value = existing ? existing.name : '';
   document.getElementById('recurring-edit-amount').value = existing ? existing.amount : '';
   document.getElementById('recurring-edit-end').value = existing ? (existing.endDate || '') : '';
@@ -3789,26 +3853,34 @@ function closeRecurringEdit(){
 async function saveRecurringEdit(){
   const name=document.getElementById('recurring-edit-name').value.trim();
   const amount=parseFloat(document.getElementById('recurring-edit-amount').value);
+  const isIncome = state.mgrRecurringType === 'income';
   if(!name){ toast('Give it a name first'); return; }
   if(!amount || amount<=0){ toast('Enter a valid amount'); return; }
-  if(!state.mgrRecurringCategoryId){ toast('Pick a category'); return; }
+  if(!isIncome && !state.mgrRecurringCategoryId){ toast('Pick a category'); return; }
+  if(isIncome && !state.mgrRecurringIncomeCategoryId){ toast('Pick an income type'); return; }
   if(!state.mgrRecurringPaymentId){ toast('Pick a payment method'); return; }
   const endDate=document.getElementById('recurring-edit-end').value || null;
   const existing=state.mgrEditingId ? state.recurringRules.find(r=>r.id===state.mgrEditingId) : null;
 
   if(existing){
     existing.name=name; existing.amount=amount;
-    existing.categoryId=state.mgrRecurringCategoryId; existing.paymentMethod=state.mgrRecurringPaymentId;
+    existing.categoryId=isIncome ? null : state.mgrRecurringCategoryId;
+    existing.incomeCategoryId=isIncome ? state.mgrRecurringIncomeCategoryId : null;
+    existing.paymentMethod=state.mgrRecurringPaymentId;
     existing.endDate=endDate; existing.groupId=state.mgrRecurringGroupId||null;
     if(existing.endDate && existing.nextDueISO>existing.endDate) existing.active=false;
     await DB.putRecurring(existing);
     closeRecurringEdit();
     renderRecurringScreen();
-    toast('Recurring expense updated');
+    toast(isIncome ? 'Recurring income updated' : 'Recurring expense updated');
   } else {
     const startDate=document.getElementById('recurring-edit-start').value || todayISO();
     const rule={
-      id:genId(), name, amount, categoryId:state.mgrRecurringCategoryId, paymentMethod:state.mgrRecurringPaymentId,
+      id:genId(), name, amount,
+      type: isIncome ? 'income' : 'expense',
+      categoryId: isIncome ? null : state.mgrRecurringCategoryId,
+      incomeCategoryId: isIncome ? state.mgrRecurringIncomeCategoryId : null,
+      paymentMethod:state.mgrRecurringPaymentId,
       frequency:state.mgrRecurringFrequency, startDate, endDate, nextDueISO:startDate, active:true, createdAt:Date.now(),
       groupId:state.mgrRecurringGroupId||null,
     };
@@ -3817,7 +3889,7 @@ async function saveRecurringEdit(){
     await catchUpSingleRule(rule); // backfills immediately if startDate is today or in the past
     closeRecurringEdit();
     renderRecurringScreen();
-    toast('Recurring expense added');
+    toast(isIncome ? 'Recurring income added' : 'Recurring expense added');
   }
   await refreshAllExpenseViews();
 }
@@ -5641,6 +5713,22 @@ document.getElementById('recurring-edit-overlay').addEventListener('click', (e) 
 document.getElementById('recurring-edit-save-btn').addEventListener('click', saveRecurringEdit);
 document.getElementById('recurring-edit-pause-btn').addEventListener('click', toggleRecurringPause);
 document.getElementById('recurring-edit-delete-btn').addEventListener('click', requestDeleteRecurring);
+// Type toggle (expense ↔ income) — only active when adding a new rule
+document.getElementById('recurring-type-tabs').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-rtype]'); if(!btn) return;
+  state.mgrRecurringType=btn.dataset.rtype;
+  // Reset category selections when switching type
+  if(state.mgrRecurringType==='expense'){
+    state.mgrRecurringCategoryId=state.categories[0] ? state.categories[0].id : null;
+  } else {
+    state.mgrRecurringIncomeCategoryId=INCOME_CATEGORIES[0].id;
+  }
+  state.mgrRecurringCatGridExpanded=false;
+  document.getElementById('recurring-type-tabs').querySelectorAll('[data-rtype]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.rtype===state.mgrRecurringType);
+  });
+  renderRecurringEditCatGrid();
+});
 document.getElementById('recurring-edit-cat-grid').addEventListener('click', (e) => {
   if(e.target.closest('[data-rcatmore]')){ state.mgrRecurringCatGridExpanded=true; renderRecurringEditCatGrid(); return; }
   const btn=e.target.closest('[data-rcat]'); if(!btn) return;
