@@ -2464,10 +2464,10 @@ async function renderHomeOverviewPanel(){
     await renderBackupNudgeBanner();
   }
   await renderOnboardingChecklist();
-  const today=new Date();
-  const monthStart=new Date(today.getFullYear(), today.getMonth(), 1);
-  const startISO=(()=>{ const tz=monthStart.getTimezoneOffset()*60000; return new Date(monthStart-tz).toISOString().slice(0,10); })();
-  const endISO=todayISO();
+  const todayISO_=todayISO();
+  const bounds=cycleBounds(todayISO_);
+  const startISO=bounds.startISO;
+  const endISO=todayISO_;
 
   const all=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id]);
   const expenses=all.filter(isExpenseEntry);
@@ -2481,8 +2481,13 @@ async function renderHomeOverviewPanel(){
   const netEl=document.getElementById('home-net-total');
   netEl.textContent = state.incomeRevealed ? (net>=0?'+':'')+formatINR(Math.abs(net)) : '₹••••••';
   netEl.style.color = net>=0 ? '#7FFFEC' : '#FFB4B4';
-  document.getElementById('home-month-label').textContent=today.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
-  document.getElementById('home-count').textContent=`${expenses.length} expense${expenses.length===1?'':'s'} this month`;
+  // Label: if cycle day is 1, show familiar "June 2026"; otherwise show the cycle range
+  const cycleDay=getCycleDay();
+  const monthLabel = cycleDay===1
+    ? new Date(todayISO_+'T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'})
+    : `${new Date(startISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${new Date(bounds.endISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}`;
+  document.getElementById('home-month-label').textContent=monthLabel;
+  document.getElementById('home-count').textContent=`${expenses.length} expense${expenses.length===1?'':'s'} this cycle`;
 
   const byCat={};
   expenses.forEach(e=>{ byCat[e.categoryId]=(byCat[e.categoryId]||0)+Number(e.amount); });
