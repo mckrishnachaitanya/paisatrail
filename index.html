@@ -3659,6 +3659,11 @@ async function exportData(){
     const payload={
       app:'PaisaTrail', schemaVersion:5, exportedAt:new Date().toISOString(),
       categories, paymentMethods, groups, expenses, attachments, recurring, budgets, accounts,
+      preferences:{
+        cycleDay: parseInt(Store.get('pt_cycle_day')||'1',10),
+        accountsEnabled: Store.get('pt_accounts_enabled')==='1',
+        accountsHadData: Store.get('pt_accounts_had_data')==='1',
+      },
     };
     const blob=new Blob([JSON.stringify(payload)], {type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -3741,7 +3746,22 @@ async function confirmImport(){
     state.groups=await DB.getAllGroups();
     state.recurringRules=await DB.getAllRecurring();
     state.budgets=await DB.getAllBudgets();
+    // Restore preferences if present in backup
+    if(data.preferences){
+      const prefs=data.preferences;
+      if(prefs.cycleDay && prefs.cycleDay>=1 && prefs.cycleDay<=28){
+        Store.set('pt_cycle_day', String(prefs.cycleDay));
+        document.getElementById('settings-cycle-day').value=prefs.cycleDay;
+      }
+      if(prefs.accountsEnabled){
+        Store.set('pt_accounts_enabled','1');
+        state.accountsEnabled=true;
+      }
+      if(prefs.accountsHadData) Store.set('pt_accounts_had_data','1');
+    }
     state.accounts=state.accountsEnabled ? await DB.getAllAccounts() : [];
+    renderAccountsSettingsRow();
+    renderAccountsInsightsBtn();
     state.txnFilterCategoryIds=new Set();
     state.txnFilterPaymentIds=new Set();
     state.txnFilterStartISO=null; state.txnFilterEndISO=null;
