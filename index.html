@@ -144,6 +144,10 @@ input{outline:none;}
 /* ============================== HOME ============================== */
 #home-body{padding:0 20px 28px;}
 .home-header{display:flex;align-items:center;justify-content:space-between;margin:8px 0 16px;}
+#home-sticky-top{flex-shrink:0;background:var(--paper);padding:0 20px;}
+#home-scroll-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;isolation:isolate;padding:0 20px 100px;}
+#home-panel-overview{padding-top:4px;}
+#home-overview-sticky.hidden{display:none;}
 .greeting{font-family:var(--font-display);font-size:17px;}
 .month-label{font-size:12px;color:var(--muted);}
 
@@ -514,68 +518,73 @@ input{outline:none;}
 
 <!-- ============================== HOME SCREEN ============================== -->
 <div class="screen is-hidden" id="home-screen">
-  <div class="scroll">
+  <!-- Sticky top: header + tabs + overview summary. Does not scroll. -->
+  <div id="home-sticky-top">
+    <div class="home-header">
+      <div>
+        <p class="greeting">Hey there 👋</p>
+        <p class="month-label" id="home-month-label">—</p>
+      </div>
+      <div class="topbar-icons">
+        <button type="button" class="income-eye-btn" id="home-eye-btn" title="Toggle income visibility">👁️</button>
+        <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
+      </div>
+    </div>
+
+    <div class="home-tabs" id="home-tabs">
+      <button type="button" class="home-tab active" data-hometab="overview">Overview</button>
+      <button type="button" class="home-tab" data-hometab="warranties">Warranties</button>
+      <button type="button" class="home-tab" data-hometab="forecast">Forecast</button>
+      <button type="button" class="home-tab" data-hometab="budgets">Budgets</button>
+    </div>
+
+    <!-- Overview sticky content: banners, onboarding, cashflow card, donut -->
+    <div id="home-overview-sticky">
+      <div id="home-whatsnew-banner" class="whatsnew-banner hidden"></div>
+      <div id="home-backup-banner" class="backup-nudge-banner hidden"></div>
+      <div id="home-warranty-banner" class="warranty-soon-banner hidden"></div>
+      <div id="home-onboard-card" class="hidden" style="
+        background:var(--surface);border:1.5px solid var(--border);border-radius:18px;
+        padding:14px 16px;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <p style="font-size:13px;font-weight:700;color:var(--ink);">Get started</p>
+          <button type="button" id="home-onboard-dismiss" style="font-size:13px;color:var(--muted);background:none;border:none;cursor:pointer;">Dismiss</button>
+        </div>
+        <div id="home-onboard-items"></div>
+      </div>
+      <div class="spend-card">
+        <div class="cashflow-row">
+          <span class="cashflow-label">Income</span>
+          <span class="cashflow-amount cashflow-in" id="home-income-total">+₹0</span>
+        </div>
+        <div class="cashflow-row">
+          <span class="cashflow-label">Expenses</span>
+          <span class="cashflow-amount cashflow-out" id="home-expense-total">₹0</span>
+        </div>
+        <div class="cashflow-divider"></div>
+        <div class="cashflow-row cashflow-net-row">
+          <span class="cashflow-label cashflow-net-label">Net</span>
+          <span class="cashflow-amount" id="home-net-total">₹0</span>
+        </div>
+        <p class="spend-count" id="home-count">0 expenses this cycle</p>
+      </div>
+      <div class="perforation">
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+      </div>
+      <div class="donut-row">
+        <div class="donut" id="home-donut"><div class="donut-hole" id="home-donut-label">No data yet</div></div>
+        <div class="legend" id="home-legend"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scrollable area: Recent list for Overview; full panels for other tabs -->
+  <div class="scroll" id="home-scroll-body">
     <div id="home-body">
-      <div class="home-header">
-        <div>
-          <p class="greeting">Hey there 👋</p>
-          <p class="month-label" id="home-month-label">—</p>
-        </div>
-        <div class="topbar-icons">
-          <button type="button" class="income-eye-btn" id="home-eye-btn" title="Toggle income visibility">👁️</button>
-          <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
-        </div>
-      </div>
-
-      <div class="home-tabs" id="home-tabs">
-        <button type="button" class="home-tab active" data-hometab="overview">Overview</button>
-        <button type="button" class="home-tab" data-hometab="warranties">Warranties</button>
-        <button type="button" class="home-tab" data-hometab="forecast">Forecast</button>
-        <button type="button" class="home-tab" data-hometab="budgets">Budgets</button>
-      </div>
-
       <div id="home-panel-overview">
-        <div id="home-whatsnew-banner" class="whatsnew-banner hidden"></div>
-        <div id="home-backup-banner" class="backup-nudge-banner hidden"></div>
-        <div id="home-warranty-banner" class="warranty-soon-banner hidden"></div>
-        <!-- Onboarding checklist — shown until all items done or user dismisses -->
-        <div id="home-onboard-card" class="hidden" style="
-          background:var(--surface);border:1.5px solid var(--border);border-radius:18px;
-          padding:14px 16px;margin-bottom:12px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <p style="font-size:13px;font-weight:700;color:var(--ink);">Get started</p>
-            <button type="button" id="home-onboard-dismiss" style="font-size:13px;color:var(--muted);background:none;border:none;cursor:pointer;">Dismiss</button>
-          </div>
-          <div id="home-onboard-items"></div>
-        </div>
-        <div class="spend-card">
-          <div class="cashflow-row">
-            <span class="cashflow-label">Income</span>
-            <span class="cashflow-amount cashflow-in" id="home-income-total">+₹0</span>
-          </div>
-          <div class="cashflow-row">
-            <span class="cashflow-label">Expenses</span>
-            <span class="cashflow-amount cashflow-out" id="home-expense-total">₹0</span>
-          </div>
-          <div class="cashflow-divider"></div>
-          <div class="cashflow-row cashflow-net-row">
-            <span class="cashflow-label cashflow-net-label">Net</span>
-            <span class="cashflow-amount" id="home-net-total">₹0</span>
-          </div>
-          <p class="spend-count" id="home-count">0 expenses this month</p>
-        </div>
-        <div class="perforation">
-          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-        </div>
-
-        <div class="donut-row">
-          <div class="donut" id="home-donut"><div class="donut-hole" id="home-donut-label">No data yet</div></div>
-          <div class="legend" id="home-legend"></div>
-        </div>
-
         <div class="section-head">
           <p class="section-title">Recent</p>
         </div>
@@ -623,8 +632,8 @@ input{outline:none;}
         <div id="budgets-list"></div>
         <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="budgets-add-btn">+ Add budget</button>
       </div>
-    </div>
-  </div>
+    </div><!-- end home-body -->
+  </div><!-- end home-scroll-body -->
 
   <div class="bottom-nav">
     <div class="nav-item active" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
@@ -2602,10 +2611,15 @@ async function renderHomeWarrantiesPanel(){
   renderGroup('Expired', expired);
 }
 function applyHomeTabUI(){
-  document.getElementById('home-panel-overview').classList.toggle('hidden', state.homeTab!=='overview');
+  const isOverview = state.homeTab==='overview';
+  document.getElementById('home-panel-overview').classList.toggle('hidden', !isOverview);
   document.getElementById('home-panel-warranties').classList.toggle('hidden', state.homeTab!=='warranties');
   document.getElementById('home-panel-forecast').classList.toggle('hidden', state.homeTab!=='forecast');
   document.getElementById('home-panel-budgets').classList.toggle('hidden', state.homeTab!=='budgets');
+  // Show sticky overview content only on Overview tab
+  document.getElementById('home-overview-sticky').classList.toggle('hidden', !isOverview);
+  // Non-overview tabs need their own scroll padding since sticky overview is hidden
+  document.getElementById('home-scroll-body').style.paddingTop = isOverview ? '' : '12px';
   document.querySelectorAll('#home-tabs .home-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.hometab===state.homeTab);
   });
