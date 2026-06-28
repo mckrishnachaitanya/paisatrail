@@ -769,22 +769,22 @@ input{outline:none;}
 
 <!-- ============================== TRANSACTIONS SCREEN ============================== -->
 <div class="screen is-hidden" id="transactions-screen">
-  <div class="scroll">
-    <div style="padding:0 20px 12px;">
-      <div class="screen-topbar">
-        <p class="topbar-title">Transactions</p>
-        <div class="topbar-icons">
-          <button type="button" class="income-eye-btn" id="txn-eye-btn" title="Toggle income visibility">👁️</button>
-          <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
-        </div>
+  <div id="txn-sticky-top" style="flex-shrink:0;background:var(--paper);padding:0 20px;">
+    <div class="screen-topbar">
+      <p class="topbar-title">Transactions</p>
+      <div class="topbar-icons">
+        <button type="button" class="income-eye-btn" id="txn-eye-btn" title="Toggle income visibility">👁️</button>
+        <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
       </div>
-      <div class="search-bar">
-        <span>🔍</span>
-        <input id="txn-search" type="text" placeholder="Search expenses...">
-        <button type="button" class="txn-filter-btn" id="txn-filter-btn">Filter</button>
-      </div>
-      <div id="txn-list" style="margin-top:14px;"></div>
     </div>
+    <div class="search-bar">
+      <span>🔍</span>
+      <input id="txn-search" type="text" placeholder="Search expenses...">
+      <button type="button" class="txn-filter-btn" id="txn-filter-btn">Filter</button>
+    </div>
+  </div>
+  <div class="scroll" style="padding:0 20px 12px;">
+    <div id="txn-list" style="margin-top:14px;"></div>
   </div>
   <div class="bottom-nav">
     <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
@@ -851,58 +851,51 @@ input{outline:none;}
 
 <!-- ============================== INSIGHTS ============================== -->
 <div class="screen is-hidden" id="stats-screen">
-  <div class="scroll">
-    <div style="padding:0 20px 12px;">
-      <div class="screen-topbar">
-        <p class="topbar-title">Insights</p>
-        <div class="topbar-icons">
-          <button type="button" class="income-eye-btn hidden" id="stats-accounts-btn" title="View accounts">🏦</button>
-          <button type="button" class="income-eye-btn" id="stats-eye-btn" title="Toggle income visibility">👁️</button>
-          <button type="button" class="topbar-lock-btn" id="stats-lock-btn" title="Lock app">🔒</button>
-        </div>
+  <div id="stats-sticky-top" style="flex-shrink:0;background:var(--paper);padding:0 20px;">
+    <div class="screen-topbar">
+      <p class="topbar-title">Insights</p>
+      <div class="topbar-icons">
+        <button type="button" class="income-eye-btn hidden" id="stats-accounts-btn" title="View accounts">🏦</button>
+        <button type="button" class="income-eye-btn" id="stats-eye-btn" title="Toggle income visibility">👁️</button>
+        <button type="button" class="topbar-lock-btn" id="stats-lock-btn" title="Lock app">🔒</button>
       </div>
-
-      <div class="segmented-tabs" id="ins-period-type-tabs">
-        <button type="button" class="segmented-tab" data-instype="week">Week</button>
-        <button type="button" class="segmented-tab active" data-instype="month">Month</button>
-        <button type="button" class="segmented-tab" data-instype="year">Year</button>
-        <button type="button" class="segmented-tab" data-instype="custom">Custom</button>
-      </div>
-
-      <div class="ins-period-stepper" id="ins-period-stepper">
-        <button type="button" class="ins-step-btn" id="ins-prev-btn">‹</button>
-        <p class="ins-period-label" id="ins-period-label">—</p>
-        <button type="button" class="ins-step-btn" id="ins-next-btn">›</button>
-      </div>
-      <div class="ins-custom-range hidden" id="ins-custom-range">
-        <div>
-          <p class="field-label" style="margin:0 0 4px;">FROM</p>
-          <input type="date" class="date-input" id="ins-custom-start">
-        </div>
-        <div>
-          <p class="field-label" style="margin:0 0 4px;">TO</p>
-          <input type="date" class="date-input" id="ins-custom-end">
-        </div>
-      </div>
-
-      <div class="segmented-tabs" id="ins-view-tabs" style="margin-top:16px;">
-        <button type="button" class="segmented-tab active" data-insview="categories">Categories</button>
-        <button type="button" class="segmented-tab" data-insview="compare">Compare</button>
-        <button type="button" class="segmented-tab" data-insview="payment">Payment</button>
-        <button type="button" class="segmented-tab" data-insview="groups">Groups</button>
-      </div>
-
-      <div id="ins-categories-panel" style="margin-top:16px;"></div>
-
-      <div id="ins-compare-panel" class="hidden" style="margin-top:16px;">
-        <div class="cat-grid" id="ins-compare-cat-grid"></div>
-        <div id="ins-compare-result" style="margin-top:14px;"></div>
-      </div>
-
-      <div id="ins-payment-panel" class="hidden" style="margin-top:16px;"></div>
-
-      <div id="ins-groups-panel" class="hidden" style="margin-top:16px;"></div>
     </div>
+    <div class="segmented-tabs" id="ins-period-type-tabs">
+      <button type="button" class="segmented-tab" data-instype="week">Week</button>
+      <button type="button" class="segmented-tab active" data-instype="month">Month</button>
+      <button type="button" class="segmented-tab" data-instype="year">Year</button>
+      <button type="button" class="segmented-tab" data-instype="custom">Custom</button>
+    </div>
+    <div class="ins-period-stepper" id="ins-period-stepper">
+      <button type="button" class="ins-step-btn" id="ins-prev-btn">‹</button>
+      <p class="ins-period-label" id="ins-period-label">—</p>
+      <button type="button" class="ins-step-btn" id="ins-next-btn">›</button>
+    </div>
+    <div class="ins-custom-range hidden" id="ins-custom-range">
+      <div>
+        <p class="field-label" style="margin:0 0 4px;">FROM</p>
+        <input type="date" class="date-input" id="ins-custom-start">
+      </div>
+      <div>
+        <p class="field-label" style="margin:0 0 4px;">TO</p>
+        <input type="date" class="date-input" id="ins-custom-end">
+      </div>
+    </div>
+    <div class="segmented-tabs" id="ins-view-tabs" style="margin-top:16px;margin-bottom:4px;">
+      <button type="button" class="segmented-tab active" data-insview="categories">Categories</button>
+      <button type="button" class="segmented-tab" data-insview="compare">Compare</button>
+      <button type="button" class="segmented-tab" data-insview="payment">Payment</button>
+      <button type="button" class="segmented-tab" data-insview="groups">Groups</button>
+    </div>
+  </div>
+  <div class="scroll" style="padding:0 20px 12px;">
+    <div id="ins-categories-panel" style="margin-top:16px;"></div>
+    <div id="ins-compare-panel" class="hidden" style="margin-top:16px;">
+      <div class="cat-grid" id="ins-compare-cat-grid"></div>
+      <div id="ins-compare-result" style="margin-top:14px;"></div>
+    </div>
+    <div id="ins-payment-panel" class="hidden" style="margin-top:16px;"></div>
+    <div id="ins-groups-panel" class="hidden" style="margin-top:16px;"></div>
   </div>
   <div class="bottom-nav">
     <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
