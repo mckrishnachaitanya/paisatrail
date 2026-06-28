@@ -887,6 +887,10 @@ input{outline:none;}
       <button type="button" class="segmented-tab" data-insview="payment">Payment</button>
       <button type="button" class="segmented-tab" data-insview="groups">Groups</button>
     </div>
+    <!-- Group chips — sticky, shown only when Groups view active -->
+    <div id="ins-groups-chip-bar" class="hidden" style="padding:8px 0 4px;">
+      <div class="pay-row" id="ins-groups-chip-row" style="flex-wrap:wrap;gap:8px;"></div>
+    </div>
   </div>
   <div class="scroll" style="padding:0 20px 12px;">
     <div id="ins-categories-panel" style="margin-top:16px;"></div>
@@ -5268,6 +5272,7 @@ function setInsightsView(view){
   document.getElementById('ins-compare-panel').classList.toggle('hidden', view!=='compare');
   document.getElementById('ins-payment-panel').classList.toggle('hidden', view!=='payment');
   document.getElementById('ins-groups-panel').classList.toggle('hidden', view!=='groups');
+  document.getElementById('ins-groups-chip-bar').classList.toggle('hidden', view!=='groups');
   applyInsightsPeriodTypeUI();
   renderInsights();
 }
@@ -5391,38 +5396,48 @@ async function renderInsightsCompareResult(){
 }
 async function renderInsightsGroupsPanel(){
   const container=document.getElementById('ins-groups-panel');
+  const chipBar=document.getElementById('ins-groups-chip-bar');
+  const chipRow=document.getElementById('ins-groups-chip-row');
+
   if(state.groups.length===0){
+    chipBar.classList.add('hidden');
     container.innerHTML='<p class="empty-hint">No groups yet — add one from the Add/Edit screen\'s Group field.</p>';
     return;
   }
-  const chipsHTML=state.groups.map(g=>{
+
+  // Render chips in sticky bar
+  chipBar.classList.remove('hidden');
+  chipRow.innerHTML=state.groups.map(g=>{
     const selected=state.insSelectedGroupId===g.id;
     const bg=selected?'var(--grape)':'var(--surface)';
     const color=selected?'white':'var(--ink)';
     return `<button type="button" class="pay-chip" data-ins-group="${g.id}" style="background:${bg};color:${color}">${esc(g.name)}</button>`;
   }).join('');
+  chipRow.querySelectorAll('[data-ins-group]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.insSelectedGroupId=btn.dataset.insGroup;
+      renderInsightsGroupsPanel();
+    });
+  });
 
+  // Render results in scrollable panel
   let resultHTML='<p class="empty-hint">Pick a group above.</p>';
   if(state.insSelectedGroupId){
-    // Custom range guard
     if(state.insPeriodType==='custom' && (!state.insStartISO || !state.insEndISO)){
       resultHTML='<p class="empty-hint">Pick a from and to date above.</p>';
     } else if(state.insPeriodType==='custom' && state.insStartISO>state.insEndISO){
       resultHTML='<p class="empty-hint">The from date is after the to date.</p>';
     } else {
       const group=state.groups.find(g=>g.id===state.insSelectedGroupId);
-      // Current period expenses for this group
       const curAll=(await DB.getExpensesByDateRange(state.insStartISO, state.insEndISO))
         .filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && e.groupId===state.insSelectedGroupId)
         .sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
-      // Previous period total for delta
       const prevBounds=previousPeriodBounds(state.insPeriodType, state.insStartISO, state.insEndISO);
       const prevAll=(await DB.getExpensesByDateRange(prevBounds.startISO, prevBounds.endISO))
         .filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && e.groupId===state.insSelectedGroupId);
       const curTotal=curAll.reduce((s,e)=>s+Number(e.amount),0);
       const prevTotal=prevAll.reduce((s,e)=>s+Number(e.amount),0);
       const delta=formatDelta(curTotal, prevTotal);
-
       if(curAll.length===0 && prevTotal===0){
         resultHTML=`<p class="empty-hint">No expenses tagged to ${esc(group?group.name:'this group')} in this period.</p>`;
       } else {
@@ -5434,7 +5449,7 @@ async function renderInsightsGroupsPanel(){
               <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
               <div class="recent-info">
                 <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:'Expense'))}</p>
-                <span class="recent-meta">${dateLabel}${cat?' · '+esc(cat.name):''}</span>
+                <span class="recent-pm">${dateLabel}${cat?' · '+esc(cat.name):''}</span>
               </div>
               <span class="recent-amt">-${formatINR(e.amount)}</span>
             </div>`;
@@ -5449,13 +5464,7 @@ async function renderInsightsGroupsPanel(){
       }
     }
   }
-  container.innerHTML = `<div class="pay-row" id="ins-groups-chip-row">${chipsHTML}</div><div style="margin-top:14px;">${resultHTML}</div>`;
-  document.querySelectorAll('#ins-groups-chip-row [data-ins-group]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      state.insSelectedGroupId=btn.dataset.insGroup;
-      renderInsightsGroupsPanel();
-    });
-  });
+  container.innerHTML=`<div style="margin-top:4px;">${resultHTML}</div>`;
 }
 async function renderInsights(){
   document.getElementById('ins-period-label').textContent = formatPeriodLabel(state.insPeriodType, state.insStartISO, state.insEndISO);
