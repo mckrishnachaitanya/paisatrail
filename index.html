@@ -4795,9 +4795,11 @@ function openAccountsOnboarding(){
 function closeAccountsOnboarding(){
   document.getElementById('accounts-onboarding-overlay').classList.remove('show');
 }
-function renderAccountsOnboardingList(){
+async function renderAccountsOnboardingList(){
   const list=document.getElementById('accounts-onboarding-list'); list.innerHTML='';
-  state.accounts.forEach(a=>{
+  if(state.accounts.length===0) return;
+  const balances=await Promise.all(state.accounts.map(a=>computeAccountBalance(a)));
+  state.accounts.forEach((a,i)=>{
     const icon = a.type==='cc' ? '💳' : '🏦';
     const balLabel = a.type==='cc' ? 'Outstanding' : 'Balance';
     list.insertAdjacentHTML('beforeend', `
@@ -4807,7 +4809,7 @@ function renderAccountsOnboardingList(){
           <span style="font-size:20px;">${icon}</span>
           <div>
             <p style="font-size:13px;font-weight:600;color:var(--ink);">${esc(a.name)}</p>
-            <p style="font-size:11px;color:var(--muted);">${balLabel}: ${formatINR(a.openingBalance||0)}</p>
+            <p style="font-size:11px;color:var(--muted);">${balLabel}: ${formatINR(Math.abs(balances[i]))}</p>
           </div>
         </div>
         <button type="button" data-onboardedit="${a.id}"
@@ -4934,23 +4936,29 @@ function openManageAccountsScreen(){
 function closeManageAccountsScreen(){
   document.getElementById('manage-accounts-overlay').classList.remove('show');
 }
-function renderManageAccountsList(){
+async function renderManageAccountsList(){
   const list=document.getElementById('manage-accounts-list'); if(!list) return;
   list.innerHTML='';
   if(state.accounts.length===0){
     list.innerHTML='<p class="empty-hint">No accounts yet — add one below.</p>';
     return;
   }
-  state.accounts.forEach(a=>{
+  // Show loading state while computing
+  list.innerHTML='<p class="empty-hint" style="padding:8px 0;">Calculating balances…</p>';
+  const balances=await Promise.all(state.accounts.map(a=>computeAccountBalance(a)));
+  list.innerHTML='';
+  state.accounts.forEach((a,i)=>{
     const icon = a.type==='cc' ? '💳' : '🏦';
-    const balLabel = a.type==='cc' ? 'Outstanding' : 'Balance';
-    const color = a.type==='cc' ? 'var(--coral)' : 'var(--ink)';
+    const bal=balances[i];
+    const isCc=a.type==='cc';
+    const balLabel = isCc ? 'Outstanding' : 'Balance';
+    const balColor = isCc ? 'var(--coral)' : (bal<0?'var(--coral)':'var(--ink)');
     list.insertAdjacentHTML('beforeend', `
       <button type="button" class="settings-row" data-acctid="${a.id}" style="margin-bottom:8px;">
-        <span class="settings-row-icon" style="background:${a.type==='cc'?'rgba(255,107,91,.14)':'rgba(46,196,182,.14)'};">${icon}</span>
+        <span class="settings-row-icon" style="background:${isCc?'rgba(255,107,91,.14)':'rgba(46,196,182,.14)'};">${icon}</span>
         <div class="settings-row-info">
           <p class="settings-row-title">${esc(a.name)}</p>
-          <span class="settings-row-sub">${balLabel}: ${formatINR(a.openingBalance||0)}</span>
+          <span class="settings-row-sub">${balLabel}: ${formatINR(Math.abs(bal))}</span>
         </div>
         <span class="settings-row-chevron">›</span>
       </button>`);
