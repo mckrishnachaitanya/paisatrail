@@ -2025,6 +2025,7 @@ const state = {
   selectedAccountId:null,         // selected account on Add screen; null when accounts disabled
   selectedTransferFromId:null,    // From account for transfer mode
   selectedTransferToId:null,      // To account for transfer mode
+  homeLegendShowAmounts:false,    // true = legend shows ₹ amounts, false = percentages
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
@@ -2500,11 +2501,29 @@ async function renderHomeOverviewPanel(){
   document.getElementById('home-donut-label').textContent = expenseTotal>0 ? `${catTotals.length} ${catTotals.length===1?'cat':'cats'}` : 'No data yet';
 
   const legend=document.getElementById('home-legend'); legend.innerHTML='';
-  catTotals.slice(0,5).forEach(c=>{
-    const pct = expenseTotal>0 ? Math.round((c.amount/expenseTotal)*100) : 0;
-    legend.insertAdjacentHTML('beforeend', `<div class="legend-row"><span class="legend-left"><span class="legend-dot" style="background:${c.color}"></span>${esc(c.name)}</span><span class="legend-pct">${pct}%</span></div>`);
-  });
-  if(catTotals.length===0) legend.innerHTML='<p class="empty-hint" style="padding:0;">Add an expense to see your breakdown</p>';
+  if(catTotals.length===0){
+    legend.innerHTML='<p class="empty-hint" style="padding:0;">Add an expense to see your breakdown</p>';
+  } else {
+    catTotals.slice(0,5).forEach(c=>{
+      const pct = expenseTotal>0 ? Math.round((c.amount/expenseTotal)*100) : 0;
+      const rightVal = state.homeLegendShowAmounts ? formatINR(c.amount) : `${pct}%`;
+      legend.insertAdjacentHTML('beforeend', `
+        <div class="legend-row" style="cursor:pointer;">
+          <span class="legend-left"><span class="legend-dot" style="background:${c.color}"></span>${esc(c.name)}</span>
+          <span class="legend-pct">${rightVal}</span>
+        </div>`);
+    });
+    legend.style.cursor='pointer';
+    legend.onclick=()=>{
+      state.homeLegendShowAmounts=!state.homeLegendShowAmounts;
+      // Re-render just the right-side values without a full panel re-render
+      legend.querySelectorAll('.legend-row').forEach((row, i)=>{
+        const c=catTotals[i]; if(!c) return;
+        const pct = expenseTotal>0 ? Math.round((c.amount/expenseTotal)*100) : 0;
+        row.querySelector('.legend-pct').textContent = state.homeLegendShowAmounts ? formatINR(c.amount) : `${pct}%`;
+      });
+    };
+  }
 
   // Recent list — shows both expenses and income entries, newest first
   const recent=[...all].sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt)).slice(0,5);
