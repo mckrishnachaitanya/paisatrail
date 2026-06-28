@@ -4399,12 +4399,15 @@ async function renderHomeForecastPanel(){
       }
     });
 
-    // Actual income logged so far this cycle (only for month window)
+    // Actual income logged so far this cycle (only for month window).
+    // Exclude recurring-generated entries (recurringId set) — those amounts
+    // are already projected forward via projectedRecurringIncome, so counting
+    // them here would double-count the same salary/income rule.
     let incomeLoggedSoFar=0;
     if(isMonth){
       const bounds=cycleBounds(today);
       const incomeEntries=(await DB.getExpensesByDateRange(bounds.startISO, today))
-        .filter(e=>!pendingDeletes[e.id] && isIncomeEntry(e));
+        .filter(e=>!pendingDeletes[e.id] && isIncomeEntry(e) && !e.recurringId);
       incomeLoggedSoFar=incomeEntries.reduce((s,e)=>s+Number(e.amount),0);
     }
 
