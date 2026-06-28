@@ -2526,7 +2526,7 @@ async function renderHomeOverviewPanel(){
   }
 
   // Recent list — shows both expenses and income entries, newest first
-  const recent=[...all].sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt)).slice(0,5);
+  const recent=[...all].filter(e=>!isTransferEntry(e)).sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
   const list=document.getElementById('home-recent-list'); list.innerHTML='';
   if(recent.length===0){
     list.innerHTML='<p class="empty-hint">No entries yet — tap + to add your first one.</p>';
