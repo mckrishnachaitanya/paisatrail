@@ -3649,7 +3649,7 @@ async function exportData(){
       DB.getAllCategories(), DB.getAllPaymentMethods(), DB.getAllGroups(),
       DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(), DB.getAllBudgets(), DB.getAllAccounts(),
     ]);
-    const expenses=expensesRaw.filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+    const expenses=expensesRaw.filter(e => !pendingDeletes[e.id]); // includes expenses, income, and transfers
     // Attachments carry raw ArrayBuffer data, which JSON can't hold
     // directly — base64-encoded here, decoded back on import.
     const attachments=attachmentsRaw.map(a => ({
