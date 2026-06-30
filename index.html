@@ -54,20 +54,7 @@ input{outline:none;}
    let the sheet bleed through the lock screen. Data in open sheets is
    preserved — nothing is closed, pin screen just paints on top. */
 #pin-screen{z-index:1000;}
-.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  /* isolation:isolate establishes a real stacking context here, containing
-     any z-indexed descendant (e.g. .recent-row's z-index:1, meant only to
-     sit above its own swipe-to-delete background) so it can't escape and
-     compete with .bottom-nav's stacking context above the .scroll/.screen
-     boundary. Without this, .recent-row's z-index:1 climbed all the way up
-     to .screen (the nearest actual stacking context, since neither .scroll
-     nor .swipe-wrap establish one on their own — position:relative alone,
-     without a z-index, doesn't), landing it above .bottom-nav wherever they
-     geometrically overlap — exactly the seam where the FAB pokes above the
-     row via its negative margin. Confirmed by temporarily recoloring
-     .recent-row neon green: a sliver of green cut straight across the FAB's
-     dome. */
-  isolation:isolate;}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 
 /* ============================== PIN SCREEN ============================== */
 #pin-screen{align-items:center;justify-content:center;gap:26px;padding:40px 24px;background:var(--canvas);}
@@ -113,7 +100,7 @@ input{outline:none;}
 /* ============================== BOTTOM NAV ============================== */
 .bottom-nav{position:relative;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
   padding:10px 28px calc(10px + env(safe-area-inset-bottom,0px));background:var(--paper);
-  border-top:1px solid var(--border);z-index:5;} /* explicit precedence over any in-list z-index (e.g. .recent-row's 1) as a backstop alongside .scroll's isolation:isolate */
+  border-top:1px solid var(--border);z-index:5;} /* explicit precedence over any in-list z-index (e.g. .recent-row's 1) as a backstop alongside .recent-row's own isolation:isolate */
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:19px;color:var(--muted);
   width:40px;}
 .nav-item.active{color:var(--grape);}
@@ -141,9 +128,26 @@ input{outline:none;}
 .topbar-close{font-size:20px;color:var(--muted);width:32px;height:32px;display:flex;
   align-items:center;justify-content:center;}
 
+/* Cloud backup status icon — shown in topbar-icons on Home/List/Insights/Settings
+   only when Drive is connected (hidden otherwise, so non-users see no clutter).
+   Three states: idle (static cloud), syncing (pulsing animation while an
+   upload is in flight), error (small coral dot badge on last-attempt failure). */
+.cloud-status-btn{width:36px;height:36px;border-radius:50%;background:var(--chip);
+  display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;position:relative;}
+.cloud-status-btn:active{transform:scale(.92);}
+.cloud-status-btn.syncing{animation:cloudPulse 1.1s ease-in-out infinite;}
+@keyframes cloudPulse{0%,100%{opacity:1;}50%{opacity:.45;}}
+.cloud-status-btn-errdot{position:absolute;top:1px;right:1px;width:9px;height:9px;border-radius:50%;
+  background:var(--coral);border:1.5px solid var(--paper);display:none;}
+.cloud-status-btn.has-error .cloud-status-btn-errdot{display:block;}
+
 /* ============================== HOME ============================== */
 #home-body{padding:0 20px 28px;}
 .home-header{display:flex;align-items:center;justify-content:space-between;margin:8px 0 16px;}
+#home-sticky-top{flex-shrink:0;background:var(--paper);padding:0 20px;}
+#home-scroll-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 20px 100px;} /* isolation:isolate removed 2026-07-01, moved to .recent-row — see its comment */
+#home-panel-overview{padding-top:4px;}
+#home-overview-sticky.hidden{display:none;}
 .greeting{font-family:var(--font-display);font-size:17px;}
 .month-label{font-size:12px;color:var(--muted);}
 
@@ -225,8 +229,28 @@ input{outline:none;}
 .budget-recap-line.under{color:var(--mint);}
 .budget-recap-line.over{color:var(--coral);}
 
+/* isolation:isolate moved here (2026-07-01) from the much larger .scroll
+   container it used to sit on. Same fix, narrower scope: this still
+   establishes a real stacking context that contains .recent-row's own
+   z-index:1 (meant only to sit above its own swipe-to-delete background)
+   so it can't escape and compete with .bottom-nav's stacking context
+   above the .scroll/.screen boundary — without SOME stacking context
+   between .recent-row and .screen, the z-index:1 climbs all the way up
+   to .screen (the nearest actual stacking context) and lands above
+   .bottom-nav wherever they geometrically overlap, exactly the seam
+   where the FAB pokes above the row via its negative margin. Confirmed
+   by temporarily recoloring .recent-row neon green: a sliver of green
+   cut straight across the FAB's dome. Moved off .scroll specifically
+   because isolation:isolate on a full-viewport-height, frequently-
+   re-painted scroll container is suspected of causing a tablet-specific
+   GPU rendering bug (large background fills going blank/flickering on
+   one Android tablet) — see project handover doc. Putting the isolation
+   boundary on the small ~50px row element instead of the entire scroll
+   body should give the same z-index containment with far less surface
+   area for the compositor to get wrong. .bottom-nav's z-index:5 backstop
+   (see its own comment) remains in place either way as defense in depth. */
 .recent-row{display:flex;align-items:center;gap:11px;padding:10px;border-radius:18px;
-  background:var(--surface);margin-bottom:8px;position:relative;z-index:1;
+  background:var(--surface);margin-bottom:8px;position:relative;z-index:1;isolation:isolate;
   transition:margin-right .25s cubic-bezier(.32,1,.28,1);}
 .recent-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;font-size:16px;flex-shrink:0;}
@@ -514,58 +538,74 @@ input{outline:none;}
 
 <!-- ============================== HOME SCREEN ============================== -->
 <div class="screen is-hidden" id="home-screen">
-  <div class="scroll">
+  <!-- Sticky top: header + tabs + overview summary. Does not scroll. -->
+  <div id="home-sticky-top">
+    <div class="home-header">
+      <div>
+        <p class="greeting">Hey there 👋</p>
+        <p class="month-label" id="home-month-label">—</p>
+      </div>
+      <div class="topbar-icons">
+        <button type="button" class="income-eye-btn" id="home-eye-btn" title="Toggle income visibility">👁️</button>
+        <button type="button" class="cloud-status-btn hidden" id="home-cloud-btn" title="Cloud backup"><span class="cloud-status-btn-icon">⛅</span><span class="cloud-status-btn-errdot"></span></button>
+        <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
+      </div>
+    </div>
+
+    <div class="home-tabs" id="home-tabs">
+      <button type="button" class="home-tab active" data-hometab="overview">Overview</button>
+      <button type="button" class="home-tab" data-hometab="warranties">Warranties</button>
+      <button type="button" class="home-tab" data-hometab="forecast">Forecast</button>
+      <button type="button" class="home-tab" data-hometab="budgets">Budgets</button>
+    </div>
+
+    <!-- Overview sticky content: banners, onboarding, cashflow card, donut -->
+    <div id="home-overview-sticky">
+      <div id="home-whatsnew-banner" class="whatsnew-banner hidden"></div>
+      <div id="home-backup-banner" class="backup-nudge-banner hidden"></div>
+      <div id="home-warranty-banner" class="warranty-soon-banner hidden"></div>
+      <div id="home-onboard-card" class="hidden" style="
+        background:var(--surface);border:1.5px solid var(--border);border-radius:18px;
+        padding:14px 16px;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <p style="font-size:13px;font-weight:700;color:var(--ink);">Get started</p>
+          <button type="button" id="home-onboard-dismiss" style="font-size:13px;color:var(--muted);background:none;border:none;cursor:pointer;">Dismiss</button>
+        </div>
+        <div id="home-onboard-items"></div>
+      </div>
+      <div class="spend-card">
+        <div class="cashflow-row">
+          <span class="cashflow-label">Income</span>
+          <span class="cashflow-amount cashflow-in" id="home-income-total">+₹0</span>
+        </div>
+        <div class="cashflow-row">
+          <span class="cashflow-label">Expenses</span>
+          <span class="cashflow-amount cashflow-out" id="home-expense-total">₹0</span>
+        </div>
+        <div class="cashflow-divider"></div>
+        <div class="cashflow-row cashflow-net-row">
+          <span class="cashflow-label cashflow-net-label">Net</span>
+          <span class="cashflow-amount" id="home-net-total">₹0</span>
+        </div>
+        <p class="spend-count" id="home-count">0 expenses this cycle</p>
+      </div>
+      <div class="perforation">
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+      </div>
+      <div class="donut-row">
+        <div class="donut" id="home-donut"><div class="donut-hole" id="home-donut-label">No data yet</div></div>
+        <div class="legend" id="home-legend"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scrollable area: Recent list for Overview; full panels for other tabs -->
+  <div class="scroll" id="home-scroll-body">
     <div id="home-body">
-      <div class="home-header">
-        <div>
-          <p class="greeting">Hey there 👋</p>
-          <p class="month-label" id="home-month-label">—</p>
-        </div>
-        <div class="topbar-icons">
-          <button type="button" class="income-eye-btn" id="home-eye-btn" title="Toggle income visibility">👁️</button>
-          <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
-        </div>
-      </div>
-
-      <div class="home-tabs" id="home-tabs">
-        <button type="button" class="home-tab active" data-hometab="overview">Overview</button>
-        <button type="button" class="home-tab" data-hometab="warranties">Warranties</button>
-        <button type="button" class="home-tab" data-hometab="forecast">Forecast</button>
-        <button type="button" class="home-tab" data-hometab="budgets">Budgets</button>
-      </div>
-
       <div id="home-panel-overview">
-        <div id="home-whatsnew-banner" class="whatsnew-banner hidden"></div>
-        <div id="home-backup-banner" class="backup-nudge-banner hidden"></div>
-        <div id="home-warranty-banner" class="warranty-soon-banner hidden"></div>
-        <div class="spend-card">
-          <div class="cashflow-row">
-            <span class="cashflow-label">Income</span>
-            <span class="cashflow-amount cashflow-in" id="home-income-total">+₹0</span>
-          </div>
-          <div class="cashflow-row">
-            <span class="cashflow-label">Expenses</span>
-            <span class="cashflow-amount cashflow-out" id="home-expense-total">₹0</span>
-          </div>
-          <div class="cashflow-divider"></div>
-          <div class="cashflow-row cashflow-net-row">
-            <span class="cashflow-label cashflow-net-label">Net</span>
-            <span class="cashflow-amount" id="home-net-total">₹0</span>
-          </div>
-          <p class="spend-count" id="home-count">0 expenses this month</p>
-        </div>
-        <div class="perforation">
-          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-        </div>
-
-        <div class="donut-row">
-          <div class="donut" id="home-donut"><div class="donut-hole" id="home-donut-label">No data yet</div></div>
-          <div class="legend" id="home-legend"></div>
-        </div>
-
         <div class="section-head">
           <p class="section-title">Recent</p>
         </div>
@@ -581,6 +621,21 @@ input{outline:none;}
           <button type="button" class="segmented-tab active" data-forecastwindow="month">Rest of this month</button>
           <button type="button" class="segmented-tab" data-forecastwindow="rolling30">Next 30 days</button>
         </div>
+        <!-- Savings summary card — shown when recurring income rules exist -->
+        <div id="forecast-savings-card" class="spend-card hidden" style="margin-top:14px;">
+          <div class="legend" id="forecast-savings-breakdown"></div>
+          <div style="border-top:1px solid rgba(255,255,255,0.2);margin-top:12px;padding-top:12px;display:flex;justify-content:space-between;align-items:center;">
+            <p class="spend-label" style="margin:0;">Projected savings</p>
+            <p id="forecast-savings-amount" class="spend-amount" style="font-size:20px;margin:0;"></p>
+          </div>
+        </div>
+        <!-- Nudge when no recurring income rules exist -->
+        <button type="button" id="forecast-income-nudge" class="hidden"
+          style="width:100%;margin-top:14px;padding:14px 16px;background:rgba(46,196,182,0.12);
+                 border:1.5px dashed var(--mint);border-radius:16px;text-align:left;cursor:pointer;">
+          <p style="font-size:13px;font-weight:600;color:var(--mint);margin-bottom:4px;">See your savings projection</p>
+          <p style="font-size:12px;color:var(--muted);">Add recurring income (salary, rent received) in Settings → Recurring transactions</p>
+        </button>
         <div class="spend-card" style="margin-top:14px;">
           <p class="spend-label" id="forecast-total-label">Projected total this month</p>
           <p class="spend-amount" id="forecast-total">₹0</p>
@@ -598,8 +653,8 @@ input{outline:none;}
         <div id="budgets-list"></div>
         <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="budgets-add-btn">+ Add budget</button>
       </div>
-    </div>
-  </div>
+    </div><!-- end home-body -->
+  </div><!-- end home-scroll-body -->
 
   <div class="bottom-nav">
     <div class="nav-item active" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
@@ -622,10 +677,11 @@ input{outline:none;}
 
   <div class="scroll">
     <div style="padding:0 20px 12px;">
-      <!-- Expense / Income mode toggle — drives category grid, field visibility, save logic -->
+      <!-- Expense / Income / Transfer mode toggle -->
       <div class="segmented-tabs" id="add-type-toggle" style="margin:14px 0 16px;">
         <button type="button" class="segmented-tab active" data-addtype="expense">Expense</button>
         <button type="button" class="segmented-tab" data-addtype="income">Income</button>
+        <button type="button" class="segmented-tab" data-addtype="transfer">Transfer</button>
       </div>
 
       <div class="receipt-card">
@@ -645,8 +701,22 @@ input{outline:none;}
       <p class="field-label">DATE</p>
       <input id="add-date" type="date" class="date-input">
 
+      <!-- Transfer fields — only visible in transfer mode -->
+      <div id="add-transfer-section" class="hidden">
+        <p class="field-label">FROM ACCOUNT</p>
+        <div class="pay-row" id="add-transfer-from-row" style="flex-wrap:wrap;gap:8px;"></div>
+        <p class="field-label">TO ACCOUNT</p>
+        <div class="pay-row" id="add-transfer-to-row" style="flex-wrap:wrap;gap:8px;"></div>
+      </div>
+
       <p class="field-label">CATEGORY</p>
       <div class="cat-grid" id="add-category-grid"></div>
+
+      <!-- Account pill strip — only rendered when accounts are enabled -->
+      <div id="add-account-section" class="hidden">
+        <p class="field-label">FROM ACCOUNT</p>
+        <div class="pay-row" id="add-account-row" style="flex-wrap:wrap;gap:8px;"></div>
+      </div>
 
       <div id="add-payment-section">
         <p class="field-label">PAID VIA</p>
@@ -720,22 +790,23 @@ input{outline:none;}
 
 <!-- ============================== TRANSACTIONS SCREEN ============================== -->
 <div class="screen is-hidden" id="transactions-screen">
-  <div class="scroll">
-    <div style="padding:0 20px 12px;">
-      <div class="screen-topbar">
-        <p class="topbar-title">Transactions</p>
-        <div class="topbar-icons">
-          <button type="button" class="income-eye-btn" id="txn-eye-btn" title="Toggle income visibility">👁️</button>
-          <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
-        </div>
+  <div id="txn-sticky-top" style="flex-shrink:0;background:var(--paper);padding:0 20px;">
+    <div class="screen-topbar">
+      <p class="topbar-title">Transactions</p>
+      <div class="topbar-icons">
+        <button type="button" class="income-eye-btn" id="txn-eye-btn" title="Toggle income visibility">👁️</button>
+        <button type="button" class="cloud-status-btn hidden" id="txn-cloud-btn" title="Cloud backup"><span class="cloud-status-btn-icon">⛅</span><span class="cloud-status-btn-errdot"></span></button>
+        <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
       </div>
-      <div class="search-bar">
-        <span>🔍</span>
-        <input id="txn-search" type="text" placeholder="Search expenses...">
-        <button type="button" class="txn-filter-btn" id="txn-filter-btn">Filter</button>
-      </div>
-      <div id="txn-list" style="margin-top:14px;"></div>
     </div>
+    <div class="search-bar">
+      <span>🔍</span>
+      <input id="txn-search" type="text" placeholder="Search expenses...">
+      <button type="button" class="txn-filter-btn" id="txn-filter-btn">Filter</button>
+    </div>
+  </div>
+  <div class="scroll" style="padding:0 20px 12px;">
+    <div id="txn-list" style="margin-top:14px;"></div>
   </div>
   <div class="bottom-nav">
     <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
@@ -759,6 +830,7 @@ input{outline:none;}
       <button type="button" class="segmented-tab active" data-filtertype="all">All</button>
       <button type="button" class="segmented-tab" data-filtertype="expense">Expenses</button>
       <button type="button" class="segmented-tab" data-filtertype="income">Income</button>
+      <button type="button" class="segmented-tab" data-filtertype="transfer">Transfers</button>
     </div>
     <p class="field-label" id="txn-filter-cat-label" style="margin-top:14px;">CATEGORY</p>
     <div class="cat-grid" id="txn-filter-cat-grid"></div>
@@ -801,54 +873,56 @@ input{outline:none;}
 
 <!-- ============================== INSIGHTS ============================== -->
 <div class="screen is-hidden" id="stats-screen">
-  <div class="scroll">
-    <div style="padding:0 20px 12px;">
-      <div class="screen-topbar">
-        <p class="topbar-title">Insights</p>
+  <div id="stats-sticky-top" style="flex-shrink:0;background:var(--paper);padding:0 20px;">
+    <div class="screen-topbar">
+      <p class="topbar-title">Insights</p>
+      <div class="topbar-icons">
+        <button type="button" class="income-eye-btn hidden" id="stats-accounts-btn" title="View accounts">🏦</button>
+        <button type="button" class="income-eye-btn" id="stats-eye-btn" title="Toggle income visibility">👁️</button>
+        <button type="button" class="cloud-status-btn hidden" id="stats-cloud-btn" title="Cloud backup"><span class="cloud-status-btn-icon">⛅</span><span class="cloud-status-btn-errdot"></span></button>
         <button type="button" class="topbar-lock-btn" id="stats-lock-btn" title="Lock app">🔒</button>
       </div>
-
-      <div class="segmented-tabs" id="ins-period-type-tabs">
-        <button type="button" class="segmented-tab" data-instype="week">Week</button>
-        <button type="button" class="segmented-tab active" data-instype="month">Month</button>
-        <button type="button" class="segmented-tab" data-instype="year">Year</button>
-        <button type="button" class="segmented-tab" data-instype="custom">Custom</button>
-      </div>
-
-      <div class="ins-period-stepper" id="ins-period-stepper">
-        <button type="button" class="ins-step-btn" id="ins-prev-btn">‹</button>
-        <p class="ins-period-label" id="ins-period-label">—</p>
-        <button type="button" class="ins-step-btn" id="ins-next-btn">›</button>
-      </div>
-      <div class="ins-custom-range hidden" id="ins-custom-range">
-        <div>
-          <p class="field-label" style="margin:0 0 4px;">FROM</p>
-          <input type="date" class="date-input" id="ins-custom-start">
-        </div>
-        <div>
-          <p class="field-label" style="margin:0 0 4px;">TO</p>
-          <input type="date" class="date-input" id="ins-custom-end">
-        </div>
-      </div>
-
-      <div class="segmented-tabs" id="ins-view-tabs" style="margin-top:16px;">
-        <button type="button" class="segmented-tab active" data-insview="categories">Categories</button>
-        <button type="button" class="segmented-tab" data-insview="compare">Compare</button>
-        <button type="button" class="segmented-tab" data-insview="payment">Payment</button>
-        <button type="button" class="segmented-tab" data-insview="groups">Groups</button>
-      </div>
-
-      <div id="ins-categories-panel" style="margin-top:16px;"></div>
-
-      <div id="ins-compare-panel" class="hidden" style="margin-top:16px;">
-        <div class="cat-grid" id="ins-compare-cat-grid"></div>
-        <div id="ins-compare-result" style="margin-top:14px;"></div>
-      </div>
-
-      <div id="ins-payment-panel" class="hidden" style="margin-top:16px;"></div>
-
-      <div id="ins-groups-panel" class="hidden" style="margin-top:16px;"></div>
     </div>
+    <div class="segmented-tabs" id="ins-period-type-tabs">
+      <button type="button" class="segmented-tab" data-instype="week">Week</button>
+      <button type="button" class="segmented-tab active" data-instype="month">Month</button>
+      <button type="button" class="segmented-tab" data-instype="year">Year</button>
+      <button type="button" class="segmented-tab" data-instype="custom">Custom</button>
+    </div>
+    <div class="ins-period-stepper" id="ins-period-stepper">
+      <button type="button" class="ins-step-btn" id="ins-prev-btn">‹</button>
+      <p class="ins-period-label" id="ins-period-label">—</p>
+      <button type="button" class="ins-step-btn" id="ins-next-btn">›</button>
+    </div>
+    <div class="ins-custom-range hidden" id="ins-custom-range">
+      <div>
+        <p class="field-label" style="margin:0 0 4px;">FROM</p>
+        <input type="date" class="date-input" id="ins-custom-start">
+      </div>
+      <div>
+        <p class="field-label" style="margin:0 0 4px;">TO</p>
+        <input type="date" class="date-input" id="ins-custom-end">
+      </div>
+    </div>
+    <div class="segmented-tabs" id="ins-view-tabs" style="margin-top:16px;margin-bottom:4px;">
+      <button type="button" class="segmented-tab active" data-insview="categories">Categories</button>
+      <button type="button" class="segmented-tab" data-insview="compare">Compare</button>
+      <button type="button" class="segmented-tab" data-insview="payment">Payment</button>
+      <button type="button" class="segmented-tab" data-insview="groups">Groups</button>
+    </div>
+    <!-- Group chips — sticky, shown only when Groups view active -->
+    <div id="ins-groups-chip-bar" class="hidden" style="padding:8px 0 4px;">
+      <div class="pay-row" id="ins-groups-chip-row" style="flex-wrap:wrap;gap:8px;"></div>
+    </div>
+  </div>
+  <div class="scroll" style="padding:0 20px 12px;">
+    <div id="ins-categories-panel" style="margin-top:16px;"></div>
+    <div id="ins-compare-panel" class="hidden" style="margin-top:16px;">
+      <div class="cat-grid" id="ins-compare-cat-grid"></div>
+      <div id="ins-compare-result" style="margin-top:14px;"></div>
+    </div>
+    <div id="ins-payment-panel" class="hidden" style="margin-top:16px;"></div>
+    <div id="ins-groups-panel" class="hidden" style="margin-top:16px;"></div>
   </div>
   <div class="bottom-nav">
     <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
@@ -867,7 +941,38 @@ input{outline:none;}
         <p class="topbar-title">Settings</p>
         <button type="button" class="topbar-lock-btn" id="settings-lock-btn" title="Lock app">🔒</button>
       </div>
-      <p class="field-label" style="margin-top:0;">HELP</p>
+      <p class="field-label" style="margin-top:0;">FINANCE</p>
+      <div class="settings-row" style="cursor:default;">
+        <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">📅</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">My month starts on</p>
+          <span class="settings-row-sub">Aligns budgets, forecasts &amp; insights to your salary cycle</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <span style="font-size:13px;color:var(--muted);">Day</span>
+          <input type="number" id="settings-cycle-day" min="1" max="28" value="1"
+            style="width:48px;padding:6px 8px;border:1.5px solid var(--border);border-radius:10px;
+                   font-size:14px;font-weight:700;font-family:var(--font-mono);color:var(--ink);
+                   background:var(--surface);text-align:center;">
+        </div>
+      </div>
+      <button type="button" class="settings-row" id="settings-accounts-toggle-row" style="margin-top:8px;">
+        <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">🏦</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Accounts &amp; Wallets</p>
+          <span class="settings-row-sub" id="settings-accounts-sub">Track bank balances and credit card outstanding</span>
+        </div>
+        <div class="switch" id="settings-accounts-switch"><div class="switch-thumb"></div></div>
+      </button>
+      <button type="button" class="settings-row hidden" id="settings-manage-accounts-btn" style="margin-top:8px;">
+        <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">💼</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Manage accounts</p>
+          <span class="settings-row-sub">Add, edit, or remove your bank and credit card accounts</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>
+      <p class="field-label">HELP</p>
       <button type="button" class="settings-row" id="settings-guide-btn" style="margin-bottom:8px;">
         <span class="settings-row-icon" style="background:rgba(255,194,60,.14);">💡</span>
         <div class="settings-row-info">
@@ -890,6 +995,14 @@ input{outline:none;}
           <p class="settings-row-title">Check for updates</p>
           <span class="settings-row-sub" id="settings-forcerefresh-sub">Force-fetch the latest version of the app</span>
         </div>
+      </button>
+      <button type="button" class="settings-row" id="settings-debuglog-btn" style="margin-top:8px;">
+        <span class="settings-row-icon" style="background:rgba(255,194,60,.14);">🐞</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Debug log</p>
+          <span class="settings-row-sub">View console errors and device/render info</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
       </button>
       <p class="field-label">CUSTOMIZE</p>
       <button type="button" class="settings-row" id="settings-categories-btn" style="margin-bottom:8px;">
@@ -919,8 +1032,8 @@ input{outline:none;}
       <button type="button" class="settings-row" id="settings-recurring-btn">
         <span class="settings-row-icon" style="background:rgba(255,143,179,.14);">🔁</span>
         <div class="settings-row-info">
-          <p class="settings-row-title">Recurring expenses</p>
-          <span class="settings-row-sub">Rent, subscriptions, EMIs — logged automatically</span>
+          <p class="settings-row-title">Recurring transactions</p>
+          <span class="settings-row-sub">Salary, rent, subscriptions, EMIs — logged automatically</span>
         </div>
         <span class="settings-row-chevron">›</span>
       </button>
@@ -948,6 +1061,38 @@ input{outline:none;}
         </div>
       </button>
       <input type="file" id="import-file-input" accept="application/json,.json" class="hidden">
+      <p class="field-label">CLOUD BACKUP</p>
+      <button type="button" class="settings-row" id="settings-drive-connect-btn">
+        <span class="settings-row-icon" style="background:rgba(91,168,255,.14);">☁️</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Google Drive backup</p>
+          <span class="settings-row-sub" id="settings-drive-sub">Automatically save your data to Google Drive</span>
+        </div>
+        <span class="settings-row-chevron" id="settings-drive-chevron">›</span>
+      </button>
+      <div id="settings-drive-connected-block" class="hidden">
+        <button type="button" class="settings-row" id="settings-drive-backupnow-btn" style="margin-top:8px;">
+          <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">⬆️</span>
+          <div class="settings-row-info">
+            <p class="settings-row-title">Back up now</p>
+            <span class="settings-row-sub" id="settings-drive-lastbackup-sub">Includes all attachments</span>
+          </div>
+        </button>
+        <button type="button" class="settings-row" id="settings-drive-restore-btn" style="margin-top:8px;">
+          <span class="settings-row-icon" style="background:rgba(255,194,60,.14);">⬇️</span>
+          <div class="settings-row-info">
+            <p class="settings-row-title">Restore from Drive</p>
+            <span class="settings-row-sub">Replace current data with your latest cloud backup</span>
+          </div>
+        </button>
+        <button type="button" class="settings-row" id="settings-drive-disconnect-btn" style="margin-top:8px;">
+          <span class="settings-row-icon" style="background:rgba(255,107,91,.14);">🔌</span>
+          <div class="settings-row-info">
+            <p class="settings-row-title">Disconnect</p>
+            <span class="settings-row-sub">Stop syncing to Google Drive on this device</span>
+          </div>
+        </button>
+      </div>
       <p class="field-label">SECURITY</p>
       <button type="button" class="settings-row" id="settings-changepin-btn">
         <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">🔒</span>
@@ -1116,13 +1261,13 @@ input{outline:none;}
 <!-- ============================== RECURRING EXPENSES ============================== -->
 <div class="screen is-hidden" id="recurring-screen">
   <div class="topbar">
-    <p class="topbar-title">Recurring expenses</p>
+    <p class="topbar-title">Recurring transactions</p>
     <button class="topbar-close" id="recurring-close-btn">✕</button>
   </div>
   <div class="scroll">
     <div style="padding:0 20px 28px;">
       <div id="recurring-list"></div>
-      <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="recurring-screen-add-btn">+ Add recurring expense</button>
+      <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="recurring-screen-add-btn">+ Add recurring transaction</button>
     </div>
   </div>
 </div>
@@ -1214,15 +1359,26 @@ input{outline:none;}
   <div class="edit-sheet">
     <div class="edit-sheet-grip"></div>
     <div class="edit-sheet-head">
-      <p class="edit-sheet-title" id="recurring-edit-title">Add recurring expense</p>
+      <p class="edit-sheet-title" id="recurring-edit-title">Add recurring transaction</p>
       <button type="button" class="topbar-close" id="recurring-edit-close-btn">✕</button>
+    </div>
+    <!-- Type toggle — expense vs income; locked to read-only when editing existing rule -->
+    <div id="recurring-type-toggle-wrap" style="margin-top:14px;">
+      <div class="segmented-tabs" id="recurring-type-tabs" style="margin-bottom:0;">
+        <button type="button" class="segmented-tab active" data-rtype="expense">Expense</button>
+        <button type="button" class="segmented-tab" data-rtype="income">Income</button>
+      </div>
     </div>
     <p class="field-label" style="margin-top:14px;">NAME</p>
     <input type="text" class="sheet-input" id="recurring-edit-name" placeholder="e.g. Netflix" maxlength="40">
     <p class="field-label">AMOUNT</p>
     <input type="number" inputmode="decimal" class="sheet-input" id="recurring-edit-amount" placeholder="0" min="0" step="0.01">
-    <p class="field-label">CATEGORY</p>
+    <!-- Expense category grid (shown when type=expense) -->
+    <p class="field-label" id="recurring-edit-cat-label">CATEGORY</p>
     <div class="cat-grid" id="recurring-edit-cat-grid"></div>
+    <!-- Income category grid (shown when type=income) -->
+    <p class="field-label hidden" id="recurring-edit-incomecat-label">INCOME TYPE</p>
+    <div class="cat-grid hidden" id="recurring-edit-incomecat-grid"></div>
     <p class="field-label">PAID VIA</p>
     <div class="pay-row" id="recurring-edit-pay-row"></div>
     <div id="recurring-edit-new-only">
@@ -1236,7 +1392,11 @@ input{outline:none;}
     <input type="date" class="date-input" id="recurring-edit-end">
     <p class="field-label">GROUP (OPTIONAL)</p>
     <div class="pay-row" id="recurring-edit-group-row"></div>
-    <button type="button" class="save-btn" id="recurring-edit-save-btn" style="margin-top:18px;">Save recurring expense</button>
+    <div id="recurring-edit-account-section" class="hidden">
+      <p class="field-label">ACCOUNT (OPTIONAL)</p>
+      <div class="pay-row" id="recurring-edit-account-row" style="flex-wrap:wrap;gap:8px;"></div>
+    </div>
+    <button type="button" class="save-btn" id="recurring-edit-save-btn" style="margin-top:18px;">Save recurring transaction</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-pause-btn" style="color:var(--grape);">Pause</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-delete-btn">Delete</button>
   </div>
@@ -1261,6 +1421,126 @@ input{outline:none;}
     <p class="budget-recap-line hidden" id="budget-edit-recap"></p>
     <button type="button" class="save-btn" id="budget-edit-save-btn" style="margin-top:18px;">Save budget</button>
     <button type="button" class="text-danger-btn hidden" id="budget-edit-delete-btn">Delete</button>
+  </div>
+</div>
+
+<!-- ============================== ACCOUNTS ONBOARDING SHEET ============================== -->
+<!-- Shown once when user first enables Accounts in Settings. Guides them through
+     creating at least one account before the feature activates. -->
+<div id="accounts-onboarding-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title">Set up accounts</p>
+      <button type="button" class="topbar-close" id="accounts-onboarding-close-btn">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin:10px 0 18px;line-height:1.6;">
+      Add your bank accounts and credit cards. You can always add more later from Settings.
+    </p>
+    <div id="accounts-onboarding-list" style="margin-bottom:12px;"></div>
+    <button type="button" class="warranty-toggle-btn" id="accounts-onboarding-add-btn">+ Add account</button>
+    <button type="button" class="save-btn" id="accounts-onboarding-done-btn" style="margin-top:14px;">Done</button>
+  </div>
+</div>
+
+<!-- ============================== ACCOUNT EDIT SHEET ============================== -->
+<div id="account-edit-overlay" class="edit-sheet-overlay" style="z-index:901;">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title" id="account-edit-title">Add account</p>
+      <button type="button" class="topbar-close" id="account-edit-close-btn">✕</button>
+    </div>
+    <p class="field-label" style="margin-top:14px;">NAME</p>
+    <input type="text" class="sheet-input" id="account-edit-name" placeholder="e.g. SBI Savings" maxlength="32">
+    <p class="field-label">TYPE</p>
+    <div class="segmented-tabs" id="account-type-tabs" style="margin-bottom:0;">
+      <button type="button" class="segmented-tab active" data-accttype="savings">Savings</button>
+      <button type="button" class="segmented-tab" data-accttype="cc">Credit Card</button>
+    </div>
+    <p class="field-label" style="margin-top:14px;" id="account-balance-label">CURRENT BALANCE</p>
+    <input type="number" inputmode="decimal" class="sheet-input" id="account-edit-balance" placeholder="0" min="0" step="0.01">
+    <p class="field-label" id="account-balance-hint" style="color:var(--muted);font-size:11px;margin-top:4px;font-weight:400;letter-spacing:0;">Enter your current account balance</p>
+    <p class="field-label" style="margin-top:14px;">PAYMENT METHODS</p>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Which payment methods are used for this account?</p>
+    <div class="pay-row" id="account-edit-pm-row" style="flex-wrap:wrap;gap:8px;"></div>
+    <button type="button" class="save-btn" id="account-edit-save-btn" style="margin-top:18px;">Save account</button>
+    <button type="button" class="text-danger-btn hidden" id="account-edit-delete-btn">Delete account</button>
+  </div>
+</div>
+
+<!-- ============================== ACCOUNTS VIEW SHEET (Insights 🏦) ============================== -->
+<div id="accounts-view-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title">Accounts</p>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button type="button" id="accounts-view-eye-btn" class="income-eye-btn" title="Toggle visibility">👁️</button>
+        <button type="button" class="topbar-close" id="accounts-view-close-btn">✕</button>
+      </div>
+    </div>
+    <div id="accounts-view-list" style="margin-top:10px;"></div>
+    <div id="accounts-view-networth" style="border-top:1px solid var(--border);margin-top:8px;padding-top:16px;display:flex;justify-content:space-between;align-items:center;">
+      <p style="font-size:14px;font-weight:700;color:var(--ink);">Net Worth</p>
+      <p id="accounts-view-networth-value" style="font-family:var(--font-mono);font-size:16px;font-weight:700;"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== RE-ENABLE WARNING OVERLAY ============================== -->
+<div id="accounts-reenable-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">⚠️</div>
+    <p class="confirm-sheet-title">Balances may be out of sync</p>
+    <p class="confirm-sheet-sub">Expenses logged while accounts were disabled weren't tracked. Your account balances may need to be updated manually.</p>
+    <button type="button" class="save-btn" id="accounts-reenable-confirm-btn">Got it, continue</button>
+    <button type="button" class="confirm-sheet-cancel" id="accounts-reenable-cancel-btn">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================== ADD METHOD TO ACCOUNT PROMPT ============================== -->
+<div id="acct-addpm-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">💳</div>
+    <p class="confirm-sheet-title" id="acct-addpm-title">Add to account?</p>
+    <p class="confirm-sheet-sub" id="acct-addpm-sub"></p>
+    <button type="button" class="save-btn" id="acct-addpm-confirm-btn">Add to account</button>
+    <button type="button" class="confirm-sheet-cancel" id="acct-addpm-cancel-btn">Keep as one-off</button>
+  </div>
+</div>
+
+<!-- ============================== BULK ACCOUNT ASSIGN ============================== -->
+<div class="screen is-hidden" id="bulkaccount-screen">
+  <div class="topbar">
+    <p class="topbar-title">Assign accounts</p>
+    <button class="topbar-close" id="bulkaccount-close-btn">✕</button>
+  </div>
+  <div class="scroll">
+    <div style="padding:0 20px 28px;">
+      <p style="font-size:13px;color:var(--muted);margin:10px 0 14px;line-height:1.6;">
+        Select an account, then tick the transactions to assign to it.
+      </p>
+      <p class="field-label" style="margin-top:0;">ASSIGN TO ACCOUNT</p>
+      <div class="pay-row" id="bulkaccount-acct-row" style="flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+      <p class="field-label">TRANSACTIONS</p>
+      <div id="bulkaccount-list"></div>
+      <button type="button" class="save-btn hidden" id="bulkaccount-apply-btn" style="margin-top:14px;">Assign to account</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== MANAGE ACCOUNTS OVERLAY ============================== -->
+<div id="manage-accounts-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title">Manage accounts</p>
+      <button type="button" class="topbar-close" id="manage-accounts-close-btn">✕</button>
+    </div>
+    <div id="manage-accounts-list" style="margin-top:14px;"></div>
+    <button type="button" class="warranty-toggle-btn" id="manage-accounts-add-btn" style="margin-top:12px;">+ Add account</button>
+    <button type="button" class="warranty-toggle-btn" id="manage-accounts-bulkassign-btn" style="margin-top:8px;">Bulk assign past transactions</button>
   </div>
 </div>
 
@@ -1297,6 +1577,62 @@ input{outline:none;}
   </div>
 </div>
 
+<!-- ============================== DRIVE BACKUP CONFIRM (size estimate) ============================== -->
+<div id="drive-backup-confirm-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">☁️</div>
+    <p class="confirm-sheet-title">Back up to Google Drive?</p>
+    <p class="confirm-sheet-sub" id="drive-backup-confirm-sub"></p>
+    <button type="button" class="save-btn" id="drive-backup-confirm-btn">Back up now</button>
+    <button type="button" class="confirm-sheet-cancel" id="drive-backup-confirm-cancel-btn">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================== DRIVE RESTORE CONFIRM ============================== -->
+<div id="drive-restore-confirm-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">⚠️</div>
+    <p class="confirm-sheet-title">Restore from Drive?</p>
+    <p class="confirm-sheet-sub" id="drive-restore-confirm-sub"></p>
+    <button type="button" class="danger-btn" id="drive-restore-confirm-btn">Restore &amp; replace</button>
+    <button type="button" class="confirm-sheet-cancel" id="drive-restore-confirm-cancel-btn">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================== DRIVE AUTO-RESTORE OFFER (fresh install, empty DB) ============================== -->
+<div id="drive-autorestore-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">☁️</div>
+    <p class="confirm-sheet-title">Backup found</p>
+    <p class="confirm-sheet-sub" id="drive-autorestore-sub"></p>
+    <button type="button" class="save-btn" id="drive-autorestore-btn">Restore my data</button>
+    <button type="button" class="confirm-sheet-cancel" id="drive-autorestore-cancel-btn">Not now</button>
+  </div>
+</div>
+
+<!-- ============================== DEBUG LOG PANEL ==============================
+     Deliberately uses display:none/display:flex toggling rather than the
+     opacity:0/pointer-events:none pattern used by every other overlay in this
+     app, both because that's the actual proposed fix for the tablet rendering
+     issue being investigated, and so this panel itself never adds another
+     always-composited full-viewport layer to the stack while we're trying to
+     diagnose exactly that. Captures console.error/warn and window.onerror
+     globally (installed once, near the very top of the main JS block, before anything else
+     can throw), plus a manual "log render state" snapshot button. Persists to
+     localStorage (capped ring buffer) so a hard crash/reload doesn't lose the
+     log that led up to it. -->
+<div id="debuglog-overlay" style="display:none;position:fixed;inset:0;z-index:2100;background:var(--paper);flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0;">
+    <p style="font-family:var(--font-display);font-size:17px;font-weight:600;">Debug log</p>
+    <button type="button" id="debuglog-close-btn" style="font-size:22px;color:var(--muted);width:32px;height:32px;">✕</button>
+  </div>
+  <div style="display:flex;gap:8px;padding:12px 20px;flex-shrink:0;border-bottom:1px solid var(--border);">
+    <button type="button" id="debuglog-snapshot-btn" style="flex:1;padding:10px;border-radius:12px;border:1.5px solid var(--border);background:transparent;font-size:12px;font-weight:700;color:var(--ink);">📸 Log render state</button>
+    <button type="button" id="debuglog-clear-btn" style="flex:1;padding:10px;border-radius:12px;border:1.5px solid var(--border);background:transparent;font-size:12px;font-weight:700;color:var(--coral);">Clear log</button>
+  </div>
+  <div id="debuglog-content" style="flex:1;overflow-y:auto;padding:14px 20px 28px;font-family:var(--font-body);font-size:11px;line-height:1.5;color:var(--ink);white-space:pre-wrap;word-break:break-word;"></div>
+</div>
+
 <div id="toast"></div>
 
 <!-- ============================== ATTACHMENT VIEWER ============================== -->
@@ -1317,6 +1653,107 @@ input{outline:none;}
 
 <script>
 'use strict';
+
+/* ============================== DEBUG LOG ==============================
+   Installed first, before anything else in this script, so it can catch
+   errors thrown by code further down too. Built specifically to help
+   diagnose a tablet-only rendering issue (large background fills going
+   blank/flickering on one Android tablet, not reproduced on phone or on
+   other PWAs tested on the same tablet) — see project handover doc for
+   full context. Captures console.error/console.warn calls and uncaught
+   exceptions, plus on-demand device/render snapshots, into a capped
+   localStorage ring buffer so a hard crash doesn't lose the trail. Panel
+   itself deliberately uses display:none/flex toggling rather than this
+   app's usual opacity:0/pointer-events:none overlay pattern (see overlay
+   markup comment) so it isn't a confound in the investigation.
+   NOT a permanent feature — fine to remove once the tablet issue is
+   resolved or ruled out, but harmless to leave (near-zero overhead: a few
+   console overrides and small localStorage writes only on error/snapshot,
+   nothing runs continuously). */
+const DebugLog = {
+  KEY: 'pt_debug_log',
+  MAX_ENTRIES: 150,
+
+  installed: false,
+
+  install(){
+    if(this.installed) return;
+    this.installed = true;
+    const origError = console.error.bind(console);
+    const origWarn = console.warn.bind(console);
+    console.error = (...args) => { this.push('ERROR', args); origError(...args); };
+    console.warn = (...args) => { this.push('WARN', args); origWarn(...args); };
+    window.addEventListener('error', (e) => {
+      this.push('UNCAUGHT', [e.message, 'at', e.filename+':'+e.lineno+':'+e.colno]);
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      this.push('PROMISE-REJECT', [String(e.reason)]);
+    });
+  },
+
+  push(level, args){
+    try{
+      const line = `[${new Date().toLocaleTimeString('en-IN',{hour12:false})}] ${level}: ` +
+        args.map(a => { try{ return typeof a==='string' ? a : JSON.stringify(a); } catch(_){ return String(a); } }).join(' ');
+      const entries = this._read();
+      entries.push(line);
+      while(entries.length > this.MAX_ENTRIES) entries.shift();
+      localStorage.setItem(this.KEY, JSON.stringify(entries));
+    } catch(_){ /* localStorage full or unavailable — nothing more we can do */ }
+  },
+
+  // Manual snapshot of device/viewport/render-relevant info — the actual
+  // diagnostic payload for the tablet investigation, distinct from
+  // error capture above.
+  snapshot(){
+    try{
+      const dpr = window.devicePixelRatio || 1;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const screenEl = document.querySelector('.screen:not(.is-hidden)');
+      const screenId = screenEl ? screenEl.id : '(none visible)';
+      const visibleOverlays = [...document.querySelectorAll('.confirm-overlay.show, .edit-sheet-overlay.show')].map(el => el.id);
+      const totalFixedEls = document.querySelectorAll('[style*="position:fixed"], .screen, .confirm-overlay, .edit-sheet-overlay').length;
+      const lines = [
+        `--- snapshot ${new Date().toLocaleTimeString('en-IN',{hour12:false})} ---`,
+        `viewport: ${vw}x${vh} @ ${dpr}x DPR`,
+        `user agent: ${navigator.userAgent}`,
+        `visible screen: ${screenId}`,
+        `visible overlays: ${visibleOverlays.length ? visibleOverlays.join(', ') : '(none)'}`,
+        `total fixed/.screen/.overlay elements in DOM: ${totalFixedEls}`,
+        `localStorage usage (approx): ${this._lsSizeKB()} KB`,
+      ];
+      const entries = this._read();
+      lines.forEach(l => entries.push(l));
+      while(entries.length > this.MAX_ENTRIES) entries.shift();
+      localStorage.setItem(this.KEY, JSON.stringify(entries));
+    } catch(err){ this.push('ERROR', ['snapshot failed', String(err)]); }
+  },
+
+  _lsSizeKB(){
+    try{
+      let total=0;
+      for(const k in localStorage){ if(localStorage.hasOwnProperty(k)) total += (localStorage[k]||'').length + k.length; }
+      return (total/1024).toFixed(1);
+    } catch(_){ return '?'; }
+  },
+
+  _read(){
+    try{ return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(_){ return []; }
+  },
+
+  clear(){
+    localStorage.setItem(this.KEY, '[]');
+  },
+
+  render(){
+    const el=document.getElementById('debuglog-content');
+    if(!el) return;
+    const entries=this._read();
+    el.textContent = entries.length ? entries.join('\n') : '(no log entries yet — tap "Log render state" to capture a snapshot, or errors will appear here automatically)';
+    el.scrollTop = el.scrollHeight;
+  },
+};
+DebugLog.install();
 
 /* ============================== HELPERS ============================== */
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -1427,7 +1864,7 @@ async function tryAutoBiometric(){
 }
 
 /* ============================== DATA LAYER (IndexedDB) ============================== */
-const DB_NAME='PaisaTrailDB', DB_VERSION=4;
+const DB_NAME='PaisaTrailDB', DB_VERSION=5;
 let _dbInstance=null;
 
 function openDB(){
@@ -1448,6 +1885,7 @@ function openDB(){
       if(!db.objectStoreNames.contains('groups')) db.createObjectStore('groups',{keyPath:'id'});
       if(!db.objectStoreNames.contains('recurring')) db.createObjectStore('recurring',{keyPath:'id'});
       if(!db.objectStoreNames.contains('budgets')) db.createObjectStore('budgets',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('accounts')) db.createObjectStore('accounts',{keyPath:'id'});
     };
     req.onsuccess=(e)=>{ _dbInstance=e.target.result; resolve(_dbInstance); };
     req.onerror=(e)=>reject(e.target.error);
@@ -1643,9 +2081,9 @@ const DB = {
   // Used only by Import — wipes and rewrites every store in one
   // transaction, so a failure partway rolls everything back instead of
   // leaving a half-imported mix of old and new data.
-  async replaceAllData({expenses, categories, paymentMethods, groups, attachments, recurring, budgets}){
+  async replaceAllData({expenses, categories, paymentMethods, groups, attachments, recurring, budgets, accounts}){
     const db=await openDB();
-    const tx=db.transaction(['expenses','categories','paymentMethods','groups','attachments','recurring','budgets'],'readwrite');
+    const tx=db.transaction(['expenses','categories','paymentMethods','groups','attachments','recurring','budgets','accounts'],'readwrite');
     const stores={
       expenses: tx.objectStore('expenses'),
       categories: tx.objectStore('categories'),
@@ -1654,6 +2092,7 @@ const DB = {
       attachments: tx.objectStore('attachments'),
       recurring: tx.objectStore('recurring'),
       budgets: tx.objectStore('budgets'),
+      accounts: tx.objectStore('accounts'),
     };
     Object.values(stores).forEach(s => s.clear());
     (categories||[]).forEach(c => stores.categories.put(c));
@@ -1663,6 +2102,27 @@ const DB = {
     (attachments||[]).forEach(a => stores.attachments.put(a));
     (recurring||[]).forEach(r => stores.recurring.put(r));
     (budgets||[]).forEach(b => stores.budgets.put(b));
+    (accounts||[]).forEach(a => stores.accounts.put(a));
+    await txDone(tx);
+  },
+  async getAllAccounts(){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('accounts','readonly').objectStore('accounts').getAll();
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
+  async putAccount(account){
+    const db=await openDB();
+    const tx=db.transaction('accounts','readwrite');
+    tx.objectStore('accounts').put(account);
+    await txDone(tx);
+  },
+  async deleteAccount(id){
+    const db=await openDB();
+    const tx=db.transaction('accounts','readwrite');
+    tx.objectStore('accounts').delete(id);
     await txDone(tx);
   },
   async seedDefaults(){
@@ -1735,8 +2195,8 @@ const state = {
   bdManualSelected:new Set(), // ids ticked in manual bulk-delete mode
   bdPendingBatch:[],     // the expense objects currently shown in the confirm dialog, awaiting Delete/Cancel
   insPeriodType:'month',     // 'week'|'month'|'year'|'custom' — persists across navigation, like state.homeTab
-  insStartISO:monthBounds(todayISO()).startISO, // current period's bounds (inclusive) — only recomputed when the user steps/changes type, never reset on nav
-  insEndISO:monthBounds(todayISO()).endISO,
+  insStartISO:cycleBounds(todayISO()).startISO, // current period's bounds (inclusive) — only recomputed when the user steps/changes type, never reset on nav
+  insEndISO:cycleBounds(todayISO()).endISO,
   insView:'categories',      // 'categories'|'compare'|'payment'|'groups' — which Insights sub-view is showing; persists across navigation
   insCompareCategoryId:null, // selected category for Compare — lazily defaults to the first category the first time Compare is viewed, then persists
   insSelectedGroupId:null,   // selected group for the Groups view — persists once chosen, no lazy default (there may be no groups yet)
@@ -1775,22 +2235,35 @@ const state = {
   mgrRecurringFrequency:'monthly',// selected frequency — only editable when adding a new rule, read-only display once created
   mgrRecurringGroupId:null,       // selected group while adding/editing a recurring rule (null = no group)
   mgrRecurringCatGridExpanded:false, // false = collapsed to top 6; true = all categories shown
+  mgrRecurringType:'expense',     // 'expense'|'income' — type of recurring rule being added/edited
+  mgrRecurringIncomeCategoryId:null, // selected income category when mgrRecurringType==='income'
+  mgrRecurringAccountId:null,     // selected account id for recurring rule; null = no account assigned
   budgets:[],                     // in-memory cache of all budgets, mirrors state.recurringRules
   mgrBudgetCategoryId:null,       // categoryId selected while adding a new budget (null = the special "Overall" target); locked/unused once editing an existing budget
   budgetEditHistory:null,         // {lastMonthSpent, lastMonthActive, suggested, targetIsOverall} for whichever target is selected in the open budget sheet — null until fetched, refetched on target change
   incomeRevealed:false,           // false = income amounts show ₹•••••• on Home and List; true = real amounts shown; resets to false on every lock/unlock
+  accounts:[],                    // in-memory cache of all accounts; empty when accounts feature is disabled
+  accountsEnabled:false,          // mirrors pt_accounts_enabled localStorage key; false = accounts feature hidden throughout app
+  acctEditingId:null,             // id of account being edited in the account edit sheet; null when adding new
+  acctEditSource:null,            // 'onboarding'|'settings' — where to return after account edit save/close
+  acctEditPaymentIds:new Set(),   // payment method ids associated with the account being edited
+  acctOnboardingStep:0,           // 0 = not in onboarding
+  selectedAccountId:null,         // selected account on Add screen; null when accounts disabled
+  selectedTransferFromId:null,    // From account for transfer mode
+  selectedTransferToId:null,      // To account for transfer mode
+  homeLegendShowAmounts:false,    // true = legend shows ₹ amounts, false = percentages
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
 /* ============================== SCREEN SYSTEM ============================== */
-const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen','recurring-screen','guide-screen'];
+const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen','recurring-screen','guide-screen','bulkaccount-screen'];
 // Screens that are always opened fresh — scroll should reset to top on
 // every open. Main tab screens (home, transactions, stats, settings) are
 // intentionally excluded: preserving their scroll position across navigation
 // is correct behaviour.
 const SCROLL_RESET_SCREENS = new Set([
   'add-screen','recurring-screen','categories-screen','paymentmethods-screen',
-  'groups-screen','bulkdelete-screen','tagexpenses-screen','guide-screen'
+  'groups-screen','bulkdelete-screen','tagexpenses-screen','guide-screen','bulkaccount-screen'
 ]);
 function showScreen(id){
   SCREENS.forEach(s => document.getElementById(s).classList.toggle('is-hidden', s!==id));
@@ -2007,8 +2480,15 @@ async function unlockSuccess(){
   state.groups=await DB.getAllGroups();
   state.recurringRules=await DB.getAllRecurring();
   state.budgets=await DB.getAllBudgets();
-  await runRecurringCatchUpAll(); // before navigating, so the screen about to render already reflects anything just generated
+  state.accountsEnabled=Store.get('pt_accounts_enabled')==='1';
+  state.accounts=state.accountsEnabled ? await DB.getAllAccounts() : [];
+  renderAccountsSettingsRow();
+  renderAccountsInsightsBtn();
+  await runRecurringCatchUpAll();
   await checkWhatsNewOnOpen();
+  renderDriveSettingsRow();
+  checkDriveOnOpen(); // not awaited — auto-backup/restore-offer happens in the background, never blocks unlock
+  DebugLog.snapshot(); // one snapshot per unlock — cheap, and means we have a render-state trail leading up to any issue without the user needing to remember to capture one manually
   const target = screenBeforeLock || 'home-screen';
   showScreen(target);
   if(target==='home-screen') renderHome(); // add-screen etc. keep their existing in-progress DOM as-is
@@ -2133,14 +2613,91 @@ async function renderBackupNudgeBanner(){
   banner.innerHTML=`<span class="backup-nudge-banner-icon">💾</span><span class="backup-nudge-banner-text">${esc(text)}</span><span class="backup-nudge-banner-chevron">›</span>`;
   banner.classList.remove('hidden');
 }
+// ---- Onboarding checklist ----
+// Shows on Home Overview until all 3 items are done or user dismisses.
+// pt_onboard_dismissed='1' permanently hides it.
+// Each item taps to the relevant screen/setting.
+async function renderOnboardingChecklist(){
+  const card=document.getElementById('home-onboard-card');
+  // Permanently dismissed?
+  if(Store.get('pt_onboard_dismissed')==='1'){ card.classList.add('hidden'); return; }
+  // Evaluate each item
+  const hasCycleDay = parseInt(Store.get('pt_cycle_day')||'1',10) !== 1;
+  const hasRecurringIncome = state.recurringRules.some(r=>r.type==='income' && r.active);
+  const hasAccounts = state.accountsEnabled && state.accounts.length>0;
+  // All done — hide permanently
+  if(hasCycleDay && hasRecurringIncome && hasAccounts){
+    Store.set('pt_onboard_dismissed','1');
+    card.classList.add('hidden');
+    return;
+  }
+  card.classList.remove('hidden');
+  const items=[
+    {
+      done: hasCycleDay,
+      label: 'Set your salary cycle day',
+      sub: 'Align budgets and forecasts to when you get paid',
+      action: ()=>{ showScreen('settings-screen'); setTimeout(()=>{ document.getElementById('settings-cycle-day').focus(); },300); },
+    },
+    {
+      done: hasRecurringIncome,
+      label: 'Add recurring income',
+      sub: 'Salary, freelance — see your savings projection',
+      action: openRecurringScreen,
+    },
+    {
+      done: hasAccounts,
+      label: 'Set up accounts',
+      sub: 'Track bank and credit card balances',
+      action: ()=>{ showScreen('settings-screen'); setTimeout(()=>{ document.getElementById('settings-accounts-toggle-row').scrollIntoView({behavior:'smooth'}); },300); },
+    },
+  ];
+  const container=document.getElementById('home-onboard-items'); container.innerHTML='';
+  items.forEach((item,i)=>{
+    container.insertAdjacentHTML('beforeend',`
+      <div data-onboard-item="${i}" style="display:flex;align-items:center;gap:12px;
+           padding:10px 0;${i<items.length-1?'border-bottom:1px solid var(--border);':''}
+           cursor:${item.done?'default':'pointer'};">
+        <div style="width:24px;height:24px;border-radius:50%;flex-shrink:0;
+             background:${item.done?'var(--mint)':'var(--chip)'};
+             display:flex;align-items:center;justify-content:center;font-size:13px;">
+          ${item.done?'✓':'›'}
+        </div>
+        <div style="flex:1;">
+          <p style="font-size:13px;font-weight:${item.done?'500':'600'};color:${item.done?'var(--muted)':'var(--ink)'};
+             text-decoration:${item.done?'line-through':'none'};">${esc(item.label)}</p>
+          ${!item.done?`<p style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(item.sub)}</p>`:''}
+        </div>
+      </div>`);
+  });
+  container.querySelectorAll('[data-onboard-item]').forEach(el=>{
+    const idx=parseInt(el.dataset.onboardItem,10);
+    if(!items[idx].done) el.addEventListener('click', items[idx].action);
+  });
+}
+
 async function renderHomeOverviewPanel(){
-  await renderWhatsNewBanner();
-  await renderBackupNudgeBanner();
-  await renderWarrantyBanner();
-  const today=new Date();
-  const monthStart=new Date(today.getFullYear(), today.getMonth(), 1);
-  const startISO=(()=>{ const tz=monthStart.getTimezoneOffset()*60000; return new Date(monthStart-tz).toISOString().slice(0,10); })();
-  const endISO=todayISO();
+  // Banner hierarchy: only one shows at a time.
+  // Priority: warranty (time-sensitive) → What's New (one-time) → backup nudge (low urgency)
+  const warrantyBanner=document.getElementById('home-warranty-banner');
+  const whatsnewBanner=document.getElementById('home-whatsnew-banner');
+  const backupBanner=document.getElementById('home-backup-banner');
+  // Reset all first
+  [warrantyBanner, whatsnewBanner, backupBanner].forEach(b=>{ b.classList.add('hidden'); b.innerHTML=''; });
+  // Evaluate candidates in priority order — stop at first match
+  const soon=await getWarrantiesExpiringSoon();
+  if(soon.length>0){
+    await renderWarrantyBanner();
+  } else if(await shouldShowWhatsNewBanner()){
+    await renderWhatsNewBanner();
+  } else if(await shouldShowBackupNudge()){
+    await renderBackupNudgeBanner();
+  }
+  await renderOnboardingChecklist();
+  const todayISO_=todayISO();
+  const bounds=cycleBounds(todayISO_);
+  const startISO=bounds.startISO;
+  const endISO=todayISO_;
 
   const all=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id]);
   const expenses=all.filter(isExpenseEntry);
@@ -2154,8 +2711,13 @@ async function renderHomeOverviewPanel(){
   const netEl=document.getElementById('home-net-total');
   netEl.textContent = state.incomeRevealed ? (net>=0?'+':'')+formatINR(Math.abs(net)) : '₹••••••';
   netEl.style.color = net>=0 ? '#7FFFEC' : '#FFB4B4';
-  document.getElementById('home-month-label').textContent=today.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
-  document.getElementById('home-count').textContent=`${expenses.length} expense${expenses.length===1?'':'s'} this month`;
+  // Label: if cycle day is 1, show familiar "June 2026"; otherwise show the cycle range
+  const cycleDay=getCycleDay();
+  const monthLabel = cycleDay===1
+    ? new Date(todayISO_+'T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'})
+    : `${new Date(startISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${new Date(bounds.endISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}`;
+  document.getElementById('home-month-label').textContent=monthLabel;
+  document.getElementById('home-count').textContent=`${expenses.length} expense${expenses.length===1?'':'s'} this cycle`;
 
   const byCat={};
   expenses.forEach(e=>{ byCat[e.categoryId]=(byCat[e.categoryId]||0)+Number(e.amount); });
@@ -2168,14 +2730,32 @@ async function renderHomeOverviewPanel(){
   document.getElementById('home-donut-label').textContent = expenseTotal>0 ? `${catTotals.length} ${catTotals.length===1?'cat':'cats'}` : 'No data yet';
 
   const legend=document.getElementById('home-legend'); legend.innerHTML='';
-  catTotals.slice(0,5).forEach(c=>{
-    const pct = expenseTotal>0 ? Math.round((c.amount/expenseTotal)*100) : 0;
-    legend.insertAdjacentHTML('beforeend', `<div class="legend-row"><span class="legend-left"><span class="legend-dot" style="background:${c.color}"></span>${esc(c.name)}</span><span class="legend-pct">${pct}%</span></div>`);
-  });
-  if(catTotals.length===0) legend.innerHTML='<p class="empty-hint" style="padding:0;">Add an expense to see your breakdown</p>';
+  if(catTotals.length===0){
+    legend.innerHTML='<p class="empty-hint" style="padding:0;">Add an expense to see your breakdown</p>';
+  } else {
+    catTotals.slice(0,5).forEach(c=>{
+      const pct = expenseTotal>0 ? Math.round((c.amount/expenseTotal)*100) : 0;
+      const rightVal = state.homeLegendShowAmounts ? formatINR(c.amount) : `${pct}%`;
+      legend.insertAdjacentHTML('beforeend', `
+        <div class="legend-row" style="cursor:pointer;">
+          <span class="legend-left"><span class="legend-dot" style="background:${c.color}"></span>${esc(c.name)}</span>
+          <span class="legend-pct">${rightVal}</span>
+        </div>`);
+    });
+    legend.style.cursor='pointer';
+    legend.onclick=()=>{
+      state.homeLegendShowAmounts=!state.homeLegendShowAmounts;
+      // Re-render just the right-side values without a full panel re-render
+      legend.querySelectorAll('.legend-row').forEach((row, i)=>{
+        const c=catTotals[i]; if(!c) return;
+        const pct = expenseTotal>0 ? Math.round((c.amount/expenseTotal)*100) : 0;
+        row.querySelector('.legend-pct').textContent = state.homeLegendShowAmounts ? formatINR(c.amount) : `${pct}%`;
+      });
+    };
+  }
 
   // Recent list — shows both expenses and income entries, newest first
-  const recent=[...all].sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt)).slice(0,5);
+  const recent=[...all].filter(e=>!isTransferEntry(e)).sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
   const list=document.getElementById('home-recent-list'); list.innerHTML='';
   if(recent.length===0){
     list.innerHTML='<p class="empty-hint">No entries yet — tap + to add your first one.</p>';
@@ -2251,10 +2831,15 @@ async function renderHomeWarrantiesPanel(){
   renderGroup('Expired', expired);
 }
 function applyHomeTabUI(){
-  document.getElementById('home-panel-overview').classList.toggle('hidden', state.homeTab!=='overview');
+  const isOverview = state.homeTab==='overview';
+  document.getElementById('home-panel-overview').classList.toggle('hidden', !isOverview);
   document.getElementById('home-panel-warranties').classList.toggle('hidden', state.homeTab!=='warranties');
   document.getElementById('home-panel-forecast').classList.toggle('hidden', state.homeTab!=='forecast');
   document.getElementById('home-panel-budgets').classList.toggle('hidden', state.homeTab!=='budgets');
+  // Show sticky overview content only on Overview tab
+  document.getElementById('home-overview-sticky').classList.toggle('hidden', !isOverview);
+  // Non-overview tabs need their own scroll padding since sticky overview is hidden
+  document.getElementById('home-scroll-body').style.paddingTop = isOverview ? '' : '12px';
   document.querySelectorAll('#home-tabs .home-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.hometab===state.homeTab);
   });
@@ -2358,9 +2943,11 @@ function formatGroupLabel(dateISO){
 async function getFilteredTransactions(){
   const search=(document.getElementById('txn-search').value||'').toLowerCase().trim();
   let list=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
-  // Type filter — 'all' shows everything; 'expense' and 'income' narrow to one type
+  // Type filter — 'all' hides transfers (they're a distinct type); 'transfer' shows only transfers
   if(state.txnFilterType==='expense') list=list.filter(isExpenseEntry);
-  if(state.txnFilterType==='income') list=list.filter(isIncomeEntry);
+  else if(state.txnFilterType==='income') list=list.filter(isIncomeEntry);
+  else if(state.txnFilterType==='transfer') list=list.filter(isTransferEntry);
+  else list=list.filter(e=>!isTransferEntry(e)); // 'all' — hide transfers by default
   // Category filter only applies to expense entries — income entries use a
   // separate INCOME_CATEGORIES list so txnFilterCategoryIds never match them
   if(state.txnFilterCategoryIds.size>0) list=list.filter(e => isIncomeEntry(e) || state.txnFilterCategoryIds.has(e.categoryId));
@@ -2438,6 +3025,22 @@ async function renderTransactions(){
         lastGroup=groupLabel;
       }
       const isInc=isIncomeEntry(e);
+      const isTxfr=isTransferEntry(e);
+      if(isTxfr){
+        const fromAcct=state.accounts.find(a=>a.id===e.fromAccountId);
+        const toAcct=state.accounts.find(a=>a.id===e.toAccountId);
+        container.insertAdjacentHTML('beforeend', `
+          <div class="recent-row" data-id="${e.id}">
+            <div class="recent-icon" style="background:rgba(134,87,224,0.14);">⇄</div>
+            <div class="recent-info">
+              <p class="recent-title">${esc(e.note||'Transfer')}</p>
+              <span class="recent-pm">${esc(fromAcct?fromAcct.name:'?')} → ${esc(toAcct?toAcct.name:'?')}</span>
+            </div>
+            <span class="recent-amt" style="color:var(--grape);">${formatINR(e.amount)}</span>
+            <button class="txn-delete" data-del="${e.id}">🗑️</button>
+          </div>`);
+        return;
+      }
       const cat=isInc ? INCOME_CATEGORIES.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
       const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
@@ -2465,7 +3068,7 @@ async function renderTransactions(){
         </div>`);
     });
   }
-  const typeLabel = state.txnFilterType==='income' ? 'income entries' : state.txnFilterType==='expense' ? 'expenses' : 'entries';
+  const typeLabel = state.txnFilterType==='income' ? 'income entries' : state.txnFilterType==='expense' ? 'expenses' : state.txnFilterType==='transfer' ? 'transfers' : 'entries';
   document.getElementById('txn-filter-show-btn').textContent = `Show ${list.length} ${typeLabel}`;
 }
 
@@ -2528,12 +3131,13 @@ async function openTxnFilterSheet(){
   document.getElementById('txn-filter-end').value = state.txnFilterEndISO || '';
   document.getElementById('txn-filter-min-amount').value = state.txnFilterMinAmount!=null ? state.txnFilterMinAmount : '';
   document.getElementById('txn-filter-max-amount').value = state.txnFilterMaxAmount!=null ? state.txnFilterMaxAmount : '';
+  // Hide Transfer tab when accounts not enabled
+  document.querySelector('#txn-filter-type-tabs [data-filtertype="transfer"]').classList.toggle('hidden', !state.accountsEnabled);
   // Sync the Type toggle buttons to current state
   document.querySelectorAll('#txn-filter-type-tabs .segmented-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.filtertype === state.txnFilterType);
   });
-  // Hide the category filter row when viewing income-only (income has its own fixed categories)
-  const showCatFilter = state.txnFilterType !== 'income';
+  const showCatFilter = state.txnFilterType !== 'income' && state.txnFilterType !== 'transfer';
   document.getElementById('txn-filter-cat-label').classList.toggle('hidden', !showCatFilter);
   document.getElementById('txn-filter-cat-grid').classList.toggle('hidden', !showCatFilter);
   syncIncomeFilterSections();
@@ -2542,13 +3146,13 @@ async function openTxnFilterSheet(){
   document.getElementById('txn-filter-overlay').classList.add('show');
 }
 function syncIncomeFilterSections(){
-  // Payment method, Group, and Split filters are expense-only concepts;
-  // hide them (and clear their state) when Income-only is selected.
   const isIncome = state.txnFilterType === 'income';
+  const isTransfer = state.txnFilterType === 'transfer';
+  // Payment method, Group, and Split are expense-only — hide for income and transfer
   ['txn-filter-pay-label','txn-filter-pay-row',
    'txn-filter-group-label','txn-filter-group-row',
    'txn-filter-split-label','txn-filter-split-toggle','txn-filter-split-status-tabs'
-  ].forEach(id => document.getElementById(id).classList.toggle('hidden', isIncome));
+  ].forEach(id => document.getElementById(id).classList.toggle('hidden', isIncome || isTransfer));
 }
 function syncSplitFilterUI(){
   const toggle=document.getElementById('txn-filter-split-toggle');
@@ -2887,7 +3491,7 @@ async function openManageDeleteConfirm(type, id, name){
     let count, label;
     if(type==='category'){ count=await DB.countExpensesByCategory(id); label='category'; }
     else if(type==='paymentMethod'){ count=await DB.countExpensesByPaymentMethod(id); label='payment method'; }
-    else if(type==='recurring'){ count=(await getExpensesByRecurringId(id)).length; label='recurring expense'; }
+    else if(type==='recurring'){ count=(await getExpensesByRecurringId(id)).length; label='recurring transaction'; }
     else { count=(await getExpensesByGroupId(id)).length; label='group'; }
     document.getElementById('manage-confirm-sub').textContent = count>0
       ? `${count} expense${count===1?'':'s'} ${count===1?'uses':'use'} this ${label} — they won't be deleted, just unlinked from it.`
@@ -3264,11 +3868,11 @@ function base64ToArrayBuffer(base64){
 
 async function exportData(){
   try{
-    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw, recurring, budgets] = await Promise.all([
+    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw, recurring, budgets, accounts] = await Promise.all([
       DB.getAllCategories(), DB.getAllPaymentMethods(), DB.getAllGroups(),
-      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(), DB.getAllBudgets(),
+      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(), DB.getAllBudgets(), DB.getAllAccounts(),
     ]);
-    const expenses=expensesRaw.filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+    const expenses=expensesRaw.filter(e => !pendingDeletes[e.id]); // includes expenses, income, and transfers
     // Attachments carry raw ArrayBuffer data, which JSON can't hold
     // directly — base64-encoded here, decoded back on import.
     const attachments=attachmentsRaw.map(a => ({
@@ -3280,8 +3884,13 @@ async function exportData(){
     // not device security, and restoring an old PIN hash onto a different
     // session would be confusing at best.
     const payload={
-      app:'PaisaTrail', schemaVersion:4, exportedAt:new Date().toISOString(),
-      categories, paymentMethods, groups, expenses, attachments, recurring, budgets,
+      app:'PaisaTrail', schemaVersion:5, exportedAt:new Date().toISOString(),
+      categories, paymentMethods, groups, expenses, attachments, recurring, budgets, accounts,
+      preferences:{
+        cycleDay: parseInt(Store.get('pt_cycle_day')||'1',10),
+        accountsEnabled: Store.get('pt_accounts_enabled')==='1',
+        accountsHadData: Store.get('pt_accounts_had_data')==='1',
+      },
     };
     const blob=new Blob([JSON.stringify(payload)], {type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -3339,41 +3948,439 @@ function closeImportConfirm(){
   document.getElementById('import-confirm-overlay').classList.remove('show');
   pendingImportPayload=null;
 }
+// Shared by local-file import and Google Drive restore — applies a parsed
+// backup payload to IndexedDB + relevant localStorage prefs, then refreshes
+// every in-memory cache and view. Caller is responsible for confirmation UX
+// before calling this; this function itself is unconditionally destructive.
+async function applyBackupPayload(data){
+  const attachments=(data.attachments||[])
+    .filter(a => a && a.id && a.dataBase64)
+    .map(a => ({ id:a.id, expenseId:a.expenseId, type:a.type, fileName:a.fileName, mimeType:a.mimeType, data: base64ToArrayBuffer(a.dataBase64) }));
+  await DB.replaceAllData({
+    expenses: (data.expenses||[]).filter(e => e && e.id),
+    categories: (data.categories||[]).filter(c => c && c.id),
+    paymentMethods: (data.paymentMethods||[]).filter(p => p && p.id),
+    groups: (data.groups||[]).filter(g => g && g.id),
+    attachments,
+    recurring: (data.recurring||[]).filter(r => r && r.id),
+    budgets: (data.budgets||[]).filter(b => b && b.id),
+    accounts: (data.accounts||[]).filter(a => a && a.id),
+  });
+  // Reload every in-memory cache from what's actually on disk now,
+  // rather than trusting the file's arrays directly post-filtering.
+  state.categories=await DB.getAllCategories();
+  state.paymentMethods=await DB.getAllPaymentMethods();
+  state.groups=await DB.getAllGroups();
+  state.recurringRules=await DB.getAllRecurring();
+  state.budgets=await DB.getAllBudgets();
+  // Restore preferences if present in backup
+  if(data.preferences){
+    const prefs=data.preferences;
+    if(prefs.cycleDay && prefs.cycleDay>=1 && prefs.cycleDay<=28){
+      Store.set('pt_cycle_day', String(prefs.cycleDay));
+      document.getElementById('settings-cycle-day').value=prefs.cycleDay;
+    }
+    if(prefs.accountsEnabled){
+      Store.set('pt_accounts_enabled','1');
+      state.accountsEnabled=true;
+    }
+    if(prefs.accountsHadData) Store.set('pt_accounts_had_data','1');
+  }
+  state.accounts=state.accountsEnabled ? await DB.getAllAccounts() : [];
+  renderAccountsSettingsRow();
+  renderAccountsInsightsBtn();
+  state.txnFilterCategoryIds=new Set();
+  state.txnFilterPaymentIds=new Set();
+  state.txnFilterStartISO=null; state.txnFilterEndISO=null;
+  state.txnFilterMinAmount=null; state.txnFilterMaxAmount=null;
+  state.insSelectedGroupId=null;
+  Object.values(pendingDeletes).forEach(entry => { if(entry && entry.timer) clearTimeout(entry.timer); });
+  Object.keys(pendingDeletes).forEach(k => delete pendingDeletes[k]); // stale undo timers from before the wipe no longer apply
+  await refreshAllExpenseViews();
+}
 async function confirmImport(){
   const data=pendingImportPayload;
   if(!data) return;
   closeImportConfirm();
   try{
-    const attachments=(data.attachments||[])
-      .filter(a => a && a.id && a.dataBase64)
-      .map(a => ({ id:a.id, expenseId:a.expenseId, type:a.type, fileName:a.fileName, mimeType:a.mimeType, data: base64ToArrayBuffer(a.dataBase64) }));
-    await DB.replaceAllData({
-      expenses: (data.expenses||[]).filter(e => e && e.id),
-      categories: (data.categories||[]).filter(c => c && c.id),
-      paymentMethods: (data.paymentMethods||[]).filter(p => p && p.id),
-      groups: (data.groups||[]).filter(g => g && g.id),
-      attachments,
-      recurring: (data.recurring||[]).filter(r => r && r.id),
-      budgets: (data.budgets||[]).filter(b => b && b.id),
-    });
-    // Reload every in-memory cache from what's actually on disk now,
-    // rather than trusting the file's arrays directly post-filtering.
-    state.categories=await DB.getAllCategories();
-    state.paymentMethods=await DB.getAllPaymentMethods();
-    state.groups=await DB.getAllGroups();
-    state.recurringRules=await DB.getAllRecurring();
-    state.budgets=await DB.getAllBudgets();
-    state.txnFilterCategoryIds=new Set();
-    state.txnFilterPaymentIds=new Set();
-    state.txnFilterStartISO=null; state.txnFilterEndISO=null;
-    state.txnFilterMinAmount=null; state.txnFilterMaxAmount=null;
-    state.insSelectedGroupId=null;
-    Object.values(pendingDeletes).forEach(entry => { if(entry && entry.timer) clearTimeout(entry.timer); });
-    Object.keys(pendingDeletes).forEach(k => delete pendingDeletes[k]); // stale undo timers from before the wipe no longer apply
-    await refreshAllExpenseViews();
+    await applyBackupPayload(data);
     toast('Import complete');
   } catch(err){
     toast('Import failed — the file may be corrupted');
+  }
+}
+
+/* ============================== GOOGLE DRIVE BACKUP ============================== */
+// Architecture: Google Identity Services implicit token flow (no backend,
+// no client secret, no refresh tokens — by design, since PaisaTrail has no
+// server). Files live in the appDataFolder space (drive.appdata scope) —
+// hidden from the user's normal Drive UI, only reachable via this app's
+// OAuth client, which protects backups from accidental manual deletion
+// (the original motivating problem: browser storage getting cleared while
+// cleaning up other PWAs). Tradeoff accepted: zero visibility/manual
+// control over the files outside the app itself — see conversation history
+// for the explicit decision to keep appDataFolder over a visible folder.
+//
+// Pruning model: keep the 3 most recent CALENDAR DAYS of backups, not the
+// 3 most recent uploads. A same-day manual backup overwrites/replaces that
+// day's auto-backup (manual is treated as a superset of the auto payload).
+//
+// Token lifetime: implicit flow tokens expire in ~1hr and are NOT
+// refreshable without a backend. We silently attempt to get a fresh token
+// when needed (Google often re-issues without a prompt if the browser
+// session is alive) and only show a visible re-auth prompt when the
+// silent attempt fails.
+const DRIVE_CLIENT_ID='661093981288-58cvi84a2rki2agv4ohb7j92en0da3en.apps.googleusercontent.com';
+const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.appdata';
+const DRIVE_FILE_PREFIX='paisatrail-backup-';
+const DRIVE_KEEP_DAYS=3;
+const DRIVE_AUTO_INTERVAL_MS=24*60*60*1000;
+
+const CloudBackup={
+  tokenClient:null,
+  gsiLoaded:false,
+  accessToken:null,
+  tokenExpiresAt:0,
+  syncing:false, // true only while an upload is actually in flight — drives the pulsing topbar icon
+
+  async loadGsi(){
+    if(this.gsiLoaded) return;
+    await new Promise((resolve,reject)=>{
+      const s=document.createElement('script');
+      s.src='https://accounts.google.com/gsi/client';
+      s.async=true;
+      s.onload=()=>{ this.gsiLoaded=true; resolve(); };
+      s.onerror=()=>reject(new Error('Failed to load Google Identity Services'));
+      document.head.appendChild(s);
+    });
+  },
+
+  isConnected(){
+    return !!Store.get('pt_drive_connected');
+  },
+
+  // Resolves with a valid access token, requesting one (silently if
+  // possible) if we don't already have an unexpired one in memory. Token
+  // is held only in memory, never persisted — re-acquired each cold start.
+  async getToken(interactive){
+    if(this.accessToken && Date.now() < this.tokenExpiresAt - 60000){
+      return this.accessToken;
+    }
+    await this.loadGsi();
+    if(!this.tokenClient){
+      this.tokenClient=google.accounts.oauth2.initTokenClient({
+        client_id: DRIVE_CLIENT_ID,
+        scope: DRIVE_SCOPE,
+        callback: ()=>{}, // overridden per-call below
+      });
+    }
+    return new Promise((resolve,reject)=>{
+      this.tokenClient.callback=(resp)=>{
+        if(resp && resp.access_token){
+          this.accessToken=resp.access_token;
+          this.tokenExpiresAt=Date.now() + (resp.expires_in||3600)*1000;
+          Store.set('pt_drive_connected','1');
+          resolve(this.accessToken);
+        } else {
+          reject(new Error('No access token returned'));
+        }
+      };
+      this.tokenClient.error_callback=(err)=>{ reject(err||new Error('Auth failed')); };
+      try{
+        this.tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+      } catch(err){ reject(err); }
+    });
+  },
+
+  async apiFetch(url, opts={}){
+    const token=await this.getToken(false).catch(()=>this.getToken(true));
+    const res=await fetch(url, {
+      ...opts,
+      headers:{ ...(opts.headers||{}), 'Authorization':`Bearer ${token}` },
+    });
+    if(!res.ok){
+      const body=await res.text().catch(()=>'');
+      throw new Error(`Drive API ${res.status}: ${body.slice(0,200)}`);
+    }
+    return res;
+  },
+
+  // Lists backup files in appDataFolder, newest first.
+  async listBackups(){
+    const res=await this.apiFetch(
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name,createdTime,size)&orderBy=createdTime desc&pageSize=50`
+    );
+    const data=await res.json();
+    return (data.files||[]).filter(f => f.name.startsWith(DRIVE_FILE_PREFIX));
+  },
+
+  dayKeyFromFilename(name){
+    // paisatrail-backup-2026-06-30T14-30-00.json -> 2026-06-30
+    const m=name.match(/paisatrail-backup-(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : null;
+  },
+
+  // After a successful upload, prune to the 3 most recent calendar days.
+  // If today's day already had a file (from an earlier auto-backup) and
+  // this upload is a manual backup superseding it, the caller passes
+  // replaceFileId of that earlier same-day file to delete it explicitly
+  // (manual backups are a superset, so no reason to keep both).
+  async pruneOldBackups(replaceFileId){
+    const files=await this.listBackups();
+    const toDelete=new Set();
+    if(replaceFileId) toDelete.add(replaceFileId);
+    const remaining=files.filter(f => !toDelete.has(f.id));
+    const seenDays=[];
+    for(const f of remaining){
+      const day=this.dayKeyFromFilename(f.name);
+      if(!day) continue;
+      if(!seenDays.includes(day)){
+        if(seenDays.length>=DRIVE_KEEP_DAYS){ toDelete.add(f.id); continue; }
+        seenDays.push(day);
+      } else {
+        // Same day, older file already counted for this slot — extra
+        // shouldn't normally exist post-replace logic, but prune defensively.
+        toDelete.add(f.id);
+      }
+    }
+    await Promise.all([...toDelete].map(id =>
+      this.apiFetch(`https://www.googleapis.com/drive/v3/files/${id}`, { method:'DELETE' }).catch(()=>{})
+    ));
+  },
+
+  // Builds the backup payload. includeAllAttachments=false (auto-backup)
+  // restricts attachments to those linked to a warranty-tracked expense.
+  async buildPayload(includeAllAttachments){
+    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw, recurring, budgets, accounts] = await Promise.all([
+      DB.getAllCategories(), DB.getAllPaymentMethods(), DB.getAllGroups(),
+      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(), DB.getAllBudgets(), DB.getAllAccounts(),
+    ]);
+    const expenses=expensesRaw.filter(e => !pendingDeletes[e.id]);
+    const warrantyExpenseIds=new Set(expenses.filter(e => e.warrantyExpiry).map(e => e.id));
+    const attachmentsFiltered=includeAllAttachments
+      ? attachmentsRaw
+      : attachmentsRaw.filter(a => warrantyExpenseIds.has(a.expenseId));
+    const attachments=attachmentsFiltered.map(a => ({
+      id:a.id, expenseId:a.expenseId, type:a.type, fileName:a.fileName, mimeType:a.mimeType,
+      dataBase64: arrayBufferToBase64(a.data),
+    }));
+    return {
+      app:'PaisaTrail', schemaVersion:5, exportedAt:new Date().toISOString(),
+      categories, paymentMethods, groups, expenses, attachments, recurring, budgets, accounts,
+      preferences:{
+        cycleDay: parseInt(Store.get('pt_cycle_day')||'1',10),
+        accountsEnabled: Store.get('pt_accounts_enabled')==='1',
+        accountsHadData: Store.get('pt_accounts_had_data')==='1',
+      },
+    };
+  },
+
+  filenameForNow(){
+    const d=new Date();
+    const pad=n=>String(n).padStart(2,'0');
+    const stamp=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+    return `${DRIVE_FILE_PREFIX}${stamp}.json`;
+  },
+
+  async uploadBackup(payload, filename){
+    const boundary='paisatrail-boundary-'+Date.now();
+    const metadata={ name:filename, parents:['appDataFolder'], mimeType:'application/json' };
+    const body=
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(payload)}\r\n` +
+      `--${boundary}--`;
+    await this.apiFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method:'POST',
+      headers:{ 'Content-Type':`multipart/related; boundary=${boundary}` },
+      body,
+    });
+  },
+
+  // Finds today's existing backup file (if any) so a manual backup can
+  // supersede it rather than leaving two same-day files in the window.
+  async findTodaysFileId(){
+    const files=await this.listBackups();
+    const todayKey=todayISO();
+    const match=files.find(f => this.dayKeyFromFilename(f.name)===todayKey);
+    return match ? match.id : null;
+  },
+
+  async runBackup(includeAllAttachments){
+    this.syncing=true;
+    renderCloudStatusIcons();
+    try{
+      const payload=await this.buildPayload(includeAllAttachments);
+      const filename=this.filenameForNow();
+      const existingTodayId=await this.findTodaysFileId().catch(()=>null);
+      await this.uploadBackup(payload, filename);
+      await this.pruneOldBackups(existingTodayId);
+      Store.set('pt_drive_last_backup', String(Date.now()));
+      Store.set('pt_drive_last_error', '');
+    } catch(err){
+      Store.set('pt_drive_last_error', '1');
+      throw err;
+    } finally {
+      this.syncing=false;
+      renderCloudStatusIcons();
+    }
+  },
+
+  async restoreLatest(){
+    const files=await this.listBackups();
+    if(files.length===0) throw new Error('No backup found on Drive');
+    const latest=files[0];
+    const res=await this.apiFetch(`https://www.googleapis.com/drive/v3/files/${latest.id}?alt=media`);
+    const data=await res.json();
+    await applyBackupPayload(data);
+    return data;
+  },
+
+  async getLatestBackupMeta(){
+    const files=await this.listBackups();
+    return files.length ? files[0] : null;
+  },
+
+  disconnect(){
+    if(this.accessToken){
+      try{ google.accounts.oauth2.revoke(this.accessToken, ()=>{}); } catch(err){}
+    }
+    this.accessToken=null;
+    this.tokenExpiresAt=0;
+    this.tokenClient=null;
+    Store.set('pt_drive_connected','');
+    Store.set('pt_drive_last_backup','');
+    Store.set('pt_drive_email','');
+  },
+};
+
+function renderDriveSettingsRow(){
+  const connected=CloudBackup.isConnected();
+  document.getElementById('settings-drive-connected-block').classList.toggle('hidden', !connected);
+  document.getElementById('settings-drive-chevron').classList.toggle('hidden', connected);
+  const sub=document.getElementById('settings-drive-sub');
+  if(connected){
+    sub.textContent='Connected — backs up automatically once a day';
+    const last=parseInt(Store.get('pt_drive_last_backup')||'0',10);
+    document.getElementById('settings-drive-lastbackup-sub').textContent = last
+      ? `Includes all attachments · Last backup ${new Date(last).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}`
+      : 'Includes all attachments';
+  } else {
+    sub.textContent='Automatically save your data to Google Drive';
+  }
+  renderCloudStatusIcons();
+}
+
+// Drives the small cloud icon shown in the topbar on Home/List/Insights.
+// Hidden entirely when Drive isn't connected (no clutter for non-users).
+// Pulses while CloudBackup.syncing is true; shows a coral dot if the last
+// backup attempt failed (cleared automatically on the next successful one).
+function renderCloudStatusIcons(){
+  const connected=CloudBackup.isConnected();
+  const hadError=Store.get('pt_drive_last_error')==='1';
+  ['home-cloud-btn','txn-cloud-btn','stats-cloud-btn'].forEach(id => {
+    const btn=document.getElementById(id);
+    if(!btn) return;
+    btn.classList.toggle('hidden', !connected);
+    btn.classList.toggle('syncing', CloudBackup.syncing);
+    btn.classList.toggle('has-error', hadError && !CloudBackup.syncing);
+    btn.title = CloudBackup.syncing ? 'Backing up to Google Drive…'
+      : hadError ? 'Last backup failed — tap to view'
+      : 'Cloud backup';
+  });
+}
+
+
+async function handleDriveConnectClick(){
+  if(CloudBackup.isConnected()) return; // connected block handles its own buttons
+  try{
+    await CloudBackup.getToken(true);
+    toast('Connected to Google Drive');
+    renderDriveSettingsRow();
+    // First connect on a device with existing local data — kick off a
+    // silent backup so there's something on Drive immediately, but don't
+    // block the UI on it.
+    CloudBackup.runBackup(false).then(renderDriveSettingsRow).catch(()=>{});
+  } catch(err){
+    toast('Could not connect to Google Drive');
+  }
+}
+
+function openDriveBackupConfirm(){
+  document.getElementById('drive-backup-confirm-sub').textContent =
+    'This uploads all transactions and every attachment to your Google Drive. May take a moment depending on attachment count.';
+  document.getElementById('drive-backup-confirm-overlay').classList.add('show');
+}
+function closeDriveBackupConfirm(){
+  document.getElementById('drive-backup-confirm-overlay').classList.remove('show');
+}
+async function confirmDriveBackupNow(){
+  closeDriveBackupConfirm();
+  const btn=document.getElementById('settings-drive-backupnow-btn');
+  const subEl=btn.querySelector('.settings-row-sub');
+  const prevText=subEl.textContent;
+  subEl.textContent='Backing up… don\u2019t close the app';
+  btn.style.opacity='0.6';
+  try{
+    await CloudBackup.runBackup(true);
+    toast('Backup complete');
+  } catch(err){
+    toast('Backup failed — please try again');
+  } finally {
+    btn.style.opacity='';
+    renderDriveSettingsRow();
+  }
+}
+
+function openDriveRestoreConfirm(){
+  document.getElementById('drive-restore-confirm-sub').textContent =
+    'Restoring will replace your current data with the latest Drive backup. This may permanently remove transactions or attachments added since that backup — this can\u2019t be undone.';
+  document.getElementById('drive-restore-confirm-overlay').classList.add('show');
+}
+function closeDriveRestoreConfirm(){
+  document.getElementById('drive-restore-confirm-overlay').classList.remove('show');
+}
+async function confirmDriveRestore(){
+  closeDriveRestoreConfirm();
+  try{
+    await CloudBackup.restoreLatest();
+    toast('Restore complete');
+  } catch(err){
+    toast(err && err.message==='No backup found on Drive' ? 'No backup found on Drive' : 'Restore failed — please try again');
+  }
+}
+
+function confirmDriveDisconnect(){
+  CloudBackup.disconnect();
+  renderDriveSettingsRow();
+  toast('Disconnected from Google Drive');
+}
+
+// Called once per unlock (from unlockSuccess) — checks for an auto-backup
+// due, and on a genuinely empty local DB, offers to restore from Drive if
+// the user is already connected (e.g. reinstalled the app/cleared storage
+// but the Drive connection somehow persisted — unlikely but harmless to
+// check) or simply has a token still valid in memory. In the common case
+// (totally fresh device, no token), this silently does nothing — the user
+// must tap Connect themselves; we cannot prompt for Drive auth without a
+// user gesture, and unprompted auto-restore on a brand new device is out
+// of scope.
+async function checkDriveOnOpen(){
+  if(!CloudBackup.isConnected()) return;
+  const expenseCount=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).length;
+  if(expenseCount===0){
+    try{
+      const meta=await CloudBackup.getLatestBackupMeta();
+      if(meta){
+        document.getElementById('drive-autorestore-sub').textContent =
+          `A backup from ${new Date(meta.createdTime).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})} is available on Google Drive. Restore it now?`;
+        document.getElementById('drive-autorestore-overlay').classList.add('show');
+      }
+    } catch(err){ /* silent — connect button remains available manually */ }
+    return;
+  }
+  const last=parseInt(Store.get('pt_drive_last_backup')||'0',10);
+  if(Date.now() - last > DRIVE_AUTO_INTERVAL_MS){
+    CloudBackup.runBackup(false).then(renderDriveSettingsRow).catch(()=>{});
   }
 }
 
@@ -3504,11 +4511,24 @@ async function checkWhatsNewOnOpen(){
   if(lastSeen===latest.version) return;
   if(isNotifEnabled() && isNotifAvailable() && Notification.permission==='granted'){
     try{
-      new Notification('PaisaTrail updated', { body: latest.highlights[0] || "Tap to see what's new", icon:'./icons/icon.svg' });
+      // Android Chrome requires SW-based notifications; new Notification() is
+      // silently ignored on mobile. Try SW first, fall back to direct API for
+      // desktop browsers that don't have an active SW registration.
+      if('serviceWorker' in navigator){
+        const reg = await navigator.serviceWorker.getRegistration();
+        if(reg){
+          await reg.showNotification('PaisaTrail updated', {
+            body: latest.highlights[0] || "Tap to see what's new",
+            icon: './icons/icon.svg',
+            badge: './icons/icon.svg',
+          });
+        } else {
+          new Notification('PaisaTrail updated', { body: latest.highlights[0] || "Tap to see what's new", icon:'./icons/icon.svg' });
+        }
+      } else {
+        new Notification('PaisaTrail updated', { body: latest.highlights[0] || "Tap to see what's new", icon:'./icons/icon.svg' });
+      }
     } catch(err){}
-    // Do NOT mark version seen here — only mark it when the user actually
-    // opens the What's New screen. This keeps the Home banner visible as a
-    // persistent fallback in case the OS notification goes unnoticed.
   }
 }
 
@@ -3551,14 +4571,25 @@ async function catchUpSingleRule(rule){
   const generated=[];
   const today=todayISO();
   let count=0;
+  const isIncomeRule = rule.type === 'income';
   while(rule.active && rule.nextDueISO<=today && count<RECURRING_CATCHUP_CAP){
-    const expense={
+    const entry = isIncomeRule ? {
+      id:genId(), amount:rule.amount,
+      type:'income',
+      incomeCategoryId: rule.incomeCategoryId || INCOME_CATEGORIES[0].id,
+      categoryId: null,
+      paymentMethod:rule.paymentMethod,
+      accountId: rule.accountId||null,
+      date:rule.nextDueISO, note:rule.name, attachmentIds:[], recurringId:rule.id,
+      groupId:rule.groupId||null, warrantyExpiry:null, warrantyDurationMonths:null, createdAt:Date.now(),
+    } : {
       id:genId(), amount:rule.amount, categoryId:rule.categoryId, paymentMethod:rule.paymentMethod,
+      accountId: rule.accountId||null,
       date:rule.nextDueISO, note:rule.name, attachmentIds:[], recurringId:rule.id, groupId:rule.groupId||null,
       warrantyExpiry:null, warrantyDurationMonths:null, createdAt:Date.now(),
     };
-    await DB.addExpense(expense);
-    generated.push({name:rule.name});
+    await DB.addExpense(entry);
+    generated.push({name:rule.name, isIncome:isIncomeRule});
     rule.nextDueISO=advanceRecurringDate(rule, rule.nextDueISO);
     if(rule.endDate && rule.nextDueISO>rule.endDate) rule.active=false;
     count++;
@@ -3574,9 +4605,9 @@ async function catchUpSingleRule(rule){
 function buildCatchUpToastMessage(generated){
   const total=generated.length;
   const uniqueNames=[...new Set(generated.map(g=>g.name))];
-  if(total===1) return `${generated[0].name} added automatically`;
+  if(total===1) return `${generated[0].name} ${generated[0].isIncome?'income':'expense'} added automatically`;
   if(total===2 && uniqueNames.length===2) return `${uniqueNames[0]} and ${uniqueNames[1]} added automatically`;
-  return `${total} recurring expenses added automatically`;
+  return `${total} recurring transactions added automatically`;
 }
 // Runs on every unlock (see unlockSuccess) so a multi-day-idle phone catches
 // up the moment it's opened, not on some background schedule this offline
@@ -3601,7 +4632,7 @@ function renderRecurringArea(){
   if(state.recurringLinkedId){
     area.innerHTML=`
       <div class="warranty-card">
-        <p class="empty-hint" style="padding:0;text-align:left;">This expense was generated by a recurring rule. Manage it from Settings → Recurring expenses.</p>
+        <p class="empty-hint" style="padding:0;text-align:left;">This expense was generated by a recurring rule. Manage it from Settings → Recurring transactions.</p>
       </div>`;
     return;
   }
@@ -3647,20 +4678,25 @@ function openRecurringScreen(){
 function renderRecurringScreen(){
   const list=document.getElementById('recurring-list'); list.innerHTML='';
   if(state.recurringRules.length===0){
-    list.innerHTML='<p class="empty-hint">No recurring expenses yet — add one here, or toggle "Make this recurring" when adding a new expense.</p>';
+    list.innerHTML='<p class="empty-hint">No recurring transactions yet — add one here, or toggle "Make this recurring" when adding a new expense.</p>';
     return;
   }
   state.recurringRules.forEach(r=>{
-    const cat=state.categories.find(c=>c.id===r.categoryId);
+    const isIncomeRule = r.type === 'income';
+    const cat = isIncomeRule
+      ? INCOME_CATEGORIES.find(c=>c.id===r.incomeCategoryId)
+      : state.categories.find(c=>c.id===r.categoryId);
     const dateLabel=new Date(r.nextDueISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
     const subLine = r.active
-      ? `${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Next ${dateLabel}`
+      ? `${isIncomeRule?'+':''}${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Next ${dateLabel}`
       : `${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Paused`;
+    const iconBg = cat ? cat.color+'22' : '#9088A822';
+    const icon = cat ? cat.icon : (isIncomeRule ? '💰' : '🔁');
     list.insertAdjacentHTML('beforeend', `
       <button type="button" class="settings-row" data-recurringid="${r.id}" style="margin-bottom:8px;">
-        <span class="settings-row-icon" style="background:${cat?cat.color:'#9088A8'}22;">${cat?cat.icon:'🔁'}</span>
+        <span class="settings-row-icon" style="background:${iconBg};">${icon}</span>
         <div class="settings-row-info">
-          <p class="settings-row-title">${esc(r.name)}</p>
+          <p class="settings-row-title">${esc(r.name)}${isIncomeRule?' <span style="font-size:10px;background:rgba(46,196,182,.15);color:var(--mint);padding:1px 6px;border-radius:6px;font-weight:700;vertical-align:middle;">INCOME</span>':''}</p>
           <span class="settings-row-sub">${esc(subLine)}</span>
         </div>
         <span class="settings-row-chevron">›</span>
@@ -3668,6 +4704,13 @@ function renderRecurringScreen(){
   });
 }
 function renderRecurringEditCatGrid(){
+  const isIncome = state.mgrRecurringType === 'income';
+  // Toggle which grid/label is visible
+  document.getElementById('recurring-edit-cat-label').classList.toggle('hidden', isIncome);
+  document.getElementById('recurring-edit-cat-grid').classList.toggle('hidden', isIncome);
+  document.getElementById('recurring-edit-incomecat-label').classList.toggle('hidden', !isIncome);
+  document.getElementById('recurring-edit-incomecat-grid').classList.toggle('hidden', !isIncome);
+  if(isIncome){ renderRecurringEditIncomeCatGrid(); return; }
   const grid=document.getElementById('recurring-edit-cat-grid'); grid.innerHTML='';
   const COLLAPSE_AT=6;
   const counts=state.catUsageCounts || {};
@@ -3694,6 +4737,22 @@ function renderRecurringEditCatGrid(){
       </button>`);
   }
 }
+function renderRecurringEditIncomeCatGrid(){
+  const grid=document.getElementById('recurring-edit-incomecat-grid'); grid.innerHTML='';
+  INCOME_CATEGORIES.forEach(cat=>{
+    const selected=state.mgrRecurringIncomeCategoryId===cat.id;
+    const bg = selected ? cat.color+'26' : 'var(--surface)';
+    const border = selected ? cat.color : 'transparent';
+    grid.insertAdjacentHTML('beforeend', `
+      <button type="button" class="cat-chip" data-rincomecat="${cat.id}" style="background:${bg};border-color:${border}">
+        <span class="cat-emoji">${cat.icon}</span><span class="cat-name">${esc(cat.name)}</span>
+      </button>`);
+  });
+  // Bind clicks inline since income cat grid is rendered fresh each time
+  grid.querySelectorAll('[data-rincomecat]').forEach(btn=>{
+    btn.onclick=()=>{ state.mgrRecurringIncomeCategoryId=btn.dataset.rincomecat; renderRecurringEditIncomeCatGrid(); };
+  });
+}
 function renderRecurringEditPayRow(){
   const row=document.getElementById('recurring-edit-pay-row'); row.innerHTML='';
   state.paymentMethods.forEach(pm=>{
@@ -3717,7 +4776,6 @@ function renderRecurringEditFreqRow(){
 }
 function renderRecurringEditGroupRow(){
   const row=document.getElementById('recurring-edit-group-row'); row.innerHTML='';
-  // "None" chip
   const noneSelected = !state.mgrRecurringGroupId;
   row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-rgrp="none" style="background:${noneSelected?'var(--grape)':'var(--surface)'};color:${noneSelected?'white':'var(--ink)'}">None</button>`);
   state.groups.forEach(g=>{
@@ -3731,11 +4789,42 @@ function renderRecurringEditGroupRow(){
     };
   });
 }
+function renderRecurringEditAccountRow(){
+  const section=document.getElementById('recurring-edit-account-section');
+  if(!state.accountsEnabled || state.accounts.length===0){ section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  const row=document.getElementById('recurring-edit-account-row'); row.innerHTML='';
+  // None chip
+  const noneSelected=!state.mgrRecurringAccountId;
+  row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-racct="none" style="background:${noneSelected?'var(--grape)':'var(--surface)'};color:${noneSelected?'white':'var(--ink)'}">None</button>`);
+  state.accounts.forEach(a=>{
+    const selected=state.mgrRecurringAccountId===a.id;
+    const icon=a.type==='cc'?'💳':'🏦';
+    row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-racct="${a.id}" style="background:${selected?'var(--grape)':'var(--surface)'};color:${selected?'white':'var(--ink)'}"><span>${icon}</span>${esc(a.name)}</button>`);
+  });
+  row.querySelectorAll('[data-racct]').forEach(btn=>{
+    btn.onclick=()=>{ state.mgrRecurringAccountId=btn.dataset.racct==='none'?null:btn.dataset.racct; renderRecurringEditAccountRow(); };
+  });
+}
 function openRecurringEdit(id){
   state.mgrEditingType='recurring';
   state.mgrEditingId=id;
   const existing=id ? state.recurringRules.find(r=>r.id===id) : null;
-  document.getElementById('recurring-edit-title').textContent = existing ? 'Edit recurring expense' : 'Add recurring expense';
+  // Type — locked to read-only once a rule exists (changing type would invalidate
+  // all past auto-generated entries). New rules default to expense.
+  state.mgrRecurringType = existing ? (existing.type || 'expense') : 'expense';
+  state.mgrRecurringIncomeCategoryId = existing ? (existing.incomeCategoryId || INCOME_CATEGORIES[0].id) : INCOME_CATEGORIES[0].id;
+  // Apply type toggle UI — tabs disabled when editing existing rule
+  const typeTabs = document.getElementById('recurring-type-tabs');
+  typeTabs.querySelectorAll('[data-rtype]').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.rtype===state.mgrRecurringType);
+  });
+  typeTabs.style.pointerEvents = existing ? 'none' : '';
+  typeTabs.style.opacity = existing ? '0.5' : '';
+  const isIncome = state.mgrRecurringType === 'income';
+  document.getElementById('recurring-edit-title').textContent = existing
+    ? (isIncome ? 'Edit recurring income' : 'Edit recurring expense')
+    : 'Add recurring transaction';
   document.getElementById('recurring-edit-name').value = existing ? existing.name : '';
   document.getElementById('recurring-edit-amount').value = existing ? existing.amount : '';
   document.getElementById('recurring-edit-end').value = existing ? (existing.endDate || '') : '';
@@ -3743,12 +4832,14 @@ function openRecurringEdit(id){
   state.mgrRecurringPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
   state.mgrRecurringFrequency = existing ? existing.frequency : 'monthly';
   state.mgrRecurringGroupId = existing ? (existing.groupId || null) : null;
+  state.mgrRecurringAccountId = existing ? (existing.accountId || null) : null;
   state.mgrRecurringCatGridExpanded = false;
   // Use cached usage counts if available; fetch async in background to update sort order
   getCategoryUsageCounts().then(counts=>{ state.catUsageCounts=counts; renderRecurringEditCatGrid(); }).catch(()=>{});
   renderRecurringEditCatGrid();
   renderRecurringEditPayRow();
   renderRecurringEditGroupRow();
+  renderRecurringEditAccountRow();
 
   // Frequency and start date only make sense to set once, at creation —
   // changing either after occurrences already exist would scramble the
@@ -3774,35 +4865,45 @@ function closeRecurringEdit(){
 async function saveRecurringEdit(){
   const name=document.getElementById('recurring-edit-name').value.trim();
   const amount=parseFloat(document.getElementById('recurring-edit-amount').value);
+  const isIncome = state.mgrRecurringType === 'income';
   if(!name){ toast('Give it a name first'); return; }
   if(!amount || amount<=0){ toast('Enter a valid amount'); return; }
-  if(!state.mgrRecurringCategoryId){ toast('Pick a category'); return; }
+  if(!isIncome && !state.mgrRecurringCategoryId){ toast('Pick a category'); return; }
+  if(isIncome && !state.mgrRecurringIncomeCategoryId){ toast('Pick an income type'); return; }
   if(!state.mgrRecurringPaymentId){ toast('Pick a payment method'); return; }
   const endDate=document.getElementById('recurring-edit-end').value || null;
   const existing=state.mgrEditingId ? state.recurringRules.find(r=>r.id===state.mgrEditingId) : null;
 
   if(existing){
     existing.name=name; existing.amount=amount;
-    existing.categoryId=state.mgrRecurringCategoryId; existing.paymentMethod=state.mgrRecurringPaymentId;
+    existing.categoryId=isIncome ? null : state.mgrRecurringCategoryId;
+    existing.incomeCategoryId=isIncome ? state.mgrRecurringIncomeCategoryId : null;
+    existing.paymentMethod=state.mgrRecurringPaymentId;
     existing.endDate=endDate; existing.groupId=state.mgrRecurringGroupId||null;
+    existing.accountId=state.mgrRecurringAccountId||null;
     if(existing.endDate && existing.nextDueISO>existing.endDate) existing.active=false;
     await DB.putRecurring(existing);
     closeRecurringEdit();
     renderRecurringScreen();
-    toast('Recurring expense updated');
+    toast(isIncome ? 'Recurring income updated' : 'Recurring expense updated');
   } else {
     const startDate=document.getElementById('recurring-edit-start').value || todayISO();
     const rule={
-      id:genId(), name, amount, categoryId:state.mgrRecurringCategoryId, paymentMethod:state.mgrRecurringPaymentId,
+      id:genId(), name, amount,
+      type: isIncome ? 'income' : 'expense',
+      categoryId: isIncome ? null : state.mgrRecurringCategoryId,
+      incomeCategoryId: isIncome ? state.mgrRecurringIncomeCategoryId : null,
+      paymentMethod:state.mgrRecurringPaymentId,
       frequency:state.mgrRecurringFrequency, startDate, endDate, nextDueISO:startDate, active:true, createdAt:Date.now(),
       groupId:state.mgrRecurringGroupId||null,
+      accountId:state.mgrRecurringAccountId||null,
     };
     await DB.putRecurring(rule);
     state.recurringRules.push(rule);
     await catchUpSingleRule(rule); // backfills immediately if startDate is today or in the past
     closeRecurringEdit();
     renderRecurringScreen();
-    toast('Recurring expense added');
+    toast(isIncome ? 'Recurring income added' : 'Recurring expense added');
   }
   await refreshAllExpenseViews();
 }
@@ -3904,11 +5005,10 @@ async function renderHomeForecastPanel(){
   const isMonth=state.forecastWindow==='month';
   let windowEndISO, remainingDays, spentSoFar=0;
   if(isMonth){
-    const now=new Date();
-    windowEndISO=dateToISO(new Date(now.getFullYear(), now.getMonth()+1, 0));
+    const bounds=cycleBounds(today);
+    windowEndISO=bounds.endISO;
     remainingDays=Math.max(0, Math.round((new Date(windowEndISO+'T00:00:00') - new Date(today+'T00:00:00'))/86400000));
-    const monthStartISO=dateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
-    spentSoFar=(await DB.getExpensesByDateRange(monthStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
+    spentSoFar=(await DB.getExpensesByDateRange(bounds.startISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
   } else {
     windowEndISO=dateToISO(addDays(new Date(today+'T00:00:00'), FORECAST_ROLLING_WINDOW_DAYS));
     remainingDays=FORECAST_ROLLING_WINDOW_DAYS;
@@ -3930,6 +5030,83 @@ async function renderHomeForecastPanel(){
   breakdown.insertAdjacentHTML('beforeend', `<div class="legend-row"><span>Estimated other spending</span><span>${estimatedOther!=null ? '~'+formatINR(estimatedOther) : `Not enough history yet (last ${state.forecastLookbackDays} days)`}</span></div>`);
   if(excludedCount>0){
     breakdown.insertAdjacentHTML('beforeend', `<div class="legend-row"><span>Excluded as one-time</span><span>${formatINR(excludedTotal)} · ${excludedCount} expense${excludedCount===1?'':'s'}</span></div>`);
+  }
+
+  // ── Savings projection ──
+  // Income rules that are active and due within the forecast window
+  const incomeRules=state.recurringRules.filter(r=>r.active && r.type==='income');
+  const savingsCard=document.getElementById('forecast-savings-card');
+  const nudge=document.getElementById('forecast-income-nudge');
+
+  if(incomeRules.length===0){
+    // No recurring income set up — show nudge, hide card
+    savingsCard.classList.add('hidden');
+    nudge.classList.remove('hidden');
+  } else {
+    nudge.classList.add('hidden');
+    savingsCard.classList.remove('hidden');
+
+    // Project recurring income due within the window (same engine as expenses)
+    let projectedRecurringIncome=0;
+    incomeRules.forEach(rule=>{
+      let cursor=rule.nextDueISO;
+      let count=0;
+      while(cursor<=windowEndISO && count<RECURRING_CATCHUP_CAP){
+        projectedRecurringIncome+=Number(rule.amount);
+        cursor=advanceRecurringDate(rule, cursor);
+        count++;
+      }
+    });
+
+    // Actual income logged so far this cycle (only for month window).
+    // Exclude recurring-generated entries (recurringId set) — those amounts
+    // are already projected forward via projectedRecurringIncome, so counting
+    // them here would double-count the same salary/income rule.
+    let incomeLoggedSoFar=0;
+    if(isMonth){
+      const bounds=cycleBounds(today);
+      const incomeEntries=(await DB.getExpensesByDateRange(bounds.startISO, today))
+        .filter(e=>!pendingDeletes[e.id] && isIncomeEntry(e) && !e.recurringId);
+      incomeLoggedSoFar=incomeEntries.reduce((s,e)=>s+Number(e.amount),0);
+    }
+
+    const projectedIncome=projectedRecurringIncome+incomeLoggedSoFar;
+    const projectedSavings=projectedIncome-projectedTotal;
+    const savingsColor=projectedSavings>=0 ? 'var(--mint)' : 'var(--coral)';
+
+    const savingsBreakdown=document.getElementById('forecast-savings-breakdown');
+    savingsBreakdown.innerHTML='';
+    savingsBreakdown.insertAdjacentHTML('beforeend',
+      `<div class="legend-row" style="color:rgba(255,255,255,0.8);">
+        <span>Projected income</span>
+        <span>${maskIncome(projectedIncome)}</span>
+      </div>`);
+    if(isMonth && incomeLoggedSoFar>0){
+      savingsBreakdown.insertAdjacentHTML('beforeend',
+        `<div class="legend-row" style="color:rgba(255,255,255,0.6);font-size:12px;">
+          <span style="padding-left:10px;">└ Logged so far</span>
+          <span>${maskIncome(incomeLoggedSoFar)}</span>
+        </div>`);
+    }
+    if(projectedRecurringIncome>0){
+      savingsBreakdown.insertAdjacentHTML('beforeend',
+        `<div class="legend-row" style="color:rgba(255,255,255,0.6);font-size:12px;">
+          <span style="padding-left:10px;">└ Recurring due</span>
+          <span>${maskIncome(projectedRecurringIncome)}</span>
+        </div>`);
+    }
+    savingsBreakdown.insertAdjacentHTML('beforeend',
+      `<div class="legend-row" style="color:rgba(255,255,255,0.8);">
+        <span>Projected spend</span>
+        <span>${formatINR(projectedTotal)}</span>
+      </div>`);
+
+    document.getElementById('forecast-savings-amount').textContent=maskIncome(Math.abs(projectedSavings));
+    document.getElementById('forecast-savings-amount').style.color=savingsColor;
+    // Prefix minus if overspending
+    if(projectedSavings<0){
+      document.getElementById('forecast-savings-amount').textContent='-'+maskIncome(Math.abs(projectedSavings));
+    }
   }
 
   const list=document.getElementById('forecast-upcoming-list'); list.innerHTML='';
@@ -3954,10 +5131,9 @@ async function renderHomeForecastPanel(){
 
 /* ============================== BUDGETS ============================== */
 async function getMonthToDateExpenses(){
-  const now=new Date();
-  const monthStartISO=dateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
   const today=todayISO();
-  return (await DB.getExpensesByDateRange(monthStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+  const cycleStartISO=cycleBounds(today).startISO;
+  return (await DB.getExpensesByDateRange(cycleStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
 }
 // Unlike Forecast's "estimated other spending," budgets intentionally
 // include recurring-generated expenses in the spent total — a recurring
@@ -3975,11 +5151,15 @@ function budgetSpentAmount(budget, monthExpenses){
 // make the rate wildly noisy before there's enough signal.
 function computeBudgetPace(spent, limit){
   if(!(limit>0)) return null;
-  const now=new Date();
-  const daysElapsed=now.getDate();
+  const today=todayISO();
+  const bounds=cycleBounds(today);
+  const cycleStart=new Date(bounds.startISO+'T00:00:00');
+  const cycleEnd=new Date(bounds.endISO+'T00:00:00');
+  const todayDate=new Date(today+'T00:00:00');
+  const daysElapsed=Math.round((todayDate-cycleStart)/86400000)+1;
   if(daysElapsed<3) return null;
-  const daysInMonth=new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-  const projected=(spent/daysElapsed)*daysInMonth;
+  const daysInCycle=Math.round((cycleEnd-cycleStart)/86400000)+1;
+  const projected=(spent/daysElapsed)*daysInCycle;
   return { projected, over: projected>limit };
 }
 // Targets you can still set a NEW budget for — every category without one
@@ -4009,13 +5189,12 @@ function budgetDisplayInfo(budget){
 // the Insights section below — safe since these are hoisted function
 // declarations in the same scope.
 function monthsAgoBounds(n){
-  const now=new Date();
-  return monthBounds(dateToISO(new Date(now.getFullYear(), now.getMonth()-n, 1)));
+  return cyclesAgoBounds(n);
 }
-// Pulls last month's actual spend for a target (for the edit sheet's
+// Pulls last cycle's actual spend for a target (for the edit sheet's
 // "last month" recap) plus a suggested monthly limit averaged across
-// however many of the last 3 calendar months were actually "active" (had
-// ANY app usage) — averaging in silent pre-app months would understate the
+// however many of the last 3 cycles were actually "active" (had
+// ANY app usage) — averaging in silent pre-app cycles would understate the
 // suggestion for a newer install. targetCategoryId is null for "Overall".
 async function getBudgetHistoryData(targetCategoryId){
   const m1=monthsAgoBounds(1), m2=monthsAgoBounds(2), m3=monthsAgoBounds(3);
@@ -4169,6 +5348,393 @@ function requestDeleteBudget(){
   openManageDeleteConfirm('budget', id, info.name);
 }
 
+/* ============================== ACCOUNTS & WALLETS ============================== */
+// pt_accounts_enabled: '1' = feature on, '0'/absent = feature off.
+// pt_accounts_had_data: '1' = user has previously set up accounts (used to detect re-enable).
+
+function isAccountsEnabled(){ return state.accountsEnabled; }
+
+// Called when Settings accounts toggle is tapped.
+async function handleAccountsToggle(){
+  if(state.accountsEnabled){
+    // Disable — keep data, just hide the feature
+    state.accountsEnabled=false;
+    Store.set('pt_accounts_enabled','0');
+    renderAccountsSettingsRow();
+    renderAccountsInsightsBtn();
+    toast('Accounts disabled — your data is kept');
+  } else {
+    // Enable — check if user had prior data (re-enable) or first time
+    const hadData = Store.get('pt_accounts_had_data')==='1';
+    if(hadData && state.accounts.length===0){
+      // Reload accounts from DB first
+      state.accounts = await DB.getAllAccounts();
+    }
+    if(hadData && state.accounts.length>0){
+      // Re-enable: show out-of-sync warning
+      document.getElementById('accounts-reenable-overlay').classList.add('show');
+    } else {
+      // First time: show onboarding
+      openAccountsOnboarding();
+    }
+  }
+}
+
+function renderAccountsSettingsRow(){
+  const sw=document.getElementById('settings-accounts-switch');
+  sw.classList.toggle('on', state.accountsEnabled);
+  document.getElementById('settings-manage-accounts-btn').classList.toggle('hidden', !state.accountsEnabled);
+}
+
+function renderAccountsInsightsBtn(){
+  const btn=document.getElementById('stats-accounts-btn');
+  if(btn) btn.classList.toggle('hidden', !state.accountsEnabled);
+}
+
+// ---- Onboarding ----
+function openAccountsOnboarding(){
+  renderAccountsOnboardingList();
+  document.getElementById('accounts-onboarding-overlay').classList.add('show');
+}
+function closeAccountsOnboarding(){
+  document.getElementById('accounts-onboarding-overlay').classList.remove('show');
+}
+async function renderAccountsOnboardingList(){
+  const list=document.getElementById('accounts-onboarding-list'); list.innerHTML='';
+  if(state.accounts.length===0) return;
+  const balances=await Promise.all(state.accounts.map(a=>computeAccountBalance(a)));
+  state.accounts.forEach((a,i)=>{
+    const icon = a.type==='cc' ? '💳' : '🏦';
+    const balLabel = a.type==='cc' ? 'Outstanding' : 'Balance';
+    list.insertAdjacentHTML('beforeend', `
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:12px 14px;background:var(--surface);border-radius:14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:20px;">${icon}</span>
+          <div>
+            <p style="font-size:13px;font-weight:600;color:var(--ink);">${esc(a.name)}</p>
+            <p style="font-size:11px;color:var(--muted);">${balLabel}: ${formatINR(Math.abs(balances[i]))}</p>
+          </div>
+        </div>
+        <button type="button" data-onboardedit="${a.id}"
+          style="font-size:13px;color:var(--grape);font-weight:700;background:none;border:none;cursor:pointer;">Edit</button>
+      </div>`);
+  });
+  list.querySelectorAll('[data-onboardedit]').forEach(btn=>{
+    btn.onclick=()=>openAccountEdit(btn.dataset.onboardedit, 'onboarding');
+  });
+}
+async function finishAccountsOnboarding(){
+  if(state.accounts.length===0){ toast('Add at least one account to continue'); return; }
+  state.accountsEnabled=true;
+  Store.set('pt_accounts_enabled','1');
+  Store.set('pt_accounts_had_data','1');
+  closeAccountsOnboarding();
+  renderAccountsSettingsRow();
+  renderAccountsInsightsBtn();
+  toast('Accounts enabled');
+}
+
+// ---- Account edit sheet ----
+function renderAccountEditPmRow(){
+  const row=document.getElementById('account-edit-pm-row'); row.innerHTML='';
+  state.paymentMethods.forEach(pm=>{
+    const selected=state.acctEditPaymentIds.has(pm.id);
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    row.insertAdjacentHTML('beforeend', `
+      <button type="button" class="pay-chip" data-acctpm="${pm.id}" style="background:${bg};color:${color}">
+        <span>${pm.icon}</span>${esc(pm.name)}
+      </button>`);
+  });
+  row.querySelectorAll('[data-acctpm]').forEach(btn=>{
+    btn.onclick=()=>{
+      const pmId=btn.dataset.acctpm;
+      if(state.acctEditPaymentIds.has(pmId)) state.acctEditPaymentIds.delete(pmId);
+      else state.acctEditPaymentIds.add(pmId);
+      renderAccountEditPmRow();
+    };
+  });
+}
+// source: 'onboarding' | 'settings' — where to return after save/close
+function openAccountEdit(id, source='settings'){
+  state.acctEditingId = id || null;
+  state.acctEditSource = source;
+  const existing = id ? state.accounts.find(a=>a.id===id) : null;
+  const type = existing ? existing.type : 'savings';
+  state.acctEditPaymentIds = new Set(existing ? (existing.paymentMethodIds||[]) : []);
+  document.getElementById('account-edit-title').textContent = existing ? 'Edit account' : 'Add account';
+  document.getElementById('account-edit-name').value = existing ? existing.name : '';
+  document.getElementById('account-edit-balance').value = existing ? (existing.openingBalance||0) : '';
+  // Type tabs
+  document.getElementById('account-type-tabs').querySelectorAll('[data-accttype]').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.accttype===type);
+  });
+  // Lock type for existing (same reason as recurring frequency)
+  const tabs=document.getElementById('account-type-tabs');
+  tabs.style.pointerEvents = existing ? 'none' : '';
+  tabs.style.opacity = existing ? '0.5' : '';
+  applyAccountTypeLabels(type);
+  document.getElementById('account-edit-delete-btn').classList.toggle('hidden', !existing);
+  renderAccountEditPmRow();
+  document.getElementById('account-edit-overlay').classList.add('show');
+}
+function closeAccountEdit(){
+  document.getElementById('account-edit-overlay').classList.remove('show');
+  state.acctEditingId=null;
+}
+function getAccountEditType(){
+  const active=document.querySelector('#account-type-tabs [data-accttype].active');
+  return active ? active.dataset.accttype : 'savings';
+}
+function applyAccountTypeLabels(type){
+  const isCc = type==='cc';
+  document.getElementById('account-balance-label').textContent = isCc ? 'CURRENT OUTSTANDING' : 'CURRENT BALANCE';
+  document.getElementById('account-balance-hint').textContent = isCc
+    ? 'Enter how much you currently owe on this card'
+    : 'Enter your current account balance';
+}
+async function saveAccountEdit(){
+  const name=document.getElementById('account-edit-name').value.trim();
+  const balance=parseFloat(document.getElementById('account-edit-balance').value)||0;
+  const type=getAccountEditType();
+  if(!name){ toast('Give the account a name'); return; }
+  const existing = state.acctEditingId ? state.accounts.find(a=>a.id===state.acctEditingId) : null;
+  if(existing){
+    existing.name=name; existing.openingBalance=balance;
+    existing.paymentMethodIds=[...state.acctEditPaymentIds];
+    await DB.putAccount(existing);
+  } else {
+    const account={ id:genId(), name, type, openingBalance:balance, paymentMethodIds:[...state.acctEditPaymentIds], createdAt:Date.now() };
+    await DB.putAccount(account);
+    state.accounts.push(account);
+  }
+  closeAccountEdit();
+  if(state.acctEditSource==='onboarding'){
+    renderAccountsOnboardingList();
+  } else {
+    renderManageAccountsList();
+  }
+  toast(existing ? 'Account updated' : 'Account added');
+}
+async function deleteAccountEdit(){
+  const id=state.acctEditingId; if(!id) return;
+  const acct=state.accounts.find(a=>a.id===id);
+  if(!acct) return;
+  await DB.deleteAccount(id);
+  state.accounts=state.accounts.filter(a=>a.id!==id);
+  closeAccountEdit();
+  if(state.acctEditSource==='onboarding'){
+    renderAccountsOnboardingList();
+  } else {
+    renderManageAccountsList();
+  }
+  toast('Account deleted');
+}
+
+// ---- Manage accounts (from Settings) ----
+function openManageAccountsScreen(){
+  renderManageAccountsList();
+  document.getElementById('manage-accounts-overlay').classList.add('show');
+}
+function closeManageAccountsScreen(){
+  document.getElementById('manage-accounts-overlay').classList.remove('show');
+}
+async function renderManageAccountsList(){
+  const list=document.getElementById('manage-accounts-list'); if(!list) return;
+  list.innerHTML='';
+  if(state.accounts.length===0){
+    list.innerHTML='<p class="empty-hint">No accounts yet — add one below.</p>';
+    return;
+  }
+  // Show loading state while computing
+  list.innerHTML='<p class="empty-hint" style="padding:8px 0;">Calculating balances…</p>';
+  const balances=await Promise.all(state.accounts.map(a=>computeAccountBalance(a)));
+  list.innerHTML='';
+  state.accounts.forEach((a,i)=>{
+    const icon = a.type==='cc' ? '💳' : '🏦';
+    const bal=balances[i];
+    const isCc=a.type==='cc';
+    const balLabel = isCc ? 'Outstanding' : 'Balance';
+    const balColor = isCc ? 'var(--coral)' : (bal<0?'var(--coral)':'var(--ink)');
+    list.insertAdjacentHTML('beforeend', `
+      <button type="button" class="settings-row" data-acctid="${a.id}" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:${isCc?'rgba(255,107,91,.14)':'rgba(46,196,182,.14)'};">${icon}</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">${esc(a.name)}</p>
+          <span class="settings-row-sub">${balLabel}: ${formatINR(Math.abs(bal))}</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>`);
+  });
+  list.querySelectorAll('[data-acctid]').forEach(btn=>{
+    btn.onclick=()=>openAccountEdit(btn.dataset.acctid, 'settings');
+  });
+}
+
+// ---- Accounts view sheet (Insights 🏦) ----
+function openAccountsViewSheet(){
+  renderAccountsViewSheet(); // async — renders loading state immediately, then updates
+  document.getElementById('accounts-view-overlay').classList.add('show');
+}
+function closeAccountsViewSheet(){
+  document.getElementById('accounts-view-overlay').classList.remove('show');
+}
+// Computes running balance for an account from opening balance + all transactions.
+// Savings: opening + income credited - expenses debited + transfers in - transfers out
+// CC: opening (outstanding) + expenses debited - payments (transfers in from savings) + transfers out
+async function computeAccountBalance(account){
+  const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31'))
+    .filter(e=>!pendingDeletes[e.id]);
+  const isCc=account.type==='cc';
+  let balance=account.openingBalance||0;
+  all.forEach(e=>{
+    if(isExpenseEntry(e) && e.accountId===account.id){
+      balance += isCc ? Number(e.amount) : -Number(e.amount);
+    }
+    if(isIncomeEntry(e) && e.accountId===account.id){
+      balance += isCc ? -Number(e.amount) : Number(e.amount);
+    }
+    if(isTransferEntry(e)){
+      if(e.fromAccountId===account.id){
+        balance -= Number(e.amount); // money left this account
+      }
+      if(e.toAccountId===account.id){
+        balance += isCc ? -Number(e.amount) : Number(e.amount); // CC: payment reduces outstanding
+      }
+    }
+  });
+  return balance;
+}
+async function renderAccountsViewSheet(){
+  const list=document.getElementById('accounts-view-list'); list.innerHTML='';
+  if(state.accounts.length===0){
+    list.innerHTML='<p class="empty-hint">No accounts set up yet.</p>';
+    document.getElementById('accounts-view-networth').style.display='none';
+    return;
+  }
+  document.getElementById('accounts-view-networth').style.display='';
+  // Show loading state while computing
+  list.innerHTML='<p class="empty-hint" style="padding:8px 0;">Calculating balances…</p>';
+  const balances=await Promise.all(state.accounts.map(a=>computeAccountBalance(a)));
+  list.innerHTML='';
+  let netWorth=0;
+  state.accounts.forEach((a,i)=>{
+    const isCc=a.type==='cc';
+    const bal=balances[i];
+    netWorth += isCc ? -Math.abs(bal) : bal;
+    const icon = isCc ? '💳' : '🏦';
+    const balLabel = isCc ? 'outstanding' : 'balance';
+    const balColor = isCc ? 'var(--coral)' : (bal<0 ? 'var(--coral)' : 'var(--ink)');
+    const maskedBal = state.incomeRevealed ? formatINR(Math.abs(bal)) : '₹••••••';
+    const negPrefix = !isCc && bal<0 && state.incomeRevealed ? '-' : '';
+    list.insertAdjacentHTML('beforeend', `
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:14px 16px;background:var(--surface);border-radius:16px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:40px;height:40px;border-radius:12px;flex-shrink:0;
+                      background:${isCc?'rgba(255,107,91,.14)':'rgba(46,196,182,.14)'};
+                      display:flex;align-items:center;justify-content:center;font-size:18px;">${icon}</div>
+          <div>
+            <p style="font-size:14px;font-weight:600;color:var(--ink);">${esc(a.name)}</p>
+            <p style="font-size:11px;color:var(--muted);margin-top:2px;">${isCc?'Credit Card':'Savings Account'}</p>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <p style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${balColor};">${negPrefix}${maskedBal}</p>
+          <p style="font-size:10px;color:var(--muted);margin-top:2px;">${balLabel}</p>
+        </div>
+      </div>`);
+  });
+  const nwEl=document.getElementById('accounts-view-networth-value');
+  const maskedNW = state.incomeRevealed ? formatINR(Math.abs(netWorth)) : '₹••••••';
+  nwEl.textContent = state.incomeRevealed ? ((netWorth>=0?'':'-')+maskedNW) : maskedNW;
+  nwEl.style.color = netWorth>=0 ? 'var(--mint)' : 'var(--coral)';
+}
+
+// ---- Bulk account assign ----
+let _bulkAcctSelectedAccountId=null;
+let _bulkAcctSelected=new Set();
+
+async function openBulkAccountScreen(){
+  _bulkAcctSelectedAccountId = state.accounts.length>0 ? state.accounts[0].id : null;
+  _bulkAcctSelected=new Set();
+  closeManageAccountsScreen();
+  renderBulkAccountAcctRow();
+  await renderBulkAccountList();
+  showScreen('bulkaccount-screen');
+}
+function renderBulkAccountAcctRow(){
+  const row=document.getElementById('bulkaccount-acct-row'); row.innerHTML='';
+  state.accounts.forEach(a=>{
+    const selected=_bulkAcctSelectedAccountId===a.id;
+    const icon=a.type==='cc'?'💳':'🏦';
+    row.insertAdjacentHTML('beforeend',`
+      <button type="button" class="pay-chip" data-bacct="${a.id}"
+        style="background:${selected?'var(--grape)':'var(--surface)'};color:${selected?'white':'var(--ink)'}">
+        <span>${icon}</span>${esc(a.name)}
+      </button>`);
+  });
+  row.querySelectorAll('[data-bacct]').forEach(btn=>{
+    btn.onclick=()=>{
+      _bulkAcctSelectedAccountId=btn.dataset.bacct;
+      _bulkAcctSelected=new Set();
+      renderBulkAccountAcctRow();
+      renderBulkAccountList();
+    };
+  });
+}
+async function renderBulkAccountList(){
+  const list=document.getElementById('bulkaccount-list'); list.innerHTML='';
+  const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31'))
+    .filter(e=>!pendingDeletes[e.id] && !e.accountId)
+    .sort((a,b)=>b.date.localeCompare(a.date));
+  if(all.length===0){
+    list.innerHTML='<p class="empty-hint">All transactions already have an account assigned.</p>';
+    document.getElementById('bulkaccount-apply-btn').classList.add('hidden');
+    return;
+  }
+  all.forEach(e=>{
+    const isInc=isIncomeEntry(e);
+    const cat=isInc ? INCOME_CATEGORIES.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
+    const dateLabel=new Date(e.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+    const checked=_bulkAcctSelected.has(e.id);
+    list.insertAdjacentHTML('beforeend',`
+      <div class="recent-row" data-bulkacctid="${e.id}" style="cursor:pointer;padding:10px 0;">
+        <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:(isInc?'💰':'✨')}</div>
+        <div class="recent-info">
+          <p class="recent-title">${esc(e.note||'Untitled')}</p>
+          <span class="recent-pm">${esc(dateLabel)}</span>
+        </div>
+        <span class="recent-amt" style="color:${isInc?'var(--mint)':'var(--ink)'};">${isInc?'+':''}${formatINR(e.amount)}</span>
+        <input type="checkbox" ${checked?'checked':''} style="margin-left:10px;width:18px;height:18px;flex-shrink:0;" data-bulkacctcheck="${e.id}">
+      </div>`);
+  });
+  list.querySelectorAll('[data-bulkacctid]').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const id=row.dataset.bulkacctid;
+      if(_bulkAcctSelected.has(id)) _bulkAcctSelected.delete(id);
+      else _bulkAcctSelected.add(id);
+      const cb=row.querySelector('[data-bulkacctcheck]');
+      if(cb) cb.checked=_bulkAcctSelected.has(id);
+      document.getElementById('bulkaccount-apply-btn').classList.toggle('hidden', _bulkAcctSelected.size===0);
+    });
+  });
+  document.getElementById('bulkaccount-apply-btn').classList.toggle('hidden', _bulkAcctSelected.size===0);
+}
+async function applyBulkAccountAssign(){
+  if(!_bulkAcctSelectedAccountId || _bulkAcctSelected.size===0) return;
+  const ids=[..._bulkAcctSelected];
+  for(const id of ids){
+    const exp=await DB.getExpense(id);
+    if(exp){ exp.accountId=_bulkAcctSelectedAccountId; await DB.addExpense(exp); }
+  }
+  const count=ids.length;
+  _bulkAcctSelected=new Set();
+  await renderBulkAccountList();
+  toast(`${count} transaction${count===1?'':'s'} assigned`);
+}
+
 /* ============================== INSIGHTS ============================== */
 function dateToISO(d){ const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); }
 function addDays(d, n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
@@ -4184,13 +5750,56 @@ function monthBounds(refISO){
   const end=new Date(d.getFullYear(), d.getMonth()+1, 0); // day 0 = last day of the previous month
   return { startISO: dateToISO(start), endISO: dateToISO(end) };
 }
+// Returns the user's financial cycle start day (1–28), defaulting to 1.
+// Stored in localStorage as pt_cycle_day. When 1, behaviour is identical
+// to calendar month — so existing users see zero change until they opt in.
+function getCycleDay(){
+  const v=parseInt(localStorage.getItem('pt_cycle_day')||'1',10);
+  return (v>=1 && v<=28) ? v : 1;
+}
+// Computes the financial cycle bounds (start/end ISO dates) that contain
+// the given reference date, using the user's configured cycle start day.
+// Example: cycle day 26, today = 10 Jun → cycle is 26 May – 25 Jun.
+// When cycle day is 1, output is identical to monthBounds().
+function cycleBounds(refISO){
+  const cycleDay=getCycleDay();
+  if(cycleDay===1) return monthBounds(refISO);
+  const ref=new Date(refISO+'T00:00:00');
+  const refDay=ref.getDate();
+  let startYear=ref.getFullYear(), startMonth=ref.getMonth();
+  // If today is before the cycle start day, the cycle started last month
+  if(refDay < cycleDay) {
+    startMonth -= 1;
+    if(startMonth < 0){ startMonth=11; startYear--; }
+  }
+  const lastDayOfStartMonth=new Date(startYear, startMonth+1, 0).getDate();
+  const clampedStart=Math.min(cycleDay, lastDayOfStartMonth);
+  const cycleStart=new Date(startYear, startMonth, clampedStart);
+  // End is one day before next cycle start
+  let endYear=startYear, endMonth=startMonth+1;
+  if(endMonth>11){ endMonth=0; endYear++; }
+  const lastDayOfEndMonth=new Date(endYear, endMonth+1, 0).getDate();
+  const clampedEnd=Math.min(cycleDay, lastDayOfEndMonth);
+  const cycleEnd=new Date(endYear, endMonth, clampedEnd-1);
+  return { startISO: dateToISO(cycleStart), endISO: dateToISO(cycleEnd) };
+}
+// Same as monthsAgoBounds but uses cycleBounds. n=1 → previous cycle, etc.
+function cyclesAgoBounds(n){
+  const today=new Date();
+  const cycleDay=getCycleDay();
+  // Step back n months from current cycle start
+  const cur=cycleBounds(todayISO());
+  const ref=new Date(cur.startISO+'T00:00:00');
+  ref.setMonth(ref.getMonth()-n);
+  return cycleBounds(dateToISO(ref));
+}
 function yearBounds(refISO){
   const d=new Date(refISO+'T00:00:00');
   return { startISO: dateToISO(new Date(d.getFullYear(),0,1)), endISO: dateToISO(new Date(d.getFullYear(),11,31)) };
 }
 function stepPeriod(type, startISO, dir){
   if(type==='week') return weekBounds(dateToISO(addDays(new Date(startISO+'T00:00:00'), 7*dir)));
-  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()+dir); return monthBounds(dateToISO(d)); }
+  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()+dir); return cycleBounds(dateToISO(d)); }
   if(type==='year'){ const d=new Date(startISO+'T00:00:00'); d.setFullYear(d.getFullYear()+dir); return yearBounds(dateToISO(d)); }
   return null;
 }
@@ -4198,7 +5807,7 @@ function stepPeriod(type, startISO, dir){
 // fall back to the same number of days immediately before the chosen range.
 function previousPeriodBounds(type, startISO, endISO){
   if(type==='week') return weekBounds(dateToISO(addDays(new Date(startISO+'T00:00:00'), -7)));
-  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()-1); return monthBounds(dateToISO(d)); }
+  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()-1); return cycleBounds(dateToISO(d)); }
   if(type==='year'){ const d=new Date(startISO+'T00:00:00'); d.setFullYear(d.getFullYear()-1); return yearBounds(dateToISO(d)); }
   const start=new Date(startISO+'T00:00:00'), end=new Date(endISO+'T00:00:00');
   const lengthDays=Math.round((end-start)/86400000)+1;
@@ -4207,7 +5816,13 @@ function previousPeriodBounds(type, startISO, endISO){
 }
 function formatPeriodLabel(type, startISO, endISO){
   if(type==='custom' && (!startISO || !endISO)) return 'Pick a date range';
-  if(type==='month') return new Date(startISO+'T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  if(type==='month'){
+    // When cycle day is 1, show familiar "June 2026" label.
+    // When cycle day ≠ 1, show "26 May – 25 Jun" so the non-calendar range is clear.
+    if(getCycleDay()===1) return new Date(startISO+'T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+    const s=new Date(startISO+'T00:00:00'), e=new Date(endISO+'T00:00:00');
+    return `${s.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}`;
+  }
   if(type==='year') return new Date(startISO+'T00:00:00').getFullYear().toString();
   const s=new Date(startISO+'T00:00:00'), e=new Date(endISO+'T00:00:00');
   return `${s.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}`;
@@ -4248,7 +5863,7 @@ function applyInsightsPeriodTypeUI(){
 function setInsightsPeriodType(type){
   state.insPeriodType=type;
   if(type==='week'){ const b=weekBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
-  else if(type==='month'){ const b=monthBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
+  else if(type==='month'){ const b=cycleBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
   else if(type==='year'){ const b=yearBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
   else { state.insStartISO=null; state.insEndISO=null; document.getElementById('ins-custom-start').value=''; document.getElementById('ins-custom-end').value=''; }
   applyInsightsPeriodTypeUI();
@@ -4269,6 +5884,7 @@ function setInsightsView(view){
   document.getElementById('ins-compare-panel').classList.toggle('hidden', view!=='compare');
   document.getElementById('ins-payment-panel').classList.toggle('hidden', view!=='payment');
   document.getElementById('ins-groups-panel').classList.toggle('hidden', view!=='groups');
+  document.getElementById('ins-groups-chip-bar').classList.toggle('hidden', view!=='groups');
   applyInsightsPeriodTypeUI();
   renderInsights();
 }
@@ -4392,38 +6008,48 @@ async function renderInsightsCompareResult(){
 }
 async function renderInsightsGroupsPanel(){
   const container=document.getElementById('ins-groups-panel');
+  const chipBar=document.getElementById('ins-groups-chip-bar');
+  const chipRow=document.getElementById('ins-groups-chip-row');
+
   if(state.groups.length===0){
+    chipBar.classList.add('hidden');
     container.innerHTML='<p class="empty-hint">No groups yet — add one from the Add/Edit screen\'s Group field.</p>';
     return;
   }
-  const chipsHTML=state.groups.map(g=>{
+
+  // Render chips in sticky bar
+  chipBar.classList.remove('hidden');
+  chipRow.innerHTML=state.groups.map(g=>{
     const selected=state.insSelectedGroupId===g.id;
     const bg=selected?'var(--grape)':'var(--surface)';
     const color=selected?'white':'var(--ink)';
     return `<button type="button" class="pay-chip" data-ins-group="${g.id}" style="background:${bg};color:${color}">${esc(g.name)}</button>`;
   }).join('');
+  chipRow.querySelectorAll('[data-ins-group]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.insSelectedGroupId=btn.dataset.insGroup;
+      renderInsightsGroupsPanel();
+    });
+  });
 
+  // Render results in scrollable panel
   let resultHTML='<p class="empty-hint">Pick a group above.</p>';
   if(state.insSelectedGroupId){
-    // Custom range guard
     if(state.insPeriodType==='custom' && (!state.insStartISO || !state.insEndISO)){
       resultHTML='<p class="empty-hint">Pick a from and to date above.</p>';
     } else if(state.insPeriodType==='custom' && state.insStartISO>state.insEndISO){
       resultHTML='<p class="empty-hint">The from date is after the to date.</p>';
     } else {
       const group=state.groups.find(g=>g.id===state.insSelectedGroupId);
-      // Current period expenses for this group
       const curAll=(await DB.getExpensesByDateRange(state.insStartISO, state.insEndISO))
         .filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && e.groupId===state.insSelectedGroupId)
         .sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
-      // Previous period total for delta
       const prevBounds=previousPeriodBounds(state.insPeriodType, state.insStartISO, state.insEndISO);
       const prevAll=(await DB.getExpensesByDateRange(prevBounds.startISO, prevBounds.endISO))
         .filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && e.groupId===state.insSelectedGroupId);
       const curTotal=curAll.reduce((s,e)=>s+Number(e.amount),0);
       const prevTotal=prevAll.reduce((s,e)=>s+Number(e.amount),0);
       const delta=formatDelta(curTotal, prevTotal);
-
       if(curAll.length===0 && prevTotal===0){
         resultHTML=`<p class="empty-hint">No expenses tagged to ${esc(group?group.name:'this group')} in this period.</p>`;
       } else {
@@ -4435,7 +6061,7 @@ async function renderInsightsGroupsPanel(){
               <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
               <div class="recent-info">
                 <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:'Expense'))}</p>
-                <span class="recent-meta">${dateLabel}${cat?' · '+esc(cat.name):''}</span>
+                <span class="recent-pm">${dateLabel}${cat?' · '+esc(cat.name):''}</span>
               </div>
               <span class="recent-amt">-${formatINR(e.amount)}</span>
             </div>`;
@@ -4450,13 +6076,7 @@ async function renderInsightsGroupsPanel(){
       }
     }
   }
-  container.innerHTML = `<div class="pay-row" id="ins-groups-chip-row">${chipsHTML}</div><div style="margin-top:14px;">${resultHTML}</div>`;
-  document.querySelectorAll('#ins-groups-chip-row [data-ins-group]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      state.insSelectedGroupId=btn.dataset.insGroup;
-      renderInsightsGroupsPanel();
-    });
-  });
+  container.innerHTML=`<div style="margin-top:4px;">${resultHTML}</div>`;
 }
 async function renderInsights(){
   document.getElementById('ins-period-label').textContent = formatPeriodLabel(state.insPeriodType, state.insStartISO, state.insEndISO);
@@ -4472,12 +6092,37 @@ async function renderInsights(){
 // on whether we're in expense or income mode. Called on open and on toggle.
 function renderAddModeUI(){
   const isIncome = state.addMode === 'income';
-  document.getElementById('add-expense-only-fields').classList.toggle('hidden', isIncome);
-  document.getElementById('add-payment-section').classList.toggle('hidden', isIncome);
-  renderCategoryGrid();
-  updateNotePlaceholder();
-  renderPaymentChips();
-  if(!isIncome){
+  const isTransfer = state.addMode === 'transfer';
+
+  // Title
+  document.getElementById('add-screen-title').textContent =
+    isTransfer ? 'Add transfer' : isIncome ? 'Add income' : 'Add expense';
+
+  // Transfer-specific fields
+  document.getElementById('add-transfer-section').classList.toggle('hidden', !isTransfer);
+
+  // Category label + grid — hide in transfer mode
+  const catGrid=document.getElementById('add-category-grid');
+  const catLabel=catGrid.previousElementSibling;
+  catLabel.classList.toggle('hidden', isTransfer);
+  catGrid.classList.toggle('hidden', isTransfer);
+
+  // Account strip (From account for expense/income)
+  document.getElementById('add-account-section').classList.toggle('hidden', isTransfer || !state.accountsEnabled || state.accounts.length===0);
+
+  // Payment method — only for expense
+  document.getElementById('add-payment-section').classList.toggle('hidden', isIncome || isTransfer);
+
+  // Expense-only fields (warranty, split, recurring etc.)
+  document.getElementById('add-expense-only-fields').classList.toggle('hidden', isIncome || isTransfer);
+
+  if(isTransfer){
+    renderTransferAccountRows();
+  } else {
+    renderAccountPillStrip();
+    renderCategoryGrid();
+    updateNotePlaceholder();
+    renderPaymentChips();
     renderExcludeForecastRow();
     renderWarrantyArea();
     renderGroupArea();
@@ -4552,8 +6197,9 @@ const INCOME_CATEGORIES=[
 // Backward-compat: records saved before income tracking have no type field,
 // treat them as expenses. Always use these helpers rather than checking
 // e.type === 'expense' directly to avoid breaking old data.
-function isExpenseEntry(e){ return !e.type || e.type==='expense'; }
+function isExpenseEntry(e){ return (!e.type || e.type==='expense') && e.type!=='transfer'; }
 function isIncomeEntry(e){ return e.type==='income'; }
+function isTransferEntry(e){ return e.type==='transfer'; }
 
 // Single-pass usage count per category, all-time — powers the "most-used
 // first" sort on the Add screen's category grid. Fetched once per Add-screen
@@ -4584,9 +6230,69 @@ function updateNotePlaceholder(){
   const cat=state.categories.find(c=>c.id===state.selectedCategoryId);
   document.getElementById('add-note').placeholder = (cat && NOTE_PLACEHOLDERS[cat.name]) || 'What was this for?';
 }
+function renderTransferAccountRows(){
+  ['from','to'].forEach(dir=>{
+    const row=document.getElementById(`add-transfer-${dir}-row`); row.innerHTML='';
+    const selectedId = dir==='from' ? state.selectedTransferFromId : state.selectedTransferToId;
+    state.accounts.forEach(a=>{
+      const selected=selectedId===a.id;
+      const icon=a.type==='cc'?'💳':'🏦';
+      row.insertAdjacentHTML('beforeend',`
+        <button type="button" class="pay-chip" data-transfer-${dir}="${a.id}"
+          style="background:${selected?'var(--grape)':'var(--surface)'};color:${selected?'white':'var(--ink)'}">
+          <span>${icon}</span>${esc(a.name)}
+        </button>`);
+    });
+    row.querySelectorAll(`[data-transfer-${dir}]`).forEach(btn=>{
+      btn.onclick=()=>{
+        if(dir==='from') state.selectedTransferFromId=btn.dataset.transferFrom;
+        else state.selectedTransferToId=btn.dataset.transferTo;
+        renderTransferAccountRows();
+      };
+    });
+  });
+}
+function renderAccountPillStrip(){
+  const section=document.getElementById('add-account-section');
+  if(!state.accountsEnabled || state.accounts.length===0){ section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  const row=document.getElementById('add-account-row'); row.innerHTML='';
+  state.accounts.forEach(a=>{
+    const selected=state.selectedAccountId===a.id;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    const icon = a.type==='cc' ? '💳' : '🏦';
+    row.insertAdjacentHTML('beforeend', `
+      <button type="button" class="pay-chip" data-acctpill="${a.id}" style="background:${bg};color:${color}">
+        <span>${icon}</span>${esc(a.name)}
+      </button>`);
+  });
+  row.querySelectorAll('[data-acctpill]').forEach(btn=>{
+    btn.onclick=()=>{
+      state.selectedAccountId=btn.dataset.acctpill;
+      renderAccountPillStrip();
+      renderPaymentChips(); // re-filter payment methods to selected account
+    };
+  });
+}
 function renderPaymentChips(){
   const row=document.getElementById('add-payment-row'); row.innerHTML='';
-  state.paymentMethods.forEach(pm=>{
+  // When accounts enabled and an account is selected, filter to that account's methods.
+  // If the account has no methods assigned yet, show all (graceful fallback).
+  let methods = state.paymentMethods;
+  if(state.accountsEnabled && state.selectedAccountId){
+    const acct=state.accounts.find(a=>a.id===state.selectedAccountId);
+    if(acct && acct.paymentMethodIds && acct.paymentMethodIds.length>0){
+      const ids=new Set(acct.paymentMethodIds);
+      const filtered=state.paymentMethods.filter(pm=>ids.has(pm.id));
+      if(filtered.length>0) methods=filtered;
+    }
+  }
+  // If currently selected payment method is not in filtered list, reset to first available
+  if(state.selectedPaymentId && !methods.find(pm=>pm.id===state.selectedPaymentId)){
+    state.selectedPaymentId = methods[0] ? methods[0].id : null;
+  }
+  methods.forEach(pm=>{
     const selected=state.selectedPaymentId===pm.id;
     const bg = selected ? 'var(--grape)' : 'var(--surface)';
     const color = selected ? 'white' : 'var(--ink)';
@@ -4961,12 +6667,23 @@ async function openAddScreen(existing){
   state.returnScreen = getCurrentScreen();
   state.editingExpenseId = existing ? existing.id : null;
   state.editingExpense = existing || null;
-  state.addMode = (existing && existing.type==='income') ? 'income' : 'expense';
+  state.addMode = (existing && existing.type==='income') ? 'income' : (existing && existing.type==='transfer') ? 'transfer' : 'expense';
+  // Transfer state
+  state.selectedTransferFromId = existing ? (existing.fromAccountId||null) : (state.accounts[0]?state.accounts[0].id:null);
+  state.selectedTransferToId = existing ? (existing.toAccountId||null) : (state.accounts[1]?state.accounts[1].id:null);
   state.selectedCategoryId = existing ? existing.categoryId : (state.categories[0] ? state.categories[0].id : null);
   state.selectedIncomeCategoryId = existing ? (existing.incomeCategoryId || INCOME_CATEGORIES[0].id) : INCOME_CATEGORIES[0].id;
   state.catGridExpanded = false; // always start collapsed — same pattern as MORE OPTIONS below
   state.catUsageCounts = await getCategoryUsageCounts();
   state.selectedPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
+  // Account — default to last used (pt_last_account), or first account if no prior selection
+  if(state.accountsEnabled && state.accounts.length>0){
+    const lastAcct=Store.get('pt_last_account');
+    const validLast=lastAcct && state.accounts.find(a=>a.id===lastAcct);
+    state.selectedAccountId = existing ? (existing.accountId||null) : (validLast ? lastAcct : state.accounts[0].id);
+  } else {
+    state.selectedAccountId=null;
+  }
   state.pendingAttachments = [];
   state.existingAttachmentIds = existing ? ((existing.attachmentIds && existing.attachmentIds.length) ? existing.attachmentIds.slice() : (existing.attachmentId ? [existing.attachmentId] : [])) : [];
   state.existingAttachments = null;
@@ -5008,6 +6725,29 @@ async function saveExpense(){
   const amount=parseFloat(document.getElementById('add-amount').value);
   if(!amount || amount<=0){ toast('Enter a valid amount'); return; }
   const isIncome = state.addMode === 'income';
+  const isTransfer = state.addMode === 'transfer';
+
+  // Transfer path
+  if(isTransfer){
+    if(!state.selectedTransferFromId){ toast('Select a From account'); return; }
+    if(!state.selectedTransferToId){ toast('Select a To account'); return; }
+    if(state.selectedTransferFromId===state.selectedTransferToId){ toast('From and To accounts must be different'); return; }
+    const date=document.getElementById('add-date').value || todayISO();
+    const note=document.getElementById('add-note').value.trim();
+    const isEdit=!!state.editingExpenseId;
+    const id=isEdit ? state.editingExpenseId : genId();
+    const transfer={
+      id, type:'transfer', amount,
+      fromAccountId:state.selectedTransferFromId,
+      toAccountId:state.selectedTransferToId,
+      date, note, attachmentIds:[],
+      createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
+    };
+    await DB.addExpense(transfer);
+    toast(isEdit ? 'Transfer updated ✓' : 'Transfer saved ✓');
+    goToReturnScreen();
+    return;
+  }
 
   // Income path — much simpler: no warranty, no group, no recurring
   if(isIncome){
@@ -5019,10 +6759,12 @@ async function saveExpense(){
     const income={
       id, type:'income', amount,
       incomeCategoryId: state.selectedIncomeCategoryId,
+      accountId: state.accountsEnabled ? (state.selectedAccountId||null) : null,
       date, note, attachmentIds:[],
       createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
     };
     await DB.addExpense(income);
+    if(state.accountsEnabled && state.selectedAccountId) Store.set('pt_last_account', state.selectedAccountId);
     toast(isEdit ? 'Income updated ✓' : 'Income saved ✓');
     goToReturnScreen();
     return;
@@ -5109,7 +6851,8 @@ async function saveExpense(){
 
   const expense={
     id, type:'expense', amount, categoryId: state.selectedCategoryId,
-    paymentMethod: state.selectedPaymentId, // stores the payment method's id, despite the field name
+    paymentMethod: state.selectedPaymentId,
+    accountId: state.accountsEnabled ? (state.selectedAccountId||null) : null,
     date, note, attachmentIds, recurringId, groupId,
     warrantyExpiry: state.warrantyEnabled ? state.warrantyExpiry : null,
     warrantyDurationMonths: state.warrantyEnabled ? state.warrantyDurationMonths : null,
@@ -5119,7 +6862,30 @@ async function saveExpense(){
     excludeFromForecast: state.excludeFromForecast,
     createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
   };
-  await DB.addExpense(expense); // put() — works for both create and update since the id matches
+  await DB.addExpense(expense);
+
+  // Persist last used account for next Add screen open
+  if(state.accountsEnabled && state.selectedAccountId){
+    Store.set('pt_last_account', state.selectedAccountId);
+  }
+
+  // If the selected payment method is not in the selected account's methods,
+  // prompt to add it — non-blocking, save already happened above.
+  if(state.accountsEnabled && state.selectedAccountId && state.selectedPaymentId){
+    const acct=state.accounts.find(a=>a.id===state.selectedAccountId);
+    const pm=state.paymentMethods.find(p=>p.id===state.selectedPaymentId);
+    if(acct && pm && !(acct.paymentMethodIds||[]).includes(state.selectedPaymentId)){
+      state._pendingAcctPmAccountId=acct.id;
+      state._pendingAcctPmMethodId=pm.id;
+      document.getElementById('acct-addpm-title').textContent=`Add "${pm.name}" to ${acct.name}?`;
+      document.getElementById('acct-addpm-sub').textContent=`This payment method isn't linked to ${acct.name} yet. Add it so it appears automatically next time?`;
+      document.getElementById('acct-addpm-overlay').classList.add('show');
+      // Don't wait — return now so the toast and navigation happen immediately
+      toast(isEdit ? 'Expense updated ✓' : 'Expense saved ✓');
+      goToReturnScreen();
+      return;
+    }
+  }
 
   toast(isEdit ? 'Expense updated ✓' : 'Expense saved ✓');
   goToReturnScreen();
@@ -5153,10 +6919,18 @@ document.getElementById('add-amount').addEventListener('input', () => {
 document.getElementById('add-type-toggle').addEventListener('click', (e) => {
   const btn=e.target.closest('.segmented-tab'); if(!btn) return;
   const newMode=btn.dataset.addtype; if(!newMode || newMode===state.addMode) return;
+  // Transfer mode only available when accounts are enabled and 2+ accounts exist
+  if(newMode==='transfer' && (!state.accountsEnabled || state.accounts.length<2)){
+    toast('Add at least 2 accounts in Settings to use transfers');
+    return;
+  }
   state.addMode=newMode;
+  const isTransfer=newMode==='transfer';
   const isIncome=newMode==='income';
-  document.getElementById('add-screen-title').textContent = state.editingExpenseId ? (isIncome?'Edit income':'Edit expense') : (isIncome?'Add income':'Add expense');
-  document.getElementById('add-save-btn').textContent = state.editingExpenseId ? 'Save changes' : (isIncome?'Save income':'Save expense');
+  const titleMap={expense:'Add expense',income:'Add income',transfer:'Add transfer'};
+  const editTitleMap={expense:'Edit expense',income:'Edit income',transfer:'Edit transfer'};
+  document.getElementById('add-screen-title').textContent = state.editingExpenseId ? editTitleMap[newMode] : titleMap[newMode];
+  document.getElementById('add-save-btn').textContent = state.editingExpenseId ? 'Save changes' : (isTransfer?'Save transfer':isIncome?'Save income':'Save expense');
   document.querySelectorAll('#add-type-toggle .segmented-tab').forEach(b => b.classList.toggle('active', b.dataset.addtype===newMode));
   renderAddModeUI();
 });
@@ -5226,12 +7000,12 @@ document.getElementById('txn-filter-type-tabs').addEventListener('click', (e) =>
   const newType=btn.dataset.filtertype; if(!newType || newType===state.txnFilterType) return;
   state.txnFilterType=newType;
   document.querySelectorAll('#txn-filter-type-tabs .segmented-tab').forEach(b => b.classList.toggle('active', b.dataset.filtertype===newType));
-  // Hide category filter when Income-only (income has fixed categories)
-  const showCat=newType!=='income';
+  // Hide category filter for income and transfer
+  const showCat = newType!=='income' && newType!=='transfer';
   document.getElementById('txn-filter-cat-label').classList.toggle('hidden', !showCat);
   document.getElementById('txn-filter-cat-grid').classList.toggle('hidden', !showCat);
-  // Clear expense-only filter state when switching to income
-  if(newType==='income'){
+  // Clear expense-only filter state when switching to income or transfer
+  if(newType==='income' || newType==='transfer'){
     state.txnFilterPaymentIds.clear();
     state.txnFilterGroupIds.clear();
     if(state.txnFilterSplitOnly){ state.txnFilterSplitOnly=false; syncSplitFilterUI(); }
@@ -5355,9 +7129,78 @@ document.getElementById('import-confirm-overlay').addEventListener('click', (e) 
 });
 document.getElementById('import-confirm-btn').addEventListener('click', confirmImport);
 
+// ---- Google Drive backup listeners ----
+document.getElementById('settings-drive-connect-btn').addEventListener('click', handleDriveConnectClick);
+document.getElementById('settings-drive-backupnow-btn').addEventListener('click', openDriveBackupConfirm);
+document.getElementById('drive-backup-confirm-cancel-btn').addEventListener('click', closeDriveBackupConfirm);
+document.getElementById('drive-backup-confirm-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='drive-backup-confirm-overlay') closeDriveBackupConfirm();
+});
+document.getElementById('drive-backup-confirm-btn').addEventListener('click', confirmDriveBackupNow);
+
+document.getElementById('settings-drive-restore-btn').addEventListener('click', openDriveRestoreConfirm);
+document.getElementById('drive-restore-confirm-cancel-btn').addEventListener('click', closeDriveRestoreConfirm);
+document.getElementById('drive-restore-confirm-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='drive-restore-confirm-overlay') closeDriveRestoreConfirm();
+});
+document.getElementById('drive-restore-confirm-btn').addEventListener('click', confirmDriveRestore);
+
+document.getElementById('settings-drive-disconnect-btn').addEventListener('click', confirmDriveDisconnect);
+
+document.getElementById('drive-autorestore-cancel-btn').addEventListener('click', () => {
+  document.getElementById('drive-autorestore-overlay').classList.remove('show');
+});
+document.getElementById('drive-autorestore-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='drive-autorestore-overlay') document.getElementById('drive-autorestore-overlay').classList.remove('show');
+});
+document.getElementById('drive-autorestore-btn').addEventListener('click', async () => {
+  document.getElementById('drive-autorestore-overlay').classList.remove('show');
+  try{
+    await CloudBackup.restoreLatest();
+    toast('Restore complete');
+  } catch(err){
+    toast('Restore failed — please try again');
+  }
+});
+
 document.getElementById('settings-changepin-btn').addEventListener('click', startChangePIN);
 document.getElementById('settings-guide-btn').addEventListener('click', () => openGuideScreen('settings-screen'));
 document.getElementById('settings-forcerefresh-btn').addEventListener('click', forceRefreshApp);
+
+// ---- Debug log panel ----
+document.getElementById('settings-debuglog-btn').addEventListener('click', () => {
+  DebugLog.render();
+  document.getElementById('debuglog-overlay').style.display='flex';
+});
+document.getElementById('debuglog-close-btn').addEventListener('click', () => {
+  document.getElementById('debuglog-overlay').style.display='none';
+});
+document.getElementById('debuglog-snapshot-btn').addEventListener('click', () => {
+  DebugLog.snapshot();
+  DebugLog.render();
+  toast('Snapshot logged');
+});
+document.getElementById('debuglog-clear-btn').addEventListener('click', () => {
+  DebugLog.clear();
+  DebugLog.render();
+  toast('Log cleared');
+});
+// Cycle day — save on change, clamp to 1–28, refresh all cycle-dependent views
+document.getElementById('settings-cycle-day').addEventListener('change', () => {
+  let v=parseInt(document.getElementById('settings-cycle-day').value, 10);
+  if(isNaN(v)||v<1) v=1;
+  if(v>28) v=28;
+  document.getElementById('settings-cycle-day').value=v;
+  localStorage.setItem('pt_cycle_day', String(v));
+  // Re-anchor Insights month period to the new cycle bounds
+  if(state.insPeriodType==='month'){
+    const b=cycleBounds(todayISO());
+    state.insStartISO=b.startISO; state.insEndISO=b.endISO;
+  }
+  renderInsights();
+  renderHomeBudgetsPanel();
+  toast('Cycle start day updated');
+});
 document.getElementById('guide-close-btn').addEventListener('click', closeGuideScreen);
 document.getElementById('settings-notif-row').addEventListener('click', async () => {
   if(isNotifEnabled()){
@@ -5378,24 +7221,39 @@ document.getElementById('home-whatsnew-banner').addEventListener('click', openWh
   document.getElementById(id).addEventListener('click', lockVault);
 });
 
+// Cloud status icon — tappable, jumps to Settings → Cloud Backup section.
+// Only visible when Drive is connected (see renderCloudStatusIcons).
+['home-cloud-btn','txn-cloud-btn','stats-cloud-btn'].forEach(id => {
+  const btn=document.getElementById(id);
+  if(btn) btn.addEventListener('click', () => {
+    showScreen('settings-screen');
+    setTimeout(()=>{ document.getElementById('settings-drive-connect-btn').scrollIntoView({behavior:'smooth'}); }, 300);
+  });
+});
+
 // Income eye toggle — reveals/masks all income amounts on Home and List.
 // State resets to false (masked) on every lock/unlock.
 function updateEyeButtons(){
   const icon = state.incomeRevealed ? '🙈' : '👁️';
   const title = state.incomeRevealed ? 'Mask income' : 'Show income';
-  ['home-eye-btn','txn-eye-btn'].forEach(id => {
+  ['home-eye-btn','txn-eye-btn','stats-eye-btn','accounts-view-eye-btn'].forEach(id => {
     const btn = document.getElementById(id);
     if(btn){ btn.textContent=icon; btn.title=title; }
   });
 }
-['home-eye-btn','txn-eye-btn'].forEach(id => {
+['home-eye-btn','txn-eye-btn','stats-eye-btn','accounts-view-eye-btn'].forEach(id => {
   document.getElementById(id).addEventListener('click', async ()=>{
     state.incomeRevealed = !state.incomeRevealed;
     updateEyeButtons();
     await renderHomeOverviewPanel();
     renderTransactions();
+    if(document.getElementById('accounts-view-overlay').classList.contains('show')) await renderAccountsViewSheet();
+    // Re-render forecast if it's visible so masked income values update
+    if(!document.getElementById('home-panel-forecast').classList.contains('hidden')) renderHomeForecastPanel();
   });
 });
+document.getElementById('forecast-income-nudge').addEventListener('click', openRecurringScreen);
+document.getElementById('stats-accounts-btn').addEventListener('click', openAccountsViewSheet);
 document.getElementById('settings-biometric-row').addEventListener('click', async ()=>{
   if(isBioEnabled()){
     disableBiometric();
@@ -5560,6 +7418,22 @@ document.getElementById('recurring-edit-overlay').addEventListener('click', (e) 
 document.getElementById('recurring-edit-save-btn').addEventListener('click', saveRecurringEdit);
 document.getElementById('recurring-edit-pause-btn').addEventListener('click', toggleRecurringPause);
 document.getElementById('recurring-edit-delete-btn').addEventListener('click', requestDeleteRecurring);
+// Type toggle (expense ↔ income) — only active when adding a new rule
+document.getElementById('recurring-type-tabs').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-rtype]'); if(!btn) return;
+  state.mgrRecurringType=btn.dataset.rtype;
+  // Reset category selections when switching type
+  if(state.mgrRecurringType==='expense'){
+    state.mgrRecurringCategoryId=state.categories[0] ? state.categories[0].id : null;
+  } else {
+    state.mgrRecurringIncomeCategoryId=INCOME_CATEGORIES[0].id;
+  }
+  state.mgrRecurringCatGridExpanded=false;
+  document.getElementById('recurring-type-tabs').querySelectorAll('[data-rtype]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.rtype===state.mgrRecurringType);
+  });
+  renderRecurringEditCatGrid();
+});
 document.getElementById('recurring-edit-cat-grid').addEventListener('click', (e) => {
   if(e.target.closest('[data-rcatmore]')){ state.mgrRecurringCatGridExpanded=true; renderRecurringEditCatGrid(); return; }
   const btn=e.target.closest('[data-rcat]'); if(!btn) return;
@@ -5680,6 +7554,90 @@ async function forceRefreshApp(){
   }
   window.location.reload(true);
 }
+// ---- Accounts event listeners ----
+document.getElementById('settings-accounts-toggle-row').addEventListener('click', handleAccountsToggle);
+document.getElementById('settings-manage-accounts-btn').addEventListener('click', openManageAccountsScreen);
+
+// Onboarding sheet
+document.getElementById('accounts-onboarding-close-btn').addEventListener('click', ()=>{
+  closeAccountsOnboarding();
+  // User closed without finishing — don't enable
+});
+document.getElementById('accounts-onboarding-overlay').addEventListener('click', (e)=>{
+  if(e.target.id==='accounts-onboarding-overlay') closeAccountsOnboarding();
+});
+document.getElementById('accounts-onboarding-add-btn').addEventListener('click', ()=> openAccountEdit(null,'onboarding'));
+document.getElementById('accounts-onboarding-done-btn').addEventListener('click', finishAccountsOnboarding);
+
+// Account edit sheet
+document.getElementById('account-edit-close-btn').addEventListener('click', closeAccountEdit);
+document.getElementById('account-edit-overlay').addEventListener('click', (e)=>{
+  if(e.target.id==='account-edit-overlay') closeAccountEdit();
+});
+document.getElementById('account-type-tabs').addEventListener('click', (e)=>{
+  const btn=e.target.closest('[data-accttype]'); if(!btn) return;
+  document.getElementById('account-type-tabs').querySelectorAll('[data-accttype]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.accttype===btn.dataset.accttype);
+  });
+  applyAccountTypeLabels(btn.dataset.accttype);
+});
+document.getElementById('account-edit-save-btn').addEventListener('click', saveAccountEdit);
+document.getElementById('account-edit-delete-btn').addEventListener('click', deleteAccountEdit);
+
+// Manage accounts overlay
+document.getElementById('manage-accounts-close-btn').addEventListener('click', closeManageAccountsScreen);
+document.getElementById('manage-accounts-overlay').addEventListener('click', (e)=>{
+  if(e.target.id==='manage-accounts-overlay') closeManageAccountsScreen();
+});
+document.getElementById('manage-accounts-add-btn').addEventListener('click', ()=> openAccountEdit(null,'settings'));
+document.getElementById('manage-accounts-bulkassign-btn').addEventListener('click', openBulkAccountScreen);
+
+// Bulk account assign screen
+document.getElementById('bulkaccount-close-btn').addEventListener('click', ()=> showScreen('settings-screen'));
+document.getElementById('bulkaccount-apply-btn').addEventListener('click', applyBulkAccountAssign);
+
+// Unknown payment method → add to account prompt
+document.getElementById('acct-addpm-confirm-btn').addEventListener('click', async ()=>{
+  document.getElementById('acct-addpm-overlay').classList.remove('show');
+  const acct=state.accounts.find(a=>a.id===state._pendingAcctPmAccountId);
+  const pmId=state._pendingAcctPmMethodId;
+  if(acct && pmId){
+    if(!acct.paymentMethodIds) acct.paymentMethodIds=[];
+    if(!acct.paymentMethodIds.includes(pmId)){
+      acct.paymentMethodIds.push(pmId);
+      await DB.putAccount(acct);
+    }
+  }
+  state._pendingAcctPmAccountId=null; state._pendingAcctPmMethodId=null;
+});
+document.getElementById('acct-addpm-cancel-btn').addEventListener('click', ()=>{
+  document.getElementById('acct-addpm-overlay').classList.remove('show');
+  state._pendingAcctPmAccountId=null; state._pendingAcctPmMethodId=null;
+});
+
+// Accounts view sheet (Insights)
+document.getElementById('accounts-view-close-btn').addEventListener('click', closeAccountsViewSheet);
+document.getElementById('accounts-view-overlay').addEventListener('click', (e)=>{
+  if(e.target.id==='accounts-view-overlay') closeAccountsViewSheet();
+});
+
+// Re-enable warning
+document.getElementById('accounts-reenable-confirm-btn').addEventListener('click', async ()=>{
+  document.getElementById('accounts-reenable-overlay').classList.remove('show');
+  state.accountsEnabled=true;
+  Store.set('pt_accounts_enabled','1');
+  renderAccountsSettingsRow();
+  renderAccountsInsightsBtn();
+  toast('Accounts re-enabled');
+});
+document.getElementById('accounts-reenable-cancel-btn').addEventListener('click', ()=>{
+  document.getElementById('accounts-reenable-overlay').classList.remove('show');
+});
+document.getElementById('home-onboard-dismiss').addEventListener('click', ()=>{
+  Store.set('pt_onboard_dismissed','1');
+  document.getElementById('home-onboard-card').classList.add('hidden');
+});
+
 function init(){
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed', err));
@@ -5693,6 +7651,13 @@ function init(){
   }
   renderBiometricRow();
   renderNotifRow();
+  document.getElementById('settings-cycle-day').value=getCycleDay();
+  // Accounts UI state — read from localStorage directly since unlockSuccess
+  // hasn't run yet at init time; unlockSuccess will set state.accountsEnabled.
+  const acctEnabled = Store.get('pt_accounts_enabled')==='1';
+  document.getElementById('settings-accounts-switch').classList.toggle('on', acctEnabled);
+  document.getElementById('settings-manage-accounts-btn').classList.toggle('hidden', !acctEnabled);
+  document.getElementById('stats-accounts-btn').classList.toggle('hidden', !acctEnabled);
 }
 init();
 </script>
