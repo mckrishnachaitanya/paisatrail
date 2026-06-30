@@ -24,7 +24,21 @@ Android-installable PWA. Single `index.html`, vanilla JS/CSS, IndexedDB, no fram
 
 **Onboarding checklist (2026-06-27):** "Get started" card on Home Overview. Shows when `pt_onboard_dismissed` is absent. Three items: set cycle day, add recurring income, set up accounts. Each taps to the relevant screen. Auto-dismisses permanently when all three are complete. Manual dismiss sets `pt_onboard_dismissed='1'`. Rendered by `renderOnboardingChecklist()`, called from `renderHomeOverviewPanel`.
 
-**Add/Edit:** Expense / Income / Transfer toggle. Category grid (frequency-sorted, collapses to top 6; `state.catUsageCounts` fetched once per open). MORE OPTIONS row: 5 chips (Warranty/Group/Split/Recurring/Attach), one open at a time. Transfer mode hides category, payment method, and all expense-only fields; shows From/To account pill rows instead. Transfer tab only active when ≥2 accounts exist.
+**Google Drive backup (2026-06-30):** `CloudBackup` module — Google Identity Services implicit token flow, no backend, no refresh tokens (deliberate, to preserve the zero-backend architecture). Scope: `drive.appdata` (hidden `appDataFolder`, never visible in user's normal Drive UI — protects against the original motivating problem of browser storage getting wiped while cleaning up other PWAs). OAuth Client ID is hardcoded as `DRIVE_CLIENT_ID` constant. App stays in Google's "Testing" publish status — only allowlisted test users (added manually in Cloud Console → Audience) can sign in; this is a deliberate scope decision since PaisaTrail's userbase is Krishna + his brother, and pursuing Google's verification process was judged not worth it.
+
+Auto-backup runs once per day on unlock (`checkDriveOnOpen`, called non-blocking from `unlockSuccess`) if `pt_drive_last_backup` is >24h old. Auto-backup payload = full transaction data + attachments **only** for expenses with `warrantyExpiry` set (deliberate: receipts are usually recoverable, warranty documents often aren't, and daily silent uploads of every receipt photo would be wasteful on mobile data). Manual "Back up now" in Settings includes all attachments and shows a confirm dialog first (`drive-backup-confirm-overlay`) plus a "don't close the app" state on the button while uploading — implicit-flow uploads have no background-sync guarantee and can be aborted if the PWA is closed mid-upload (a known, accepted limitation, not solved).
+
+Versioning: each backup is a new timestamped file (`paisatrail-backup-YYYY-MM-DDTHH-MM-SS.json`) in `appDataFolder`. After every successful upload, `pruneOldBackups()` keeps only the 3 most recent **calendar days** (not the 3 most recent files) — a same-day manual backup explicitly deletes that day's earlier auto-backup file rather than keeping both. `dayKeyFromFilename()` parses the date out of the filename for grouping.
+
+Restore (`CloudBackup.restoreLatest()`) always takes the single newest file overall and is a full replace via the shared `applyBackupPayload()` helper (extracted from the local-import code path — both local JSON import and Drive restore now funnel through the same apply logic, see `confirmImport()` vs the Drive restore handlers). Restore is auto-offered (`drive-autorestore-overlay`) only when local IndexedDB is empty on unlock and a Drive backup exists — never auto-triggered over existing local data. A manual "Restore from Drive" button also exists in Settings for when local data exists, gated behind an explicit destructive-action confirm (`drive-restore-confirm-overlay`) warning that local data not yet backed up may be lost — restore is never a merge, always a full replace, by design (merge logic was explicitly scoped out as a much riskier feature).
+
+Settings UI: "CLOUD BACKUP" section, `renderDriveSettingsRow()` toggles between a "Connect" row and a connected block (Back up now / Restore from Drive / Disconnect) based on `Store.get('pt_drive_connected')`. `pt_drive_last_backup` timestamp shown in the Back up now subtitle.
+
+**Known limitation, not yet solved:** if the PWA is closed/backgrounded mid-upload, the backup can fail silently (no Background Sync API reliance, since support is inconsistent on Android Chrome). The "don't close the app" button state surfaces this risk but doesn't eliminate it.
+
+**Cloud status icon (2026-06-30):** Small ☁️ button in `.topbar-icons` on Home, List, and Insights (not Settings — the full Cloud Backup section already lives there). `renderCloudStatusIcons()` is the single source of truth for all three buttons' state and is called from `renderDriveSettingsRow()` so it never drifts out of sync with the Settings row. Hidden entirely (`.hidden`) when Drive isn't connected. `.syncing` class (CSS `cloudPulse` animation) applied while `CloudBackup.syncing` is true — this flag is now set/cleared centrally inside `CloudBackup.runBackup()` itself rather than at each call site, so every backup trigger (first-connect, daily auto, manual) gets the pulsing icon automatically. `.has-error` class shows a small coral dot (`pt_drive_last_error` in localStorage, set on any `runBackup` failure, cleared on the next success) — restore failures deliberately don't set this flag, since the icon's job is backup status specifically. Tapping any of the three icons calls `showScreen('settings-screen')` + scrolls to `#settings-drive-connect-btn`, following the same `setTimeout` + `scrollIntoView` pattern already used for the accounts-onboarding nudge.
+
+ Category grid (frequency-sorted, collapses to top 6; `state.catUsageCounts` fetched once per open). MORE OPTIONS row: 5 chips (Warranty/Group/Split/Recurring/Attach), one open at a time. Transfer mode hides category, payment method, and all expense-only fields; shows From/To account pill rows instead. Transfer tab only active when ≥2 accounts exist.
 
 **Transactions (List tab):** Date-grouped, live search, filter sheet (type/category/payment/group/date/amount/split — live-apply, persist). Filter types: All / Expenses / Income / Transfers. "All" hides transfers — they only appear under Transfers filter. Income and Transfer filters hide Payment/Group/Split sections. **Sticky layout:** `#txn-sticky-top` holds topbar + search bar; transaction list scrolls beneath in `.scroll`.
 
@@ -102,6 +116,10 @@ Type guards — apply consistently, income and transfers must never reach budget
 | `pt_accounts_had_data` | '1' once any account has been created |
 | `pt_last_account` | id of last used account on Add screen |
 | `pt_onboard_dismissed` | '1' when onboarding checklist permanently dismissed |
+| `pt_drive_connected` | '1' once Google Drive backup connected on this device |
+| `pt_drive_last_backup` | timestamp (ms) of last successful Drive backup |
+| `pt_drive_email` | reserved for displaying connected account email (not currently populated — GIS implicit flow doesn't return profile info without an extra `userinfo` scope call) |
+| `pt_drive_last_error` | '1' when the last backup attempt failed (drives the cloud icon's error dot); cleared on next successful backup |
 
 ---
 
@@ -175,7 +193,8 @@ Palette: paper `#FFFCF7` · ink `#241F3D` · sunshine `#FFC23C` · coral `#FF6B5
 
 ## 9. Backlog
 
-1. **Transfers Phase 2** — transfer editing (currently add/delete only), transfer history per account
-2. **Multi-device cloud sync** — needs backend, furthest out
-3. **Excel/CSV export** — deferred ~4 months pending real usage data
-4. **Consolidate segmented-control implementations** (`.home-tabs` / `.segmented-tabs`) — minor cleanup
+1. **Device-test Google Drive backup** (2026-06-30, not yet verified on real device): connect flow on real Android Chrome, auto-backup firing correctly 24h apart, manual backup with attachments completing without the app being closed, restore-on-empty-DB prompt, manual restore with the destructive warning, pruning behavior over several real days of use, and the rare-but-expected re-auth prompt when the implicit token silently fails to refresh. Drive API calls cannot be exercised in the sandbox (no network access) — this entire feature is unverified beyond UI wiring and isolated logic tests until Krishna runs it live.
+2. **Transfers Phase 2** — transfer editing (currently add/delete only), transfer history per account
+3. **Multi-device cloud sync** — needs backend, furthest out (note: distinct from Drive backup above — this would be live Firestore sync across simultaneously-active devices, not a backup snapshot)
+4. **Excel/CSV export** — deferred ~4 months pending real usage data
+5. **Consolidate segmented-control implementations** (`.home-tabs` / `.segmented-tabs`) — minor cleanup

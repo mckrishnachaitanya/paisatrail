@@ -2,6 +2,24 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.9",
+      "date": "2026-06-30",
+      "highlights": [
+        "Cloud backup status icon now visible in the top bar on Home, List, and Insights — only shown once Drive backup is connected",
+        "Icon pulses while a backup is uploading, shows a small dot if the last attempt failed, and is tappable to jump straight to backup settings"
+      ]
+    },
+    {
+      "version": "3.8",
+      "date": "2026-06-30",
+      "highlights": [
+        "Google Drive backup: connect your Google account in Settings to back up automatically once a day — no need to remember manual exports",
+        "Auto-backup covers all transaction data plus attachments for anything under warranty; tap 'Back up now' to include every attachment",
+        "Backups are kept for the last 3 days so you can recover from a bad backup, not just the most recent one",
+        "Restore is offered automatically on a fresh install if a Drive backup exists, or manually anytime from Settings"
+      ]
+    },
+    {
       "version": "3.7",
       "date": "2026-06-27",
       "highlights": [
@@ -154,7 +172,7 @@
       "id": "settings",
       "icon": "⚙️",
       "title": "Settings",
-      "body": "Manage categories, payment methods, and groups; set up recurring expenses; back up or restore your data; and control your PIN and biometric unlock."
+      "body": "Manage categories, payment methods, and groups; set up recurring expenses; back up or restore your data (locally, or automatically via Google Drive); and control your PIN and biometric unlock."
     },
     {
       "id": "split",
