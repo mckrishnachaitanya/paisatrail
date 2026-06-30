@@ -144,10 +144,6 @@ input{outline:none;}
 /* ============================== HOME ============================== */
 #home-body{padding:0 20px 28px;}
 .home-header{display:flex;align-items:center;justify-content:space-between;margin:8px 0 16px;}
-#home-sticky-top{flex-shrink:0;background:var(--paper);padding:0 20px;}
-#home-scroll-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;isolation:isolate;padding:0 20px 100px;}
-#home-panel-overview{padding-top:4px;}
-#home-overview-sticky.hidden{display:none;}
 .greeting{font-family:var(--font-display);font-size:17px;}
 .month-label{font-size:12px;color:var(--muted);}
 
@@ -518,73 +514,58 @@ input{outline:none;}
 
 <!-- ============================== HOME SCREEN ============================== -->
 <div class="screen is-hidden" id="home-screen">
-  <!-- Sticky top: header + tabs + overview summary. Does not scroll. -->
-  <div id="home-sticky-top">
-    <div class="home-header">
-      <div>
-        <p class="greeting">Hey there 👋</p>
-        <p class="month-label" id="home-month-label">—</p>
-      </div>
-      <div class="topbar-icons">
-        <button type="button" class="income-eye-btn" id="home-eye-btn" title="Toggle income visibility">👁️</button>
-        <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
-      </div>
-    </div>
-
-    <div class="home-tabs" id="home-tabs">
-      <button type="button" class="home-tab active" data-hometab="overview">Overview</button>
-      <button type="button" class="home-tab" data-hometab="warranties">Warranties</button>
-      <button type="button" class="home-tab" data-hometab="forecast">Forecast</button>
-      <button type="button" class="home-tab" data-hometab="budgets">Budgets</button>
-    </div>
-
-    <!-- Overview sticky content: banners, onboarding, cashflow card, donut -->
-    <div id="home-overview-sticky">
-      <div id="home-whatsnew-banner" class="whatsnew-banner hidden"></div>
-      <div id="home-backup-banner" class="backup-nudge-banner hidden"></div>
-      <div id="home-warranty-banner" class="warranty-soon-banner hidden"></div>
-      <div id="home-onboard-card" class="hidden" style="
-        background:var(--surface);border:1.5px solid var(--border);border-radius:18px;
-        padding:14px 16px;margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <p style="font-size:13px;font-weight:700;color:var(--ink);">Get started</p>
-          <button type="button" id="home-onboard-dismiss" style="font-size:13px;color:var(--muted);background:none;border:none;cursor:pointer;">Dismiss</button>
-        </div>
-        <div id="home-onboard-items"></div>
-      </div>
-      <div class="spend-card">
-        <div class="cashflow-row">
-          <span class="cashflow-label">Income</span>
-          <span class="cashflow-amount cashflow-in" id="home-income-total">+₹0</span>
-        </div>
-        <div class="cashflow-row">
-          <span class="cashflow-label">Expenses</span>
-          <span class="cashflow-amount cashflow-out" id="home-expense-total">₹0</span>
-        </div>
-        <div class="cashflow-divider"></div>
-        <div class="cashflow-row cashflow-net-row">
-          <span class="cashflow-label cashflow-net-label">Net</span>
-          <span class="cashflow-amount" id="home-net-total">₹0</span>
-        </div>
-        <p class="spend-count" id="home-count">0 expenses this cycle</p>
-      </div>
-      <div class="perforation">
-        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-        <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
-      </div>
-      <div class="donut-row">
-        <div class="donut" id="home-donut"><div class="donut-hole" id="home-donut-label">No data yet</div></div>
-        <div class="legend" id="home-legend"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scrollable area: Recent list for Overview; full panels for other tabs -->
-  <div class="scroll" id="home-scroll-body">
+  <div class="scroll">
     <div id="home-body">
+      <div class="home-header">
+        <div>
+          <p class="greeting">Hey there 👋</p>
+          <p class="month-label" id="home-month-label">—</p>
+        </div>
+        <div class="topbar-icons">
+          <button type="button" class="income-eye-btn" id="home-eye-btn" title="Toggle income visibility">👁️</button>
+          <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
+        </div>
+      </div>
+
+      <div class="home-tabs" id="home-tabs">
+        <button type="button" class="home-tab active" data-hometab="overview">Overview</button>
+        <button type="button" class="home-tab" data-hometab="warranties">Warranties</button>
+        <button type="button" class="home-tab" data-hometab="forecast">Forecast</button>
+        <button type="button" class="home-tab" data-hometab="budgets">Budgets</button>
+      </div>
+
       <div id="home-panel-overview">
+        <div id="home-whatsnew-banner" class="whatsnew-banner hidden"></div>
+        <div id="home-backup-banner" class="backup-nudge-banner hidden"></div>
+        <div id="home-warranty-banner" class="warranty-soon-banner hidden"></div>
+        <div class="spend-card">
+          <div class="cashflow-row">
+            <span class="cashflow-label">Income</span>
+            <span class="cashflow-amount cashflow-in" id="home-income-total">+₹0</span>
+          </div>
+          <div class="cashflow-row">
+            <span class="cashflow-label">Expenses</span>
+            <span class="cashflow-amount cashflow-out" id="home-expense-total">₹0</span>
+          </div>
+          <div class="cashflow-divider"></div>
+          <div class="cashflow-row cashflow-net-row">
+            <span class="cashflow-label cashflow-net-label">Net</span>
+            <span class="cashflow-amount" id="home-net-total">₹0</span>
+          </div>
+          <p class="spend-count" id="home-count">0 expenses this month</p>
+        </div>
+        <div class="perforation">
+          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+          <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+        </div>
+
+        <div class="donut-row">
+          <div class="donut" id="home-donut"><div class="donut-hole" id="home-donut-label">No data yet</div></div>
+          <div class="legend" id="home-legend"></div>
+        </div>
+
         <div class="section-head">
           <p class="section-title">Recent</p>
         </div>
@@ -600,21 +581,6 @@ input{outline:none;}
           <button type="button" class="segmented-tab active" data-forecastwindow="month">Rest of this month</button>
           <button type="button" class="segmented-tab" data-forecastwindow="rolling30">Next 30 days</button>
         </div>
-        <!-- Savings summary card — shown when recurring income rules exist -->
-        <div id="forecast-savings-card" class="spend-card hidden" style="margin-top:14px;">
-          <div class="legend" id="forecast-savings-breakdown"></div>
-          <div style="border-top:1px solid rgba(255,255,255,0.2);margin-top:12px;padding-top:12px;display:flex;justify-content:space-between;align-items:center;">
-            <p class="spend-label" style="margin:0;">Projected savings</p>
-            <p id="forecast-savings-amount" class="spend-amount" style="font-size:20px;margin:0;"></p>
-          </div>
-        </div>
-        <!-- Nudge when no recurring income rules exist -->
-        <button type="button" id="forecast-income-nudge" class="hidden"
-          style="width:100%;margin-top:14px;padding:14px 16px;background:rgba(46,196,182,0.12);
-                 border:1.5px dashed var(--mint);border-radius:16px;text-align:left;cursor:pointer;">
-          <p style="font-size:13px;font-weight:600;color:var(--mint);margin-bottom:4px;">See your savings projection</p>
-          <p style="font-size:12px;color:var(--muted);">Add recurring income (salary, rent received) in Settings → Recurring transactions</p>
-        </button>
         <div class="spend-card" style="margin-top:14px;">
           <p class="spend-label" id="forecast-total-label">Projected total this month</p>
           <p class="spend-amount" id="forecast-total">₹0</p>
@@ -632,8 +598,8 @@ input{outline:none;}
         <div id="budgets-list"></div>
         <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="budgets-add-btn">+ Add budget</button>
       </div>
-    </div><!-- end home-body -->
-  </div><!-- end home-scroll-body -->
+    </div>
+  </div>
 
   <div class="bottom-nav">
     <div class="nav-item active" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
@@ -656,11 +622,10 @@ input{outline:none;}
 
   <div class="scroll">
     <div style="padding:0 20px 12px;">
-      <!-- Expense / Income / Transfer mode toggle -->
+      <!-- Expense / Income mode toggle — drives category grid, field visibility, save logic -->
       <div class="segmented-tabs" id="add-type-toggle" style="margin:14px 0 16px;">
         <button type="button" class="segmented-tab active" data-addtype="expense">Expense</button>
         <button type="button" class="segmented-tab" data-addtype="income">Income</button>
-        <button type="button" class="segmented-tab" data-addtype="transfer">Transfer</button>
       </div>
 
       <div class="receipt-card">
@@ -680,22 +645,8 @@ input{outline:none;}
       <p class="field-label">DATE</p>
       <input id="add-date" type="date" class="date-input">
 
-      <!-- Transfer fields — only visible in transfer mode -->
-      <div id="add-transfer-section" class="hidden">
-        <p class="field-label">FROM ACCOUNT</p>
-        <div class="pay-row" id="add-transfer-from-row" style="flex-wrap:wrap;gap:8px;"></div>
-        <p class="field-label">TO ACCOUNT</p>
-        <div class="pay-row" id="add-transfer-to-row" style="flex-wrap:wrap;gap:8px;"></div>
-      </div>
-
       <p class="field-label">CATEGORY</p>
       <div class="cat-grid" id="add-category-grid"></div>
-
-      <!-- Account pill strip — only rendered when accounts are enabled -->
-      <div id="add-account-section" class="hidden">
-        <p class="field-label">FROM ACCOUNT</p>
-        <div class="pay-row" id="add-account-row" style="flex-wrap:wrap;gap:8px;"></div>
-      </div>
 
       <div id="add-payment-section">
         <p class="field-label">PAID VIA</p>
@@ -769,22 +720,22 @@ input{outline:none;}
 
 <!-- ============================== TRANSACTIONS SCREEN ============================== -->
 <div class="screen is-hidden" id="transactions-screen">
-  <div id="txn-sticky-top" style="flex-shrink:0;background:var(--paper);padding:0 20px;">
-    <div class="screen-topbar">
-      <p class="topbar-title">Transactions</p>
-      <div class="topbar-icons">
-        <button type="button" class="income-eye-btn" id="txn-eye-btn" title="Toggle income visibility">👁️</button>
-        <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
+  <div class="scroll">
+    <div style="padding:0 20px 12px;">
+      <div class="screen-topbar">
+        <p class="topbar-title">Transactions</p>
+        <div class="topbar-icons">
+          <button type="button" class="income-eye-btn" id="txn-eye-btn" title="Toggle income visibility">👁️</button>
+          <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
+        </div>
       </div>
+      <div class="search-bar">
+        <span>🔍</span>
+        <input id="txn-search" type="text" placeholder="Search expenses...">
+        <button type="button" class="txn-filter-btn" id="txn-filter-btn">Filter</button>
+      </div>
+      <div id="txn-list" style="margin-top:14px;"></div>
     </div>
-    <div class="search-bar">
-      <span>🔍</span>
-      <input id="txn-search" type="text" placeholder="Search expenses...">
-      <button type="button" class="txn-filter-btn" id="txn-filter-btn">Filter</button>
-    </div>
-  </div>
-  <div class="scroll" style="padding:0 20px 12px;">
-    <div id="txn-list" style="margin-top:14px;"></div>
   </div>
   <div class="bottom-nav">
     <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
@@ -808,7 +759,6 @@ input{outline:none;}
       <button type="button" class="segmented-tab active" data-filtertype="all">All</button>
       <button type="button" class="segmented-tab" data-filtertype="expense">Expenses</button>
       <button type="button" class="segmented-tab" data-filtertype="income">Income</button>
-      <button type="button" class="segmented-tab" data-filtertype="transfer">Transfers</button>
     </div>
     <p class="field-label" id="txn-filter-cat-label" style="margin-top:14px;">CATEGORY</p>
     <div class="cat-grid" id="txn-filter-cat-grid"></div>
@@ -851,55 +801,54 @@ input{outline:none;}
 
 <!-- ============================== INSIGHTS ============================== -->
 <div class="screen is-hidden" id="stats-screen">
-  <div id="stats-sticky-top" style="flex-shrink:0;background:var(--paper);padding:0 20px;">
-    <div class="screen-topbar">
-      <p class="topbar-title">Insights</p>
-      <div class="topbar-icons">
-        <button type="button" class="income-eye-btn hidden" id="stats-accounts-btn" title="View accounts">🏦</button>
-        <button type="button" class="income-eye-btn" id="stats-eye-btn" title="Toggle income visibility">👁️</button>
+  <div class="scroll">
+    <div style="padding:0 20px 12px;">
+      <div class="screen-topbar">
+        <p class="topbar-title">Insights</p>
         <button type="button" class="topbar-lock-btn" id="stats-lock-btn" title="Lock app">🔒</button>
       </div>
-    </div>
-    <div class="segmented-tabs" id="ins-period-type-tabs">
-      <button type="button" class="segmented-tab" data-instype="week">Week</button>
-      <button type="button" class="segmented-tab active" data-instype="month">Month</button>
-      <button type="button" class="segmented-tab" data-instype="year">Year</button>
-      <button type="button" class="segmented-tab" data-instype="custom">Custom</button>
-    </div>
-    <div class="ins-period-stepper" id="ins-period-stepper">
-      <button type="button" class="ins-step-btn" id="ins-prev-btn">‹</button>
-      <p class="ins-period-label" id="ins-period-label">—</p>
-      <button type="button" class="ins-step-btn" id="ins-next-btn">›</button>
-    </div>
-    <div class="ins-custom-range hidden" id="ins-custom-range">
-      <div>
-        <p class="field-label" style="margin:0 0 4px;">FROM</p>
-        <input type="date" class="date-input" id="ins-custom-start">
+
+      <div class="segmented-tabs" id="ins-period-type-tabs">
+        <button type="button" class="segmented-tab" data-instype="week">Week</button>
+        <button type="button" class="segmented-tab active" data-instype="month">Month</button>
+        <button type="button" class="segmented-tab" data-instype="year">Year</button>
+        <button type="button" class="segmented-tab" data-instype="custom">Custom</button>
       </div>
-      <div>
-        <p class="field-label" style="margin:0 0 4px;">TO</p>
-        <input type="date" class="date-input" id="ins-custom-end">
+
+      <div class="ins-period-stepper" id="ins-period-stepper">
+        <button type="button" class="ins-step-btn" id="ins-prev-btn">‹</button>
+        <p class="ins-period-label" id="ins-period-label">—</p>
+        <button type="button" class="ins-step-btn" id="ins-next-btn">›</button>
       </div>
+      <div class="ins-custom-range hidden" id="ins-custom-range">
+        <div>
+          <p class="field-label" style="margin:0 0 4px;">FROM</p>
+          <input type="date" class="date-input" id="ins-custom-start">
+        </div>
+        <div>
+          <p class="field-label" style="margin:0 0 4px;">TO</p>
+          <input type="date" class="date-input" id="ins-custom-end">
+        </div>
+      </div>
+
+      <div class="segmented-tabs" id="ins-view-tabs" style="margin-top:16px;">
+        <button type="button" class="segmented-tab active" data-insview="categories">Categories</button>
+        <button type="button" class="segmented-tab" data-insview="compare">Compare</button>
+        <button type="button" class="segmented-tab" data-insview="payment">Payment</button>
+        <button type="button" class="segmented-tab" data-insview="groups">Groups</button>
+      </div>
+
+      <div id="ins-categories-panel" style="margin-top:16px;"></div>
+
+      <div id="ins-compare-panel" class="hidden" style="margin-top:16px;">
+        <div class="cat-grid" id="ins-compare-cat-grid"></div>
+        <div id="ins-compare-result" style="margin-top:14px;"></div>
+      </div>
+
+      <div id="ins-payment-panel" class="hidden" style="margin-top:16px;"></div>
+
+      <div id="ins-groups-panel" class="hidden" style="margin-top:16px;"></div>
     </div>
-    <div class="segmented-tabs" id="ins-view-tabs" style="margin-top:16px;margin-bottom:4px;">
-      <button type="button" class="segmented-tab active" data-insview="categories">Categories</button>
-      <button type="button" class="segmented-tab" data-insview="compare">Compare</button>
-      <button type="button" class="segmented-tab" data-insview="payment">Payment</button>
-      <button type="button" class="segmented-tab" data-insview="groups">Groups</button>
-    </div>
-    <!-- Group chips — sticky, shown only when Groups view active -->
-    <div id="ins-groups-chip-bar" class="hidden" style="padding:8px 0 4px;">
-      <div class="pay-row" id="ins-groups-chip-row" style="flex-wrap:wrap;gap:8px;"></div>
-    </div>
-  </div>
-  <div class="scroll" style="padding:0 20px 12px;">
-    <div id="ins-categories-panel" style="margin-top:16px;"></div>
-    <div id="ins-compare-panel" class="hidden" style="margin-top:16px;">
-      <div class="cat-grid" id="ins-compare-cat-grid"></div>
-      <div id="ins-compare-result" style="margin-top:14px;"></div>
-    </div>
-    <div id="ins-payment-panel" class="hidden" style="margin-top:16px;"></div>
-    <div id="ins-groups-panel" class="hidden" style="margin-top:16px;"></div>
   </div>
   <div class="bottom-nav">
     <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
@@ -918,38 +867,7 @@ input{outline:none;}
         <p class="topbar-title">Settings</p>
         <button type="button" class="topbar-lock-btn" id="settings-lock-btn" title="Lock app">🔒</button>
       </div>
-      <p class="field-label" style="margin-top:0;">FINANCE</p>
-      <div class="settings-row" style="cursor:default;">
-        <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">📅</span>
-        <div class="settings-row-info">
-          <p class="settings-row-title">My month starts on</p>
-          <span class="settings-row-sub">Aligns budgets, forecasts &amp; insights to your salary cycle</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-          <span style="font-size:13px;color:var(--muted);">Day</span>
-          <input type="number" id="settings-cycle-day" min="1" max="28" value="1"
-            style="width:48px;padding:6px 8px;border:1.5px solid var(--border);border-radius:10px;
-                   font-size:14px;font-weight:700;font-family:var(--font-mono);color:var(--ink);
-                   background:var(--surface);text-align:center;">
-        </div>
-      </div>
-      <button type="button" class="settings-row" id="settings-accounts-toggle-row" style="margin-top:8px;">
-        <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">🏦</span>
-        <div class="settings-row-info">
-          <p class="settings-row-title">Accounts &amp; Wallets</p>
-          <span class="settings-row-sub" id="settings-accounts-sub">Track bank balances and credit card outstanding</span>
-        </div>
-        <div class="switch" id="settings-accounts-switch"><div class="switch-thumb"></div></div>
-      </button>
-      <button type="button" class="settings-row hidden" id="settings-manage-accounts-btn" style="margin-top:8px;">
-        <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">💼</span>
-        <div class="settings-row-info">
-          <p class="settings-row-title">Manage accounts</p>
-          <span class="settings-row-sub">Add, edit, or remove your bank and credit card accounts</span>
-        </div>
-        <span class="settings-row-chevron">›</span>
-      </button>
-      <p class="field-label">HELP</p>
+      <p class="field-label" style="margin-top:0;">HELP</p>
       <button type="button" class="settings-row" id="settings-guide-btn" style="margin-bottom:8px;">
         <span class="settings-row-icon" style="background:rgba(255,194,60,.14);">💡</span>
         <div class="settings-row-info">
@@ -1001,8 +919,8 @@ input{outline:none;}
       <button type="button" class="settings-row" id="settings-recurring-btn">
         <span class="settings-row-icon" style="background:rgba(255,143,179,.14);">🔁</span>
         <div class="settings-row-info">
-          <p class="settings-row-title">Recurring transactions</p>
-          <span class="settings-row-sub">Salary, rent, subscriptions, EMIs — logged automatically</span>
+          <p class="settings-row-title">Recurring expenses</p>
+          <span class="settings-row-sub">Rent, subscriptions, EMIs — logged automatically</span>
         </div>
         <span class="settings-row-chevron">›</span>
       </button>
@@ -1198,13 +1116,13 @@ input{outline:none;}
 <!-- ============================== RECURRING EXPENSES ============================== -->
 <div class="screen is-hidden" id="recurring-screen">
   <div class="topbar">
-    <p class="topbar-title">Recurring transactions</p>
+    <p class="topbar-title">Recurring expenses</p>
     <button class="topbar-close" id="recurring-close-btn">✕</button>
   </div>
   <div class="scroll">
     <div style="padding:0 20px 28px;">
       <div id="recurring-list"></div>
-      <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="recurring-screen-add-btn">+ Add recurring transaction</button>
+      <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="recurring-screen-add-btn">+ Add recurring expense</button>
     </div>
   </div>
 </div>
@@ -1296,26 +1214,15 @@ input{outline:none;}
   <div class="edit-sheet">
     <div class="edit-sheet-grip"></div>
     <div class="edit-sheet-head">
-      <p class="edit-sheet-title" id="recurring-edit-title">Add recurring transaction</p>
+      <p class="edit-sheet-title" id="recurring-edit-title">Add recurring expense</p>
       <button type="button" class="topbar-close" id="recurring-edit-close-btn">✕</button>
-    </div>
-    <!-- Type toggle — expense vs income; locked to read-only when editing existing rule -->
-    <div id="recurring-type-toggle-wrap" style="margin-top:14px;">
-      <div class="segmented-tabs" id="recurring-type-tabs" style="margin-bottom:0;">
-        <button type="button" class="segmented-tab active" data-rtype="expense">Expense</button>
-        <button type="button" class="segmented-tab" data-rtype="income">Income</button>
-      </div>
     </div>
     <p class="field-label" style="margin-top:14px;">NAME</p>
     <input type="text" class="sheet-input" id="recurring-edit-name" placeholder="e.g. Netflix" maxlength="40">
     <p class="field-label">AMOUNT</p>
     <input type="number" inputmode="decimal" class="sheet-input" id="recurring-edit-amount" placeholder="0" min="0" step="0.01">
-    <!-- Expense category grid (shown when type=expense) -->
-    <p class="field-label" id="recurring-edit-cat-label">CATEGORY</p>
+    <p class="field-label">CATEGORY</p>
     <div class="cat-grid" id="recurring-edit-cat-grid"></div>
-    <!-- Income category grid (shown when type=income) -->
-    <p class="field-label hidden" id="recurring-edit-incomecat-label">INCOME TYPE</p>
-    <div class="cat-grid hidden" id="recurring-edit-incomecat-grid"></div>
     <p class="field-label">PAID VIA</p>
     <div class="pay-row" id="recurring-edit-pay-row"></div>
     <div id="recurring-edit-new-only">
@@ -1329,11 +1236,7 @@ input{outline:none;}
     <input type="date" class="date-input" id="recurring-edit-end">
     <p class="field-label">GROUP (OPTIONAL)</p>
     <div class="pay-row" id="recurring-edit-group-row"></div>
-    <div id="recurring-edit-account-section" class="hidden">
-      <p class="field-label">ACCOUNT (OPTIONAL)</p>
-      <div class="pay-row" id="recurring-edit-account-row" style="flex-wrap:wrap;gap:8px;"></div>
-    </div>
-    <button type="button" class="save-btn" id="recurring-edit-save-btn" style="margin-top:18px;">Save recurring transaction</button>
+    <button type="button" class="save-btn" id="recurring-edit-save-btn" style="margin-top:18px;">Save recurring expense</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-pause-btn" style="color:var(--grape);">Pause</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-delete-btn">Delete</button>
   </div>
@@ -1358,126 +1261,6 @@ input{outline:none;}
     <p class="budget-recap-line hidden" id="budget-edit-recap"></p>
     <button type="button" class="save-btn" id="budget-edit-save-btn" style="margin-top:18px;">Save budget</button>
     <button type="button" class="text-danger-btn hidden" id="budget-edit-delete-btn">Delete</button>
-  </div>
-</div>
-
-<!-- ============================== ACCOUNTS ONBOARDING SHEET ============================== -->
-<!-- Shown once when user first enables Accounts in Settings. Guides them through
-     creating at least one account before the feature activates. -->
-<div id="accounts-onboarding-overlay" class="edit-sheet-overlay">
-  <div class="edit-sheet">
-    <div class="edit-sheet-grip"></div>
-    <div class="edit-sheet-head">
-      <p class="edit-sheet-title">Set up accounts</p>
-      <button type="button" class="topbar-close" id="accounts-onboarding-close-btn">✕</button>
-    </div>
-    <p style="font-size:13px;color:var(--muted);margin:10px 0 18px;line-height:1.6;">
-      Add your bank accounts and credit cards. You can always add more later from Settings.
-    </p>
-    <div id="accounts-onboarding-list" style="margin-bottom:12px;"></div>
-    <button type="button" class="warranty-toggle-btn" id="accounts-onboarding-add-btn">+ Add account</button>
-    <button type="button" class="save-btn" id="accounts-onboarding-done-btn" style="margin-top:14px;">Done</button>
-  </div>
-</div>
-
-<!-- ============================== ACCOUNT EDIT SHEET ============================== -->
-<div id="account-edit-overlay" class="edit-sheet-overlay" style="z-index:901;">
-  <div class="edit-sheet">
-    <div class="edit-sheet-grip"></div>
-    <div class="edit-sheet-head">
-      <p class="edit-sheet-title" id="account-edit-title">Add account</p>
-      <button type="button" class="topbar-close" id="account-edit-close-btn">✕</button>
-    </div>
-    <p class="field-label" style="margin-top:14px;">NAME</p>
-    <input type="text" class="sheet-input" id="account-edit-name" placeholder="e.g. SBI Savings" maxlength="32">
-    <p class="field-label">TYPE</p>
-    <div class="segmented-tabs" id="account-type-tabs" style="margin-bottom:0;">
-      <button type="button" class="segmented-tab active" data-accttype="savings">Savings</button>
-      <button type="button" class="segmented-tab" data-accttype="cc">Credit Card</button>
-    </div>
-    <p class="field-label" style="margin-top:14px;" id="account-balance-label">CURRENT BALANCE</p>
-    <input type="number" inputmode="decimal" class="sheet-input" id="account-edit-balance" placeholder="0" min="0" step="0.01">
-    <p class="field-label" id="account-balance-hint" style="color:var(--muted);font-size:11px;margin-top:4px;font-weight:400;letter-spacing:0;">Enter your current account balance</p>
-    <p class="field-label" style="margin-top:14px;">PAYMENT METHODS</p>
-    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Which payment methods are used for this account?</p>
-    <div class="pay-row" id="account-edit-pm-row" style="flex-wrap:wrap;gap:8px;"></div>
-    <button type="button" class="save-btn" id="account-edit-save-btn" style="margin-top:18px;">Save account</button>
-    <button type="button" class="text-danger-btn hidden" id="account-edit-delete-btn">Delete account</button>
-  </div>
-</div>
-
-<!-- ============================== ACCOUNTS VIEW SHEET (Insights 🏦) ============================== -->
-<div id="accounts-view-overlay" class="edit-sheet-overlay">
-  <div class="edit-sheet">
-    <div class="edit-sheet-grip"></div>
-    <div class="edit-sheet-head">
-      <p class="edit-sheet-title">Accounts</p>
-      <div style="display:flex;align-items:center;gap:6px;">
-        <button type="button" id="accounts-view-eye-btn" class="income-eye-btn" title="Toggle visibility">👁️</button>
-        <button type="button" class="topbar-close" id="accounts-view-close-btn">✕</button>
-      </div>
-    </div>
-    <div id="accounts-view-list" style="margin-top:10px;"></div>
-    <div id="accounts-view-networth" style="border-top:1px solid var(--border);margin-top:8px;padding-top:16px;display:flex;justify-content:space-between;align-items:center;">
-      <p style="font-size:14px;font-weight:700;color:var(--ink);">Net Worth</p>
-      <p id="accounts-view-networth-value" style="font-family:var(--font-mono);font-size:16px;font-weight:700;"></p>
-    </div>
-  </div>
-</div>
-
-<!-- ============================== RE-ENABLE WARNING OVERLAY ============================== -->
-<div id="accounts-reenable-overlay" class="confirm-overlay">
-  <div class="confirm-sheet">
-    <div class="confirm-sheet-icon">⚠️</div>
-    <p class="confirm-sheet-title">Balances may be out of sync</p>
-    <p class="confirm-sheet-sub">Expenses logged while accounts were disabled weren't tracked. Your account balances may need to be updated manually.</p>
-    <button type="button" class="save-btn" id="accounts-reenable-confirm-btn">Got it, continue</button>
-    <button type="button" class="confirm-sheet-cancel" id="accounts-reenable-cancel-btn">Cancel</button>
-  </div>
-</div>
-
-<!-- ============================== ADD METHOD TO ACCOUNT PROMPT ============================== -->
-<div id="acct-addpm-overlay" class="confirm-overlay">
-  <div class="confirm-sheet">
-    <div class="confirm-sheet-icon">💳</div>
-    <p class="confirm-sheet-title" id="acct-addpm-title">Add to account?</p>
-    <p class="confirm-sheet-sub" id="acct-addpm-sub"></p>
-    <button type="button" class="save-btn" id="acct-addpm-confirm-btn">Add to account</button>
-    <button type="button" class="confirm-sheet-cancel" id="acct-addpm-cancel-btn">Keep as one-off</button>
-  </div>
-</div>
-
-<!-- ============================== BULK ACCOUNT ASSIGN ============================== -->
-<div class="screen is-hidden" id="bulkaccount-screen">
-  <div class="topbar">
-    <p class="topbar-title">Assign accounts</p>
-    <button class="topbar-close" id="bulkaccount-close-btn">✕</button>
-  </div>
-  <div class="scroll">
-    <div style="padding:0 20px 28px;">
-      <p style="font-size:13px;color:var(--muted);margin:10px 0 14px;line-height:1.6;">
-        Select an account, then tick the transactions to assign to it.
-      </p>
-      <p class="field-label" style="margin-top:0;">ASSIGN TO ACCOUNT</p>
-      <div class="pay-row" id="bulkaccount-acct-row" style="flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
-      <p class="field-label">TRANSACTIONS</p>
-      <div id="bulkaccount-list"></div>
-      <button type="button" class="save-btn hidden" id="bulkaccount-apply-btn" style="margin-top:14px;">Assign to account</button>
-    </div>
-  </div>
-</div>
-
-<!-- ============================== MANAGE ACCOUNTS OVERLAY ============================== -->
-<div id="manage-accounts-overlay" class="edit-sheet-overlay">
-  <div class="edit-sheet">
-    <div class="edit-sheet-grip"></div>
-    <div class="edit-sheet-head">
-      <p class="edit-sheet-title">Manage accounts</p>
-      <button type="button" class="topbar-close" id="manage-accounts-close-btn">✕</button>
-    </div>
-    <div id="manage-accounts-list" style="margin-top:14px;"></div>
-    <button type="button" class="warranty-toggle-btn" id="manage-accounts-add-btn" style="margin-top:12px;">+ Add account</button>
-    <button type="button" class="warranty-toggle-btn" id="manage-accounts-bulkassign-btn" style="margin-top:8px;">Bulk assign past transactions</button>
   </div>
 </div>
 
@@ -1644,7 +1427,7 @@ async function tryAutoBiometric(){
 }
 
 /* ============================== DATA LAYER (IndexedDB) ============================== */
-const DB_NAME='PaisaTrailDB', DB_VERSION=5;
+const DB_NAME='PaisaTrailDB', DB_VERSION=4;
 let _dbInstance=null;
 
 function openDB(){
@@ -1665,7 +1448,6 @@ function openDB(){
       if(!db.objectStoreNames.contains('groups')) db.createObjectStore('groups',{keyPath:'id'});
       if(!db.objectStoreNames.contains('recurring')) db.createObjectStore('recurring',{keyPath:'id'});
       if(!db.objectStoreNames.contains('budgets')) db.createObjectStore('budgets',{keyPath:'id'});
-      if(!db.objectStoreNames.contains('accounts')) db.createObjectStore('accounts',{keyPath:'id'});
     };
     req.onsuccess=(e)=>{ _dbInstance=e.target.result; resolve(_dbInstance); };
     req.onerror=(e)=>reject(e.target.error);
@@ -1861,9 +1643,9 @@ const DB = {
   // Used only by Import — wipes and rewrites every store in one
   // transaction, so a failure partway rolls everything back instead of
   // leaving a half-imported mix of old and new data.
-  async replaceAllData({expenses, categories, paymentMethods, groups, attachments, recurring, budgets, accounts}){
+  async replaceAllData({expenses, categories, paymentMethods, groups, attachments, recurring, budgets}){
     const db=await openDB();
-    const tx=db.transaction(['expenses','categories','paymentMethods','groups','attachments','recurring','budgets','accounts'],'readwrite');
+    const tx=db.transaction(['expenses','categories','paymentMethods','groups','attachments','recurring','budgets'],'readwrite');
     const stores={
       expenses: tx.objectStore('expenses'),
       categories: tx.objectStore('categories'),
@@ -1872,7 +1654,6 @@ const DB = {
       attachments: tx.objectStore('attachments'),
       recurring: tx.objectStore('recurring'),
       budgets: tx.objectStore('budgets'),
-      accounts: tx.objectStore('accounts'),
     };
     Object.values(stores).forEach(s => s.clear());
     (categories||[]).forEach(c => stores.categories.put(c));
@@ -1882,27 +1663,6 @@ const DB = {
     (attachments||[]).forEach(a => stores.attachments.put(a));
     (recurring||[]).forEach(r => stores.recurring.put(r));
     (budgets||[]).forEach(b => stores.budgets.put(b));
-    (accounts||[]).forEach(a => stores.accounts.put(a));
-    await txDone(tx);
-  },
-  async getAllAccounts(){
-    const db=await openDB();
-    return new Promise((resolve,reject)=>{
-      const req=db.transaction('accounts','readonly').objectStore('accounts').getAll();
-      req.onsuccess=()=>resolve(req.result);
-      req.onerror=()=>reject(req.error);
-    });
-  },
-  async putAccount(account){
-    const db=await openDB();
-    const tx=db.transaction('accounts','readwrite');
-    tx.objectStore('accounts').put(account);
-    await txDone(tx);
-  },
-  async deleteAccount(id){
-    const db=await openDB();
-    const tx=db.transaction('accounts','readwrite');
-    tx.objectStore('accounts').delete(id);
     await txDone(tx);
   },
   async seedDefaults(){
@@ -1975,8 +1735,8 @@ const state = {
   bdManualSelected:new Set(), // ids ticked in manual bulk-delete mode
   bdPendingBatch:[],     // the expense objects currently shown in the confirm dialog, awaiting Delete/Cancel
   insPeriodType:'month',     // 'week'|'month'|'year'|'custom' — persists across navigation, like state.homeTab
-  insStartISO:cycleBounds(todayISO()).startISO, // current period's bounds (inclusive) — only recomputed when the user steps/changes type, never reset on nav
-  insEndISO:cycleBounds(todayISO()).endISO,
+  insStartISO:monthBounds(todayISO()).startISO, // current period's bounds (inclusive) — only recomputed when the user steps/changes type, never reset on nav
+  insEndISO:monthBounds(todayISO()).endISO,
   insView:'categories',      // 'categories'|'compare'|'payment'|'groups' — which Insights sub-view is showing; persists across navigation
   insCompareCategoryId:null, // selected category for Compare — lazily defaults to the first category the first time Compare is viewed, then persists
   insSelectedGroupId:null,   // selected group for the Groups view — persists once chosen, no lazy default (there may be no groups yet)
@@ -2015,35 +1775,22 @@ const state = {
   mgrRecurringFrequency:'monthly',// selected frequency — only editable when adding a new rule, read-only display once created
   mgrRecurringGroupId:null,       // selected group while adding/editing a recurring rule (null = no group)
   mgrRecurringCatGridExpanded:false, // false = collapsed to top 6; true = all categories shown
-  mgrRecurringType:'expense',     // 'expense'|'income' — type of recurring rule being added/edited
-  mgrRecurringIncomeCategoryId:null, // selected income category when mgrRecurringType==='income'
-  mgrRecurringAccountId:null,     // selected account id for recurring rule; null = no account assigned
   budgets:[],                     // in-memory cache of all budgets, mirrors state.recurringRules
   mgrBudgetCategoryId:null,       // categoryId selected while adding a new budget (null = the special "Overall" target); locked/unused once editing an existing budget
   budgetEditHistory:null,         // {lastMonthSpent, lastMonthActive, suggested, targetIsOverall} for whichever target is selected in the open budget sheet — null until fetched, refetched on target change
   incomeRevealed:false,           // false = income amounts show ₹•••••• on Home and List; true = real amounts shown; resets to false on every lock/unlock
-  accounts:[],                    // in-memory cache of all accounts; empty when accounts feature is disabled
-  accountsEnabled:false,          // mirrors pt_accounts_enabled localStorage key; false = accounts feature hidden throughout app
-  acctEditingId:null,             // id of account being edited in the account edit sheet; null when adding new
-  acctEditSource:null,            // 'onboarding'|'settings' — where to return after account edit save/close
-  acctEditPaymentIds:new Set(),   // payment method ids associated with the account being edited
-  acctOnboardingStep:0,           // 0 = not in onboarding
-  selectedAccountId:null,         // selected account on Add screen; null when accounts disabled
-  selectedTransferFromId:null,    // From account for transfer mode
-  selectedTransferToId:null,      // To account for transfer mode
-  homeLegendShowAmounts:false,    // true = legend shows ₹ amounts, false = percentages
 };
 const pendingDeletes = {}; // id -> {expense, timer} — soft-deleted, removable via Undo
 
 /* ============================== SCREEN SYSTEM ============================== */
-const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen','recurring-screen','guide-screen','bulkaccount-screen'];
+const SCREENS = ['pin-screen','home-screen','add-screen','transactions-screen','stats-screen','settings-screen','bulkdelete-screen','categories-screen','paymentmethods-screen','groups-screen','tagexpenses-screen','recurring-screen','guide-screen'];
 // Screens that are always opened fresh — scroll should reset to top on
 // every open. Main tab screens (home, transactions, stats, settings) are
 // intentionally excluded: preserving their scroll position across navigation
 // is correct behaviour.
 const SCROLL_RESET_SCREENS = new Set([
   'add-screen','recurring-screen','categories-screen','paymentmethods-screen',
-  'groups-screen','bulkdelete-screen','tagexpenses-screen','guide-screen','bulkaccount-screen'
+  'groups-screen','bulkdelete-screen','tagexpenses-screen','guide-screen'
 ]);
 function showScreen(id){
   SCREENS.forEach(s => document.getElementById(s).classList.toggle('is-hidden', s!==id));
@@ -2260,11 +2007,7 @@ async function unlockSuccess(){
   state.groups=await DB.getAllGroups();
   state.recurringRules=await DB.getAllRecurring();
   state.budgets=await DB.getAllBudgets();
-  state.accountsEnabled=Store.get('pt_accounts_enabled')==='1';
-  state.accounts=state.accountsEnabled ? await DB.getAllAccounts() : [];
-  renderAccountsSettingsRow();
-  renderAccountsInsightsBtn();
-  await runRecurringCatchUpAll();
+  await runRecurringCatchUpAll(); // before navigating, so the screen about to render already reflects anything just generated
   await checkWhatsNewOnOpen();
   const target = screenBeforeLock || 'home-screen';
   showScreen(target);
@@ -2390,91 +2133,14 @@ async function renderBackupNudgeBanner(){
   banner.innerHTML=`<span class="backup-nudge-banner-icon">💾</span><span class="backup-nudge-banner-text">${esc(text)}</span><span class="backup-nudge-banner-chevron">›</span>`;
   banner.classList.remove('hidden');
 }
-// ---- Onboarding checklist ----
-// Shows on Home Overview until all 3 items are done or user dismisses.
-// pt_onboard_dismissed='1' permanently hides it.
-// Each item taps to the relevant screen/setting.
-async function renderOnboardingChecklist(){
-  const card=document.getElementById('home-onboard-card');
-  // Permanently dismissed?
-  if(Store.get('pt_onboard_dismissed')==='1'){ card.classList.add('hidden'); return; }
-  // Evaluate each item
-  const hasCycleDay = parseInt(Store.get('pt_cycle_day')||'1',10) !== 1;
-  const hasRecurringIncome = state.recurringRules.some(r=>r.type==='income' && r.active);
-  const hasAccounts = state.accountsEnabled && state.accounts.length>0;
-  // All done — hide permanently
-  if(hasCycleDay && hasRecurringIncome && hasAccounts){
-    Store.set('pt_onboard_dismissed','1');
-    card.classList.add('hidden');
-    return;
-  }
-  card.classList.remove('hidden');
-  const items=[
-    {
-      done: hasCycleDay,
-      label: 'Set your salary cycle day',
-      sub: 'Align budgets and forecasts to when you get paid',
-      action: ()=>{ showScreen('settings-screen'); setTimeout(()=>{ document.getElementById('settings-cycle-day').focus(); },300); },
-    },
-    {
-      done: hasRecurringIncome,
-      label: 'Add recurring income',
-      sub: 'Salary, freelance — see your savings projection',
-      action: openRecurringScreen,
-    },
-    {
-      done: hasAccounts,
-      label: 'Set up accounts',
-      sub: 'Track bank and credit card balances',
-      action: ()=>{ showScreen('settings-screen'); setTimeout(()=>{ document.getElementById('settings-accounts-toggle-row').scrollIntoView({behavior:'smooth'}); },300); },
-    },
-  ];
-  const container=document.getElementById('home-onboard-items'); container.innerHTML='';
-  items.forEach((item,i)=>{
-    container.insertAdjacentHTML('beforeend',`
-      <div data-onboard-item="${i}" style="display:flex;align-items:center;gap:12px;
-           padding:10px 0;${i<items.length-1?'border-bottom:1px solid var(--border);':''}
-           cursor:${item.done?'default':'pointer'};">
-        <div style="width:24px;height:24px;border-radius:50%;flex-shrink:0;
-             background:${item.done?'var(--mint)':'var(--chip)'};
-             display:flex;align-items:center;justify-content:center;font-size:13px;">
-          ${item.done?'✓':'›'}
-        </div>
-        <div style="flex:1;">
-          <p style="font-size:13px;font-weight:${item.done?'500':'600'};color:${item.done?'var(--muted)':'var(--ink)'};
-             text-decoration:${item.done?'line-through':'none'};">${esc(item.label)}</p>
-          ${!item.done?`<p style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(item.sub)}</p>`:''}
-        </div>
-      </div>`);
-  });
-  container.querySelectorAll('[data-onboard-item]').forEach(el=>{
-    const idx=parseInt(el.dataset.onboardItem,10);
-    if(!items[idx].done) el.addEventListener('click', items[idx].action);
-  });
-}
-
 async function renderHomeOverviewPanel(){
-  // Banner hierarchy: only one shows at a time.
-  // Priority: warranty (time-sensitive) → What's New (one-time) → backup nudge (low urgency)
-  const warrantyBanner=document.getElementById('home-warranty-banner');
-  const whatsnewBanner=document.getElementById('home-whatsnew-banner');
-  const backupBanner=document.getElementById('home-backup-banner');
-  // Reset all first
-  [warrantyBanner, whatsnewBanner, backupBanner].forEach(b=>{ b.classList.add('hidden'); b.innerHTML=''; });
-  // Evaluate candidates in priority order — stop at first match
-  const soon=await getWarrantiesExpiringSoon();
-  if(soon.length>0){
-    await renderWarrantyBanner();
-  } else if(await shouldShowWhatsNewBanner()){
-    await renderWhatsNewBanner();
-  } else if(await shouldShowBackupNudge()){
-    await renderBackupNudgeBanner();
-  }
-  await renderOnboardingChecklist();
-  const todayISO_=todayISO();
-  const bounds=cycleBounds(todayISO_);
-  const startISO=bounds.startISO;
-  const endISO=todayISO_;
+  await renderWhatsNewBanner();
+  await renderBackupNudgeBanner();
+  await renderWarrantyBanner();
+  const today=new Date();
+  const monthStart=new Date(today.getFullYear(), today.getMonth(), 1);
+  const startISO=(()=>{ const tz=monthStart.getTimezoneOffset()*60000; return new Date(monthStart-tz).toISOString().slice(0,10); })();
+  const endISO=todayISO();
 
   const all=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id]);
   const expenses=all.filter(isExpenseEntry);
@@ -2488,13 +2154,8 @@ async function renderHomeOverviewPanel(){
   const netEl=document.getElementById('home-net-total');
   netEl.textContent = state.incomeRevealed ? (net>=0?'+':'')+formatINR(Math.abs(net)) : '₹••••••';
   netEl.style.color = net>=0 ? '#7FFFEC' : '#FFB4B4';
-  // Label: if cycle day is 1, show familiar "June 2026"; otherwise show the cycle range
-  const cycleDay=getCycleDay();
-  const monthLabel = cycleDay===1
-    ? new Date(todayISO_+'T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'})
-    : `${new Date(startISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${new Date(bounds.endISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}`;
-  document.getElementById('home-month-label').textContent=monthLabel;
-  document.getElementById('home-count').textContent=`${expenses.length} expense${expenses.length===1?'':'s'} this cycle`;
+  document.getElementById('home-month-label').textContent=today.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  document.getElementById('home-count').textContent=`${expenses.length} expense${expenses.length===1?'':'s'} this month`;
 
   const byCat={};
   expenses.forEach(e=>{ byCat[e.categoryId]=(byCat[e.categoryId]||0)+Number(e.amount); });
@@ -2507,32 +2168,14 @@ async function renderHomeOverviewPanel(){
   document.getElementById('home-donut-label').textContent = expenseTotal>0 ? `${catTotals.length} ${catTotals.length===1?'cat':'cats'}` : 'No data yet';
 
   const legend=document.getElementById('home-legend'); legend.innerHTML='';
-  if(catTotals.length===0){
-    legend.innerHTML='<p class="empty-hint" style="padding:0;">Add an expense to see your breakdown</p>';
-  } else {
-    catTotals.slice(0,5).forEach(c=>{
-      const pct = expenseTotal>0 ? Math.round((c.amount/expenseTotal)*100) : 0;
-      const rightVal = state.homeLegendShowAmounts ? formatINR(c.amount) : `${pct}%`;
-      legend.insertAdjacentHTML('beforeend', `
-        <div class="legend-row" style="cursor:pointer;">
-          <span class="legend-left"><span class="legend-dot" style="background:${c.color}"></span>${esc(c.name)}</span>
-          <span class="legend-pct">${rightVal}</span>
-        </div>`);
-    });
-    legend.style.cursor='pointer';
-    legend.onclick=()=>{
-      state.homeLegendShowAmounts=!state.homeLegendShowAmounts;
-      // Re-render just the right-side values without a full panel re-render
-      legend.querySelectorAll('.legend-row').forEach((row, i)=>{
-        const c=catTotals[i]; if(!c) return;
-        const pct = expenseTotal>0 ? Math.round((c.amount/expenseTotal)*100) : 0;
-        row.querySelector('.legend-pct').textContent = state.homeLegendShowAmounts ? formatINR(c.amount) : `${pct}%`;
-      });
-    };
-  }
+  catTotals.slice(0,5).forEach(c=>{
+    const pct = expenseTotal>0 ? Math.round((c.amount/expenseTotal)*100) : 0;
+    legend.insertAdjacentHTML('beforeend', `<div class="legend-row"><span class="legend-left"><span class="legend-dot" style="background:${c.color}"></span>${esc(c.name)}</span><span class="legend-pct">${pct}%</span></div>`);
+  });
+  if(catTotals.length===0) legend.innerHTML='<p class="empty-hint" style="padding:0;">Add an expense to see your breakdown</p>';
 
   // Recent list — shows both expenses and income entries, newest first
-  const recent=[...all].filter(e=>!isTransferEntry(e)).sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
+  const recent=[...all].sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt)).slice(0,5);
   const list=document.getElementById('home-recent-list'); list.innerHTML='';
   if(recent.length===0){
     list.innerHTML='<p class="empty-hint">No entries yet — tap + to add your first one.</p>';
@@ -2608,15 +2251,10 @@ async function renderHomeWarrantiesPanel(){
   renderGroup('Expired', expired);
 }
 function applyHomeTabUI(){
-  const isOverview = state.homeTab==='overview';
-  document.getElementById('home-panel-overview').classList.toggle('hidden', !isOverview);
+  document.getElementById('home-panel-overview').classList.toggle('hidden', state.homeTab!=='overview');
   document.getElementById('home-panel-warranties').classList.toggle('hidden', state.homeTab!=='warranties');
   document.getElementById('home-panel-forecast').classList.toggle('hidden', state.homeTab!=='forecast');
   document.getElementById('home-panel-budgets').classList.toggle('hidden', state.homeTab!=='budgets');
-  // Show sticky overview content only on Overview tab
-  document.getElementById('home-overview-sticky').classList.toggle('hidden', !isOverview);
-  // Non-overview tabs need their own scroll padding since sticky overview is hidden
-  document.getElementById('home-scroll-body').style.paddingTop = isOverview ? '' : '12px';
   document.querySelectorAll('#home-tabs .home-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.hometab===state.homeTab);
   });
@@ -2720,11 +2358,9 @@ function formatGroupLabel(dateISO){
 async function getFilteredTransactions(){
   const search=(document.getElementById('txn-search').value||'').toLowerCase().trim();
   let list=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
-  // Type filter — 'all' hides transfers (they're a distinct type); 'transfer' shows only transfers
+  // Type filter — 'all' shows everything; 'expense' and 'income' narrow to one type
   if(state.txnFilterType==='expense') list=list.filter(isExpenseEntry);
-  else if(state.txnFilterType==='income') list=list.filter(isIncomeEntry);
-  else if(state.txnFilterType==='transfer') list=list.filter(isTransferEntry);
-  else list=list.filter(e=>!isTransferEntry(e)); // 'all' — hide transfers by default
+  if(state.txnFilterType==='income') list=list.filter(isIncomeEntry);
   // Category filter only applies to expense entries — income entries use a
   // separate INCOME_CATEGORIES list so txnFilterCategoryIds never match them
   if(state.txnFilterCategoryIds.size>0) list=list.filter(e => isIncomeEntry(e) || state.txnFilterCategoryIds.has(e.categoryId));
@@ -2802,22 +2438,6 @@ async function renderTransactions(){
         lastGroup=groupLabel;
       }
       const isInc=isIncomeEntry(e);
-      const isTxfr=isTransferEntry(e);
-      if(isTxfr){
-        const fromAcct=state.accounts.find(a=>a.id===e.fromAccountId);
-        const toAcct=state.accounts.find(a=>a.id===e.toAccountId);
-        container.insertAdjacentHTML('beforeend', `
-          <div class="recent-row" data-id="${e.id}">
-            <div class="recent-icon" style="background:rgba(134,87,224,0.14);">⇄</div>
-            <div class="recent-info">
-              <p class="recent-title">${esc(e.note||'Transfer')}</p>
-              <span class="recent-pm">${esc(fromAcct?fromAcct.name:'?')} → ${esc(toAcct?toAcct.name:'?')}</span>
-            </div>
-            <span class="recent-amt" style="color:var(--grape);">${formatINR(e.amount)}</span>
-            <button class="txn-delete" data-del="${e.id}">🗑️</button>
-          </div>`);
-        return;
-      }
       const cat=isInc ? INCOME_CATEGORIES.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
       const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
@@ -2845,7 +2465,7 @@ async function renderTransactions(){
         </div>`);
     });
   }
-  const typeLabel = state.txnFilterType==='income' ? 'income entries' : state.txnFilterType==='expense' ? 'expenses' : state.txnFilterType==='transfer' ? 'transfers' : 'entries';
+  const typeLabel = state.txnFilterType==='income' ? 'income entries' : state.txnFilterType==='expense' ? 'expenses' : 'entries';
   document.getElementById('txn-filter-show-btn').textContent = `Show ${list.length} ${typeLabel}`;
 }
 
@@ -2908,13 +2528,12 @@ async function openTxnFilterSheet(){
   document.getElementById('txn-filter-end').value = state.txnFilterEndISO || '';
   document.getElementById('txn-filter-min-amount').value = state.txnFilterMinAmount!=null ? state.txnFilterMinAmount : '';
   document.getElementById('txn-filter-max-amount').value = state.txnFilterMaxAmount!=null ? state.txnFilterMaxAmount : '';
-  // Hide Transfer tab when accounts not enabled
-  document.querySelector('#txn-filter-type-tabs [data-filtertype="transfer"]').classList.toggle('hidden', !state.accountsEnabled);
   // Sync the Type toggle buttons to current state
   document.querySelectorAll('#txn-filter-type-tabs .segmented-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.filtertype === state.txnFilterType);
   });
-  const showCatFilter = state.txnFilterType !== 'income' && state.txnFilterType !== 'transfer';
+  // Hide the category filter row when viewing income-only (income has its own fixed categories)
+  const showCatFilter = state.txnFilterType !== 'income';
   document.getElementById('txn-filter-cat-label').classList.toggle('hidden', !showCatFilter);
   document.getElementById('txn-filter-cat-grid').classList.toggle('hidden', !showCatFilter);
   syncIncomeFilterSections();
@@ -2923,13 +2542,13 @@ async function openTxnFilterSheet(){
   document.getElementById('txn-filter-overlay').classList.add('show');
 }
 function syncIncomeFilterSections(){
+  // Payment method, Group, and Split filters are expense-only concepts;
+  // hide them (and clear their state) when Income-only is selected.
   const isIncome = state.txnFilterType === 'income';
-  const isTransfer = state.txnFilterType === 'transfer';
-  // Payment method, Group, and Split are expense-only — hide for income and transfer
   ['txn-filter-pay-label','txn-filter-pay-row',
    'txn-filter-group-label','txn-filter-group-row',
    'txn-filter-split-label','txn-filter-split-toggle','txn-filter-split-status-tabs'
-  ].forEach(id => document.getElementById(id).classList.toggle('hidden', isIncome || isTransfer));
+  ].forEach(id => document.getElementById(id).classList.toggle('hidden', isIncome));
 }
 function syncSplitFilterUI(){
   const toggle=document.getElementById('txn-filter-split-toggle');
@@ -3268,7 +2887,7 @@ async function openManageDeleteConfirm(type, id, name){
     let count, label;
     if(type==='category'){ count=await DB.countExpensesByCategory(id); label='category'; }
     else if(type==='paymentMethod'){ count=await DB.countExpensesByPaymentMethod(id); label='payment method'; }
-    else if(type==='recurring'){ count=(await getExpensesByRecurringId(id)).length; label='recurring transaction'; }
+    else if(type==='recurring'){ count=(await getExpensesByRecurringId(id)).length; label='recurring expense'; }
     else { count=(await getExpensesByGroupId(id)).length; label='group'; }
     document.getElementById('manage-confirm-sub').textContent = count>0
       ? `${count} expense${count===1?'':'s'} ${count===1?'uses':'use'} this ${label} — they won't be deleted, just unlinked from it.`
@@ -3645,11 +3264,11 @@ function base64ToArrayBuffer(base64){
 
 async function exportData(){
   try{
-    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw, recurring, budgets, accounts] = await Promise.all([
+    const [categories, paymentMethods, groups, expensesRaw, attachmentsRaw, recurring, budgets] = await Promise.all([
       DB.getAllCategories(), DB.getAllPaymentMethods(), DB.getAllGroups(),
-      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(), DB.getAllBudgets(), DB.getAllAccounts(),
+      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(), DB.getAllBudgets(),
     ]);
-    const expenses=expensesRaw.filter(e => !pendingDeletes[e.id]); // includes expenses, income, and transfers
+    const expenses=expensesRaw.filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
     // Attachments carry raw ArrayBuffer data, which JSON can't hold
     // directly — base64-encoded here, decoded back on import.
     const attachments=attachmentsRaw.map(a => ({
@@ -3661,13 +3280,8 @@ async function exportData(){
     // not device security, and restoring an old PIN hash onto a different
     // session would be confusing at best.
     const payload={
-      app:'PaisaTrail', schemaVersion:5, exportedAt:new Date().toISOString(),
-      categories, paymentMethods, groups, expenses, attachments, recurring, budgets, accounts,
-      preferences:{
-        cycleDay: parseInt(Store.get('pt_cycle_day')||'1',10),
-        accountsEnabled: Store.get('pt_accounts_enabled')==='1',
-        accountsHadData: Store.get('pt_accounts_had_data')==='1',
-      },
+      app:'PaisaTrail', schemaVersion:4, exportedAt:new Date().toISOString(),
+      categories, paymentMethods, groups, expenses, attachments, recurring, budgets,
     };
     const blob=new Blob([JSON.stringify(payload)], {type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -3741,7 +3355,6 @@ async function confirmImport(){
       attachments,
       recurring: (data.recurring||[]).filter(r => r && r.id),
       budgets: (data.budgets||[]).filter(b => b && b.id),
-      accounts: (data.accounts||[]).filter(a => a && a.id),
     });
     // Reload every in-memory cache from what's actually on disk now,
     // rather than trusting the file's arrays directly post-filtering.
@@ -3750,22 +3363,6 @@ async function confirmImport(){
     state.groups=await DB.getAllGroups();
     state.recurringRules=await DB.getAllRecurring();
     state.budgets=await DB.getAllBudgets();
-    // Restore preferences if present in backup
-    if(data.preferences){
-      const prefs=data.preferences;
-      if(prefs.cycleDay && prefs.cycleDay>=1 && prefs.cycleDay<=28){
-        Store.set('pt_cycle_day', String(prefs.cycleDay));
-        document.getElementById('settings-cycle-day').value=prefs.cycleDay;
-      }
-      if(prefs.accountsEnabled){
-        Store.set('pt_accounts_enabled','1');
-        state.accountsEnabled=true;
-      }
-      if(prefs.accountsHadData) Store.set('pt_accounts_had_data','1');
-    }
-    state.accounts=state.accountsEnabled ? await DB.getAllAccounts() : [];
-    renderAccountsSettingsRow();
-    renderAccountsInsightsBtn();
     state.txnFilterCategoryIds=new Set();
     state.txnFilterPaymentIds=new Set();
     state.txnFilterStartISO=null; state.txnFilterEndISO=null;
@@ -3907,24 +3504,11 @@ async function checkWhatsNewOnOpen(){
   if(lastSeen===latest.version) return;
   if(isNotifEnabled() && isNotifAvailable() && Notification.permission==='granted'){
     try{
-      // Android Chrome requires SW-based notifications; new Notification() is
-      // silently ignored on mobile. Try SW first, fall back to direct API for
-      // desktop browsers that don't have an active SW registration.
-      if('serviceWorker' in navigator){
-        const reg = await navigator.serviceWorker.getRegistration();
-        if(reg){
-          await reg.showNotification('PaisaTrail updated', {
-            body: latest.highlights[0] || "Tap to see what's new",
-            icon: './icons/icon.svg',
-            badge: './icons/icon.svg',
-          });
-        } else {
-          new Notification('PaisaTrail updated', { body: latest.highlights[0] || "Tap to see what's new", icon:'./icons/icon.svg' });
-        }
-      } else {
-        new Notification('PaisaTrail updated', { body: latest.highlights[0] || "Tap to see what's new", icon:'./icons/icon.svg' });
-      }
+      new Notification('PaisaTrail updated', { body: latest.highlights[0] || "Tap to see what's new", icon:'./icons/icon.svg' });
     } catch(err){}
+    // Do NOT mark version seen here — only mark it when the user actually
+    // opens the What's New screen. This keeps the Home banner visible as a
+    // persistent fallback in case the OS notification goes unnoticed.
   }
 }
 
@@ -3967,25 +3551,14 @@ async function catchUpSingleRule(rule){
   const generated=[];
   const today=todayISO();
   let count=0;
-  const isIncomeRule = rule.type === 'income';
   while(rule.active && rule.nextDueISO<=today && count<RECURRING_CATCHUP_CAP){
-    const entry = isIncomeRule ? {
-      id:genId(), amount:rule.amount,
-      type:'income',
-      incomeCategoryId: rule.incomeCategoryId || INCOME_CATEGORIES[0].id,
-      categoryId: null,
-      paymentMethod:rule.paymentMethod,
-      accountId: rule.accountId||null,
-      date:rule.nextDueISO, note:rule.name, attachmentIds:[], recurringId:rule.id,
-      groupId:rule.groupId||null, warrantyExpiry:null, warrantyDurationMonths:null, createdAt:Date.now(),
-    } : {
+    const expense={
       id:genId(), amount:rule.amount, categoryId:rule.categoryId, paymentMethod:rule.paymentMethod,
-      accountId: rule.accountId||null,
       date:rule.nextDueISO, note:rule.name, attachmentIds:[], recurringId:rule.id, groupId:rule.groupId||null,
       warrantyExpiry:null, warrantyDurationMonths:null, createdAt:Date.now(),
     };
-    await DB.addExpense(entry);
-    generated.push({name:rule.name, isIncome:isIncomeRule});
+    await DB.addExpense(expense);
+    generated.push({name:rule.name});
     rule.nextDueISO=advanceRecurringDate(rule, rule.nextDueISO);
     if(rule.endDate && rule.nextDueISO>rule.endDate) rule.active=false;
     count++;
@@ -4001,9 +3574,9 @@ async function catchUpSingleRule(rule){
 function buildCatchUpToastMessage(generated){
   const total=generated.length;
   const uniqueNames=[...new Set(generated.map(g=>g.name))];
-  if(total===1) return `${generated[0].name} ${generated[0].isIncome?'income':'expense'} added automatically`;
+  if(total===1) return `${generated[0].name} added automatically`;
   if(total===2 && uniqueNames.length===2) return `${uniqueNames[0]} and ${uniqueNames[1]} added automatically`;
-  return `${total} recurring transactions added automatically`;
+  return `${total} recurring expenses added automatically`;
 }
 // Runs on every unlock (see unlockSuccess) so a multi-day-idle phone catches
 // up the moment it's opened, not on some background schedule this offline
@@ -4028,7 +3601,7 @@ function renderRecurringArea(){
   if(state.recurringLinkedId){
     area.innerHTML=`
       <div class="warranty-card">
-        <p class="empty-hint" style="padding:0;text-align:left;">This expense was generated by a recurring rule. Manage it from Settings → Recurring transactions.</p>
+        <p class="empty-hint" style="padding:0;text-align:left;">This expense was generated by a recurring rule. Manage it from Settings → Recurring expenses.</p>
       </div>`;
     return;
   }
@@ -4074,25 +3647,20 @@ function openRecurringScreen(){
 function renderRecurringScreen(){
   const list=document.getElementById('recurring-list'); list.innerHTML='';
   if(state.recurringRules.length===0){
-    list.innerHTML='<p class="empty-hint">No recurring transactions yet — add one here, or toggle "Make this recurring" when adding a new expense.</p>';
+    list.innerHTML='<p class="empty-hint">No recurring expenses yet — add one here, or toggle "Make this recurring" when adding a new expense.</p>';
     return;
   }
   state.recurringRules.forEach(r=>{
-    const isIncomeRule = r.type === 'income';
-    const cat = isIncomeRule
-      ? INCOME_CATEGORIES.find(c=>c.id===r.incomeCategoryId)
-      : state.categories.find(c=>c.id===r.categoryId);
+    const cat=state.categories.find(c=>c.id===r.categoryId);
     const dateLabel=new Date(r.nextDueISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
     const subLine = r.active
-      ? `${isIncomeRule?'+':''}${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Next ${dateLabel}`
+      ? `${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Next ${dateLabel}`
       : `${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Paused`;
-    const iconBg = cat ? cat.color+'22' : '#9088A822';
-    const icon = cat ? cat.icon : (isIncomeRule ? '💰' : '🔁');
     list.insertAdjacentHTML('beforeend', `
       <button type="button" class="settings-row" data-recurringid="${r.id}" style="margin-bottom:8px;">
-        <span class="settings-row-icon" style="background:${iconBg};">${icon}</span>
+        <span class="settings-row-icon" style="background:${cat?cat.color:'#9088A8'}22;">${cat?cat.icon:'🔁'}</span>
         <div class="settings-row-info">
-          <p class="settings-row-title">${esc(r.name)}${isIncomeRule?' <span style="font-size:10px;background:rgba(46,196,182,.15);color:var(--mint);padding:1px 6px;border-radius:6px;font-weight:700;vertical-align:middle;">INCOME</span>':''}</p>
+          <p class="settings-row-title">${esc(r.name)}</p>
           <span class="settings-row-sub">${esc(subLine)}</span>
         </div>
         <span class="settings-row-chevron">›</span>
@@ -4100,13 +3668,6 @@ function renderRecurringScreen(){
   });
 }
 function renderRecurringEditCatGrid(){
-  const isIncome = state.mgrRecurringType === 'income';
-  // Toggle which grid/label is visible
-  document.getElementById('recurring-edit-cat-label').classList.toggle('hidden', isIncome);
-  document.getElementById('recurring-edit-cat-grid').classList.toggle('hidden', isIncome);
-  document.getElementById('recurring-edit-incomecat-label').classList.toggle('hidden', !isIncome);
-  document.getElementById('recurring-edit-incomecat-grid').classList.toggle('hidden', !isIncome);
-  if(isIncome){ renderRecurringEditIncomeCatGrid(); return; }
   const grid=document.getElementById('recurring-edit-cat-grid'); grid.innerHTML='';
   const COLLAPSE_AT=6;
   const counts=state.catUsageCounts || {};
@@ -4133,22 +3694,6 @@ function renderRecurringEditCatGrid(){
       </button>`);
   }
 }
-function renderRecurringEditIncomeCatGrid(){
-  const grid=document.getElementById('recurring-edit-incomecat-grid'); grid.innerHTML='';
-  INCOME_CATEGORIES.forEach(cat=>{
-    const selected=state.mgrRecurringIncomeCategoryId===cat.id;
-    const bg = selected ? cat.color+'26' : 'var(--surface)';
-    const border = selected ? cat.color : 'transparent';
-    grid.insertAdjacentHTML('beforeend', `
-      <button type="button" class="cat-chip" data-rincomecat="${cat.id}" style="background:${bg};border-color:${border}">
-        <span class="cat-emoji">${cat.icon}</span><span class="cat-name">${esc(cat.name)}</span>
-      </button>`);
-  });
-  // Bind clicks inline since income cat grid is rendered fresh each time
-  grid.querySelectorAll('[data-rincomecat]').forEach(btn=>{
-    btn.onclick=()=>{ state.mgrRecurringIncomeCategoryId=btn.dataset.rincomecat; renderRecurringEditIncomeCatGrid(); };
-  });
-}
 function renderRecurringEditPayRow(){
   const row=document.getElementById('recurring-edit-pay-row'); row.innerHTML='';
   state.paymentMethods.forEach(pm=>{
@@ -4172,6 +3717,7 @@ function renderRecurringEditFreqRow(){
 }
 function renderRecurringEditGroupRow(){
   const row=document.getElementById('recurring-edit-group-row'); row.innerHTML='';
+  // "None" chip
   const noneSelected = !state.mgrRecurringGroupId;
   row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-rgrp="none" style="background:${noneSelected?'var(--grape)':'var(--surface)'};color:${noneSelected?'white':'var(--ink)'}">None</button>`);
   state.groups.forEach(g=>{
@@ -4185,42 +3731,11 @@ function renderRecurringEditGroupRow(){
     };
   });
 }
-function renderRecurringEditAccountRow(){
-  const section=document.getElementById('recurring-edit-account-section');
-  if(!state.accountsEnabled || state.accounts.length===0){ section.classList.add('hidden'); return; }
-  section.classList.remove('hidden');
-  const row=document.getElementById('recurring-edit-account-row'); row.innerHTML='';
-  // None chip
-  const noneSelected=!state.mgrRecurringAccountId;
-  row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-racct="none" style="background:${noneSelected?'var(--grape)':'var(--surface)'};color:${noneSelected?'white':'var(--ink)'}">None</button>`);
-  state.accounts.forEach(a=>{
-    const selected=state.mgrRecurringAccountId===a.id;
-    const icon=a.type==='cc'?'💳':'🏦';
-    row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-racct="${a.id}" style="background:${selected?'var(--grape)':'var(--surface)'};color:${selected?'white':'var(--ink)'}"><span>${icon}</span>${esc(a.name)}</button>`);
-  });
-  row.querySelectorAll('[data-racct]').forEach(btn=>{
-    btn.onclick=()=>{ state.mgrRecurringAccountId=btn.dataset.racct==='none'?null:btn.dataset.racct; renderRecurringEditAccountRow(); };
-  });
-}
 function openRecurringEdit(id){
   state.mgrEditingType='recurring';
   state.mgrEditingId=id;
   const existing=id ? state.recurringRules.find(r=>r.id===id) : null;
-  // Type — locked to read-only once a rule exists (changing type would invalidate
-  // all past auto-generated entries). New rules default to expense.
-  state.mgrRecurringType = existing ? (existing.type || 'expense') : 'expense';
-  state.mgrRecurringIncomeCategoryId = existing ? (existing.incomeCategoryId || INCOME_CATEGORIES[0].id) : INCOME_CATEGORIES[0].id;
-  // Apply type toggle UI — tabs disabled when editing existing rule
-  const typeTabs = document.getElementById('recurring-type-tabs');
-  typeTabs.querySelectorAll('[data-rtype]').forEach(btn=>{
-    btn.classList.toggle('active', btn.dataset.rtype===state.mgrRecurringType);
-  });
-  typeTabs.style.pointerEvents = existing ? 'none' : '';
-  typeTabs.style.opacity = existing ? '0.5' : '';
-  const isIncome = state.mgrRecurringType === 'income';
-  document.getElementById('recurring-edit-title').textContent = existing
-    ? (isIncome ? 'Edit recurring income' : 'Edit recurring expense')
-    : 'Add recurring transaction';
+  document.getElementById('recurring-edit-title').textContent = existing ? 'Edit recurring expense' : 'Add recurring expense';
   document.getElementById('recurring-edit-name').value = existing ? existing.name : '';
   document.getElementById('recurring-edit-amount').value = existing ? existing.amount : '';
   document.getElementById('recurring-edit-end').value = existing ? (existing.endDate || '') : '';
@@ -4228,14 +3743,12 @@ function openRecurringEdit(id){
   state.mgrRecurringPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
   state.mgrRecurringFrequency = existing ? existing.frequency : 'monthly';
   state.mgrRecurringGroupId = existing ? (existing.groupId || null) : null;
-  state.mgrRecurringAccountId = existing ? (existing.accountId || null) : null;
   state.mgrRecurringCatGridExpanded = false;
   // Use cached usage counts if available; fetch async in background to update sort order
   getCategoryUsageCounts().then(counts=>{ state.catUsageCounts=counts; renderRecurringEditCatGrid(); }).catch(()=>{});
   renderRecurringEditCatGrid();
   renderRecurringEditPayRow();
   renderRecurringEditGroupRow();
-  renderRecurringEditAccountRow();
 
   // Frequency and start date only make sense to set once, at creation —
   // changing either after occurrences already exist would scramble the
@@ -4261,45 +3774,35 @@ function closeRecurringEdit(){
 async function saveRecurringEdit(){
   const name=document.getElementById('recurring-edit-name').value.trim();
   const amount=parseFloat(document.getElementById('recurring-edit-amount').value);
-  const isIncome = state.mgrRecurringType === 'income';
   if(!name){ toast('Give it a name first'); return; }
   if(!amount || amount<=0){ toast('Enter a valid amount'); return; }
-  if(!isIncome && !state.mgrRecurringCategoryId){ toast('Pick a category'); return; }
-  if(isIncome && !state.mgrRecurringIncomeCategoryId){ toast('Pick an income type'); return; }
+  if(!state.mgrRecurringCategoryId){ toast('Pick a category'); return; }
   if(!state.mgrRecurringPaymentId){ toast('Pick a payment method'); return; }
   const endDate=document.getElementById('recurring-edit-end').value || null;
   const existing=state.mgrEditingId ? state.recurringRules.find(r=>r.id===state.mgrEditingId) : null;
 
   if(existing){
     existing.name=name; existing.amount=amount;
-    existing.categoryId=isIncome ? null : state.mgrRecurringCategoryId;
-    existing.incomeCategoryId=isIncome ? state.mgrRecurringIncomeCategoryId : null;
-    existing.paymentMethod=state.mgrRecurringPaymentId;
+    existing.categoryId=state.mgrRecurringCategoryId; existing.paymentMethod=state.mgrRecurringPaymentId;
     existing.endDate=endDate; existing.groupId=state.mgrRecurringGroupId||null;
-    existing.accountId=state.mgrRecurringAccountId||null;
     if(existing.endDate && existing.nextDueISO>existing.endDate) existing.active=false;
     await DB.putRecurring(existing);
     closeRecurringEdit();
     renderRecurringScreen();
-    toast(isIncome ? 'Recurring income updated' : 'Recurring expense updated');
+    toast('Recurring expense updated');
   } else {
     const startDate=document.getElementById('recurring-edit-start').value || todayISO();
     const rule={
-      id:genId(), name, amount,
-      type: isIncome ? 'income' : 'expense',
-      categoryId: isIncome ? null : state.mgrRecurringCategoryId,
-      incomeCategoryId: isIncome ? state.mgrRecurringIncomeCategoryId : null,
-      paymentMethod:state.mgrRecurringPaymentId,
+      id:genId(), name, amount, categoryId:state.mgrRecurringCategoryId, paymentMethod:state.mgrRecurringPaymentId,
       frequency:state.mgrRecurringFrequency, startDate, endDate, nextDueISO:startDate, active:true, createdAt:Date.now(),
       groupId:state.mgrRecurringGroupId||null,
-      accountId:state.mgrRecurringAccountId||null,
     };
     await DB.putRecurring(rule);
     state.recurringRules.push(rule);
     await catchUpSingleRule(rule); // backfills immediately if startDate is today or in the past
     closeRecurringEdit();
     renderRecurringScreen();
-    toast(isIncome ? 'Recurring income added' : 'Recurring expense added');
+    toast('Recurring expense added');
   }
   await refreshAllExpenseViews();
 }
@@ -4401,10 +3904,11 @@ async function renderHomeForecastPanel(){
   const isMonth=state.forecastWindow==='month';
   let windowEndISO, remainingDays, spentSoFar=0;
   if(isMonth){
-    const bounds=cycleBounds(today);
-    windowEndISO=bounds.endISO;
+    const now=new Date();
+    windowEndISO=dateToISO(new Date(now.getFullYear(), now.getMonth()+1, 0));
     remainingDays=Math.max(0, Math.round((new Date(windowEndISO+'T00:00:00') - new Date(today+'T00:00:00'))/86400000));
-    spentSoFar=(await DB.getExpensesByDateRange(bounds.startISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
+    const monthStartISO=dateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
+    spentSoFar=(await DB.getExpensesByDateRange(monthStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
   } else {
     windowEndISO=dateToISO(addDays(new Date(today+'T00:00:00'), FORECAST_ROLLING_WINDOW_DAYS));
     remainingDays=FORECAST_ROLLING_WINDOW_DAYS;
@@ -4426,83 +3930,6 @@ async function renderHomeForecastPanel(){
   breakdown.insertAdjacentHTML('beforeend', `<div class="legend-row"><span>Estimated other spending</span><span>${estimatedOther!=null ? '~'+formatINR(estimatedOther) : `Not enough history yet (last ${state.forecastLookbackDays} days)`}</span></div>`);
   if(excludedCount>0){
     breakdown.insertAdjacentHTML('beforeend', `<div class="legend-row"><span>Excluded as one-time</span><span>${formatINR(excludedTotal)} · ${excludedCount} expense${excludedCount===1?'':'s'}</span></div>`);
-  }
-
-  // ── Savings projection ──
-  // Income rules that are active and due within the forecast window
-  const incomeRules=state.recurringRules.filter(r=>r.active && r.type==='income');
-  const savingsCard=document.getElementById('forecast-savings-card');
-  const nudge=document.getElementById('forecast-income-nudge');
-
-  if(incomeRules.length===0){
-    // No recurring income set up — show nudge, hide card
-    savingsCard.classList.add('hidden');
-    nudge.classList.remove('hidden');
-  } else {
-    nudge.classList.add('hidden');
-    savingsCard.classList.remove('hidden');
-
-    // Project recurring income due within the window (same engine as expenses)
-    let projectedRecurringIncome=0;
-    incomeRules.forEach(rule=>{
-      let cursor=rule.nextDueISO;
-      let count=0;
-      while(cursor<=windowEndISO && count<RECURRING_CATCHUP_CAP){
-        projectedRecurringIncome+=Number(rule.amount);
-        cursor=advanceRecurringDate(rule, cursor);
-        count++;
-      }
-    });
-
-    // Actual income logged so far this cycle (only for month window).
-    // Exclude recurring-generated entries (recurringId set) — those amounts
-    // are already projected forward via projectedRecurringIncome, so counting
-    // them here would double-count the same salary/income rule.
-    let incomeLoggedSoFar=0;
-    if(isMonth){
-      const bounds=cycleBounds(today);
-      const incomeEntries=(await DB.getExpensesByDateRange(bounds.startISO, today))
-        .filter(e=>!pendingDeletes[e.id] && isIncomeEntry(e) && !e.recurringId);
-      incomeLoggedSoFar=incomeEntries.reduce((s,e)=>s+Number(e.amount),0);
-    }
-
-    const projectedIncome=projectedRecurringIncome+incomeLoggedSoFar;
-    const projectedSavings=projectedIncome-projectedTotal;
-    const savingsColor=projectedSavings>=0 ? 'var(--mint)' : 'var(--coral)';
-
-    const savingsBreakdown=document.getElementById('forecast-savings-breakdown');
-    savingsBreakdown.innerHTML='';
-    savingsBreakdown.insertAdjacentHTML('beforeend',
-      `<div class="legend-row" style="color:rgba(255,255,255,0.8);">
-        <span>Projected income</span>
-        <span>${maskIncome(projectedIncome)}</span>
-      </div>`);
-    if(isMonth && incomeLoggedSoFar>0){
-      savingsBreakdown.insertAdjacentHTML('beforeend',
-        `<div class="legend-row" style="color:rgba(255,255,255,0.6);font-size:12px;">
-          <span style="padding-left:10px;">└ Logged so far</span>
-          <span>${maskIncome(incomeLoggedSoFar)}</span>
-        </div>`);
-    }
-    if(projectedRecurringIncome>0){
-      savingsBreakdown.insertAdjacentHTML('beforeend',
-        `<div class="legend-row" style="color:rgba(255,255,255,0.6);font-size:12px;">
-          <span style="padding-left:10px;">└ Recurring due</span>
-          <span>${maskIncome(projectedRecurringIncome)}</span>
-        </div>`);
-    }
-    savingsBreakdown.insertAdjacentHTML('beforeend',
-      `<div class="legend-row" style="color:rgba(255,255,255,0.8);">
-        <span>Projected spend</span>
-        <span>${formatINR(projectedTotal)}</span>
-      </div>`);
-
-    document.getElementById('forecast-savings-amount').textContent=maskIncome(Math.abs(projectedSavings));
-    document.getElementById('forecast-savings-amount').style.color=savingsColor;
-    // Prefix minus if overspending
-    if(projectedSavings<0){
-      document.getElementById('forecast-savings-amount').textContent='-'+maskIncome(Math.abs(projectedSavings));
-    }
   }
 
   const list=document.getElementById('forecast-upcoming-list'); list.innerHTML='';
@@ -4527,9 +3954,10 @@ async function renderHomeForecastPanel(){
 
 /* ============================== BUDGETS ============================== */
 async function getMonthToDateExpenses(){
+  const now=new Date();
+  const monthStartISO=dateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
   const today=todayISO();
-  const cycleStartISO=cycleBounds(today).startISO;
-  return (await DB.getExpensesByDateRange(cycleStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+  return (await DB.getExpensesByDateRange(monthStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
 }
 // Unlike Forecast's "estimated other spending," budgets intentionally
 // include recurring-generated expenses in the spent total — a recurring
@@ -4547,15 +3975,11 @@ function budgetSpentAmount(budget, monthExpenses){
 // make the rate wildly noisy before there's enough signal.
 function computeBudgetPace(spent, limit){
   if(!(limit>0)) return null;
-  const today=todayISO();
-  const bounds=cycleBounds(today);
-  const cycleStart=new Date(bounds.startISO+'T00:00:00');
-  const cycleEnd=new Date(bounds.endISO+'T00:00:00');
-  const todayDate=new Date(today+'T00:00:00');
-  const daysElapsed=Math.round((todayDate-cycleStart)/86400000)+1;
+  const now=new Date();
+  const daysElapsed=now.getDate();
   if(daysElapsed<3) return null;
-  const daysInCycle=Math.round((cycleEnd-cycleStart)/86400000)+1;
-  const projected=(spent/daysElapsed)*daysInCycle;
+  const daysInMonth=new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const projected=(spent/daysElapsed)*daysInMonth;
   return { projected, over: projected>limit };
 }
 // Targets you can still set a NEW budget for — every category without one
@@ -4585,12 +4009,13 @@ function budgetDisplayInfo(budget){
 // the Insights section below — safe since these are hoisted function
 // declarations in the same scope.
 function monthsAgoBounds(n){
-  return cyclesAgoBounds(n);
+  const now=new Date();
+  return monthBounds(dateToISO(new Date(now.getFullYear(), now.getMonth()-n, 1)));
 }
-// Pulls last cycle's actual spend for a target (for the edit sheet's
+// Pulls last month's actual spend for a target (for the edit sheet's
 // "last month" recap) plus a suggested monthly limit averaged across
-// however many of the last 3 cycles were actually "active" (had
-// ANY app usage) — averaging in silent pre-app cycles would understate the
+// however many of the last 3 calendar months were actually "active" (had
+// ANY app usage) — averaging in silent pre-app months would understate the
 // suggestion for a newer install. targetCategoryId is null for "Overall".
 async function getBudgetHistoryData(targetCategoryId){
   const m1=monthsAgoBounds(1), m2=monthsAgoBounds(2), m3=monthsAgoBounds(3);
@@ -4744,393 +4169,6 @@ function requestDeleteBudget(){
   openManageDeleteConfirm('budget', id, info.name);
 }
 
-/* ============================== ACCOUNTS & WALLETS ============================== */
-// pt_accounts_enabled: '1' = feature on, '0'/absent = feature off.
-// pt_accounts_had_data: '1' = user has previously set up accounts (used to detect re-enable).
-
-function isAccountsEnabled(){ return state.accountsEnabled; }
-
-// Called when Settings accounts toggle is tapped.
-async function handleAccountsToggle(){
-  if(state.accountsEnabled){
-    // Disable — keep data, just hide the feature
-    state.accountsEnabled=false;
-    Store.set('pt_accounts_enabled','0');
-    renderAccountsSettingsRow();
-    renderAccountsInsightsBtn();
-    toast('Accounts disabled — your data is kept');
-  } else {
-    // Enable — check if user had prior data (re-enable) or first time
-    const hadData = Store.get('pt_accounts_had_data')==='1';
-    if(hadData && state.accounts.length===0){
-      // Reload accounts from DB first
-      state.accounts = await DB.getAllAccounts();
-    }
-    if(hadData && state.accounts.length>0){
-      // Re-enable: show out-of-sync warning
-      document.getElementById('accounts-reenable-overlay').classList.add('show');
-    } else {
-      // First time: show onboarding
-      openAccountsOnboarding();
-    }
-  }
-}
-
-function renderAccountsSettingsRow(){
-  const sw=document.getElementById('settings-accounts-switch');
-  sw.classList.toggle('on', state.accountsEnabled);
-  document.getElementById('settings-manage-accounts-btn').classList.toggle('hidden', !state.accountsEnabled);
-}
-
-function renderAccountsInsightsBtn(){
-  const btn=document.getElementById('stats-accounts-btn');
-  if(btn) btn.classList.toggle('hidden', !state.accountsEnabled);
-}
-
-// ---- Onboarding ----
-function openAccountsOnboarding(){
-  renderAccountsOnboardingList();
-  document.getElementById('accounts-onboarding-overlay').classList.add('show');
-}
-function closeAccountsOnboarding(){
-  document.getElementById('accounts-onboarding-overlay').classList.remove('show');
-}
-async function renderAccountsOnboardingList(){
-  const list=document.getElementById('accounts-onboarding-list'); list.innerHTML='';
-  if(state.accounts.length===0) return;
-  const balances=await Promise.all(state.accounts.map(a=>computeAccountBalance(a)));
-  state.accounts.forEach((a,i)=>{
-    const icon = a.type==='cc' ? '💳' : '🏦';
-    const balLabel = a.type==='cc' ? 'Outstanding' : 'Balance';
-    list.insertAdjacentHTML('beforeend', `
-      <div style="display:flex;align-items:center;justify-content:space-between;
-                  padding:12px 14px;background:var(--surface);border-radius:14px;margin-bottom:8px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:20px;">${icon}</span>
-          <div>
-            <p style="font-size:13px;font-weight:600;color:var(--ink);">${esc(a.name)}</p>
-            <p style="font-size:11px;color:var(--muted);">${balLabel}: ${formatINR(Math.abs(balances[i]))}</p>
-          </div>
-        </div>
-        <button type="button" data-onboardedit="${a.id}"
-          style="font-size:13px;color:var(--grape);font-weight:700;background:none;border:none;cursor:pointer;">Edit</button>
-      </div>`);
-  });
-  list.querySelectorAll('[data-onboardedit]').forEach(btn=>{
-    btn.onclick=()=>openAccountEdit(btn.dataset.onboardedit, 'onboarding');
-  });
-}
-async function finishAccountsOnboarding(){
-  if(state.accounts.length===0){ toast('Add at least one account to continue'); return; }
-  state.accountsEnabled=true;
-  Store.set('pt_accounts_enabled','1');
-  Store.set('pt_accounts_had_data','1');
-  closeAccountsOnboarding();
-  renderAccountsSettingsRow();
-  renderAccountsInsightsBtn();
-  toast('Accounts enabled');
-}
-
-// ---- Account edit sheet ----
-function renderAccountEditPmRow(){
-  const row=document.getElementById('account-edit-pm-row'); row.innerHTML='';
-  state.paymentMethods.forEach(pm=>{
-    const selected=state.acctEditPaymentIds.has(pm.id);
-    const bg = selected ? 'var(--grape)' : 'var(--surface)';
-    const color = selected ? 'white' : 'var(--ink)';
-    row.insertAdjacentHTML('beforeend', `
-      <button type="button" class="pay-chip" data-acctpm="${pm.id}" style="background:${bg};color:${color}">
-        <span>${pm.icon}</span>${esc(pm.name)}
-      </button>`);
-  });
-  row.querySelectorAll('[data-acctpm]').forEach(btn=>{
-    btn.onclick=()=>{
-      const pmId=btn.dataset.acctpm;
-      if(state.acctEditPaymentIds.has(pmId)) state.acctEditPaymentIds.delete(pmId);
-      else state.acctEditPaymentIds.add(pmId);
-      renderAccountEditPmRow();
-    };
-  });
-}
-// source: 'onboarding' | 'settings' — where to return after save/close
-function openAccountEdit(id, source='settings'){
-  state.acctEditingId = id || null;
-  state.acctEditSource = source;
-  const existing = id ? state.accounts.find(a=>a.id===id) : null;
-  const type = existing ? existing.type : 'savings';
-  state.acctEditPaymentIds = new Set(existing ? (existing.paymentMethodIds||[]) : []);
-  document.getElementById('account-edit-title').textContent = existing ? 'Edit account' : 'Add account';
-  document.getElementById('account-edit-name').value = existing ? existing.name : '';
-  document.getElementById('account-edit-balance').value = existing ? (existing.openingBalance||0) : '';
-  // Type tabs
-  document.getElementById('account-type-tabs').querySelectorAll('[data-accttype]').forEach(btn=>{
-    btn.classList.toggle('active', btn.dataset.accttype===type);
-  });
-  // Lock type for existing (same reason as recurring frequency)
-  const tabs=document.getElementById('account-type-tabs');
-  tabs.style.pointerEvents = existing ? 'none' : '';
-  tabs.style.opacity = existing ? '0.5' : '';
-  applyAccountTypeLabels(type);
-  document.getElementById('account-edit-delete-btn').classList.toggle('hidden', !existing);
-  renderAccountEditPmRow();
-  document.getElementById('account-edit-overlay').classList.add('show');
-}
-function closeAccountEdit(){
-  document.getElementById('account-edit-overlay').classList.remove('show');
-  state.acctEditingId=null;
-}
-function getAccountEditType(){
-  const active=document.querySelector('#account-type-tabs [data-accttype].active');
-  return active ? active.dataset.accttype : 'savings';
-}
-function applyAccountTypeLabels(type){
-  const isCc = type==='cc';
-  document.getElementById('account-balance-label').textContent = isCc ? 'CURRENT OUTSTANDING' : 'CURRENT BALANCE';
-  document.getElementById('account-balance-hint').textContent = isCc
-    ? 'Enter how much you currently owe on this card'
-    : 'Enter your current account balance';
-}
-async function saveAccountEdit(){
-  const name=document.getElementById('account-edit-name').value.trim();
-  const balance=parseFloat(document.getElementById('account-edit-balance').value)||0;
-  const type=getAccountEditType();
-  if(!name){ toast('Give the account a name'); return; }
-  const existing = state.acctEditingId ? state.accounts.find(a=>a.id===state.acctEditingId) : null;
-  if(existing){
-    existing.name=name; existing.openingBalance=balance;
-    existing.paymentMethodIds=[...state.acctEditPaymentIds];
-    await DB.putAccount(existing);
-  } else {
-    const account={ id:genId(), name, type, openingBalance:balance, paymentMethodIds:[...state.acctEditPaymentIds], createdAt:Date.now() };
-    await DB.putAccount(account);
-    state.accounts.push(account);
-  }
-  closeAccountEdit();
-  if(state.acctEditSource==='onboarding'){
-    renderAccountsOnboardingList();
-  } else {
-    renderManageAccountsList();
-  }
-  toast(existing ? 'Account updated' : 'Account added');
-}
-async function deleteAccountEdit(){
-  const id=state.acctEditingId; if(!id) return;
-  const acct=state.accounts.find(a=>a.id===id);
-  if(!acct) return;
-  await DB.deleteAccount(id);
-  state.accounts=state.accounts.filter(a=>a.id!==id);
-  closeAccountEdit();
-  if(state.acctEditSource==='onboarding'){
-    renderAccountsOnboardingList();
-  } else {
-    renderManageAccountsList();
-  }
-  toast('Account deleted');
-}
-
-// ---- Manage accounts (from Settings) ----
-function openManageAccountsScreen(){
-  renderManageAccountsList();
-  document.getElementById('manage-accounts-overlay').classList.add('show');
-}
-function closeManageAccountsScreen(){
-  document.getElementById('manage-accounts-overlay').classList.remove('show');
-}
-async function renderManageAccountsList(){
-  const list=document.getElementById('manage-accounts-list'); if(!list) return;
-  list.innerHTML='';
-  if(state.accounts.length===0){
-    list.innerHTML='<p class="empty-hint">No accounts yet — add one below.</p>';
-    return;
-  }
-  // Show loading state while computing
-  list.innerHTML='<p class="empty-hint" style="padding:8px 0;">Calculating balances…</p>';
-  const balances=await Promise.all(state.accounts.map(a=>computeAccountBalance(a)));
-  list.innerHTML='';
-  state.accounts.forEach((a,i)=>{
-    const icon = a.type==='cc' ? '💳' : '🏦';
-    const bal=balances[i];
-    const isCc=a.type==='cc';
-    const balLabel = isCc ? 'Outstanding' : 'Balance';
-    const balColor = isCc ? 'var(--coral)' : (bal<0?'var(--coral)':'var(--ink)');
-    list.insertAdjacentHTML('beforeend', `
-      <button type="button" class="settings-row" data-acctid="${a.id}" style="margin-bottom:8px;">
-        <span class="settings-row-icon" style="background:${isCc?'rgba(255,107,91,.14)':'rgba(46,196,182,.14)'};">${icon}</span>
-        <div class="settings-row-info">
-          <p class="settings-row-title">${esc(a.name)}</p>
-          <span class="settings-row-sub">${balLabel}: ${formatINR(Math.abs(bal))}</span>
-        </div>
-        <span class="settings-row-chevron">›</span>
-      </button>`);
-  });
-  list.querySelectorAll('[data-acctid]').forEach(btn=>{
-    btn.onclick=()=>openAccountEdit(btn.dataset.acctid, 'settings');
-  });
-}
-
-// ---- Accounts view sheet (Insights 🏦) ----
-function openAccountsViewSheet(){
-  renderAccountsViewSheet(); // async — renders loading state immediately, then updates
-  document.getElementById('accounts-view-overlay').classList.add('show');
-}
-function closeAccountsViewSheet(){
-  document.getElementById('accounts-view-overlay').classList.remove('show');
-}
-// Computes running balance for an account from opening balance + all transactions.
-// Savings: opening + income credited - expenses debited + transfers in - transfers out
-// CC: opening (outstanding) + expenses debited - payments (transfers in from savings) + transfers out
-async function computeAccountBalance(account){
-  const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31'))
-    .filter(e=>!pendingDeletes[e.id]);
-  const isCc=account.type==='cc';
-  let balance=account.openingBalance||0;
-  all.forEach(e=>{
-    if(isExpenseEntry(e) && e.accountId===account.id){
-      balance += isCc ? Number(e.amount) : -Number(e.amount);
-    }
-    if(isIncomeEntry(e) && e.accountId===account.id){
-      balance += isCc ? -Number(e.amount) : Number(e.amount);
-    }
-    if(isTransferEntry(e)){
-      if(e.fromAccountId===account.id){
-        balance -= Number(e.amount); // money left this account
-      }
-      if(e.toAccountId===account.id){
-        balance += isCc ? -Number(e.amount) : Number(e.amount); // CC: payment reduces outstanding
-      }
-    }
-  });
-  return balance;
-}
-async function renderAccountsViewSheet(){
-  const list=document.getElementById('accounts-view-list'); list.innerHTML='';
-  if(state.accounts.length===0){
-    list.innerHTML='<p class="empty-hint">No accounts set up yet.</p>';
-    document.getElementById('accounts-view-networth').style.display='none';
-    return;
-  }
-  document.getElementById('accounts-view-networth').style.display='';
-  // Show loading state while computing
-  list.innerHTML='<p class="empty-hint" style="padding:8px 0;">Calculating balances…</p>';
-  const balances=await Promise.all(state.accounts.map(a=>computeAccountBalance(a)));
-  list.innerHTML='';
-  let netWorth=0;
-  state.accounts.forEach((a,i)=>{
-    const isCc=a.type==='cc';
-    const bal=balances[i];
-    netWorth += isCc ? -Math.abs(bal) : bal;
-    const icon = isCc ? '💳' : '🏦';
-    const balLabel = isCc ? 'outstanding' : 'balance';
-    const balColor = isCc ? 'var(--coral)' : (bal<0 ? 'var(--coral)' : 'var(--ink)');
-    const maskedBal = state.incomeRevealed ? formatINR(Math.abs(bal)) : '₹••••••';
-    const negPrefix = !isCc && bal<0 && state.incomeRevealed ? '-' : '';
-    list.insertAdjacentHTML('beforeend', `
-      <div style="display:flex;align-items:center;justify-content:space-between;
-                  padding:14px 16px;background:var(--surface);border-radius:16px;margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <div style="width:40px;height:40px;border-radius:12px;flex-shrink:0;
-                      background:${isCc?'rgba(255,107,91,.14)':'rgba(46,196,182,.14)'};
-                      display:flex;align-items:center;justify-content:center;font-size:18px;">${icon}</div>
-          <div>
-            <p style="font-size:14px;font-weight:600;color:var(--ink);">${esc(a.name)}</p>
-            <p style="font-size:11px;color:var(--muted);margin-top:2px;">${isCc?'Credit Card':'Savings Account'}</p>
-          </div>
-        </div>
-        <div style="text-align:right;">
-          <p style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${balColor};">${negPrefix}${maskedBal}</p>
-          <p style="font-size:10px;color:var(--muted);margin-top:2px;">${balLabel}</p>
-        </div>
-      </div>`);
-  });
-  const nwEl=document.getElementById('accounts-view-networth-value');
-  const maskedNW = state.incomeRevealed ? formatINR(Math.abs(netWorth)) : '₹••••••';
-  nwEl.textContent = state.incomeRevealed ? ((netWorth>=0?'':'-')+maskedNW) : maskedNW;
-  nwEl.style.color = netWorth>=0 ? 'var(--mint)' : 'var(--coral)';
-}
-
-// ---- Bulk account assign ----
-let _bulkAcctSelectedAccountId=null;
-let _bulkAcctSelected=new Set();
-
-async function openBulkAccountScreen(){
-  _bulkAcctSelectedAccountId = state.accounts.length>0 ? state.accounts[0].id : null;
-  _bulkAcctSelected=new Set();
-  closeManageAccountsScreen();
-  renderBulkAccountAcctRow();
-  await renderBulkAccountList();
-  showScreen('bulkaccount-screen');
-}
-function renderBulkAccountAcctRow(){
-  const row=document.getElementById('bulkaccount-acct-row'); row.innerHTML='';
-  state.accounts.forEach(a=>{
-    const selected=_bulkAcctSelectedAccountId===a.id;
-    const icon=a.type==='cc'?'💳':'🏦';
-    row.insertAdjacentHTML('beforeend',`
-      <button type="button" class="pay-chip" data-bacct="${a.id}"
-        style="background:${selected?'var(--grape)':'var(--surface)'};color:${selected?'white':'var(--ink)'}">
-        <span>${icon}</span>${esc(a.name)}
-      </button>`);
-  });
-  row.querySelectorAll('[data-bacct]').forEach(btn=>{
-    btn.onclick=()=>{
-      _bulkAcctSelectedAccountId=btn.dataset.bacct;
-      _bulkAcctSelected=new Set();
-      renderBulkAccountAcctRow();
-      renderBulkAccountList();
-    };
-  });
-}
-async function renderBulkAccountList(){
-  const list=document.getElementById('bulkaccount-list'); list.innerHTML='';
-  const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31'))
-    .filter(e=>!pendingDeletes[e.id] && !e.accountId)
-    .sort((a,b)=>b.date.localeCompare(a.date));
-  if(all.length===0){
-    list.innerHTML='<p class="empty-hint">All transactions already have an account assigned.</p>';
-    document.getElementById('bulkaccount-apply-btn').classList.add('hidden');
-    return;
-  }
-  all.forEach(e=>{
-    const isInc=isIncomeEntry(e);
-    const cat=isInc ? INCOME_CATEGORIES.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
-    const dateLabel=new Date(e.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
-    const checked=_bulkAcctSelected.has(e.id);
-    list.insertAdjacentHTML('beforeend',`
-      <div class="recent-row" data-bulkacctid="${e.id}" style="cursor:pointer;padding:10px 0;">
-        <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:(isInc?'💰':'✨')}</div>
-        <div class="recent-info">
-          <p class="recent-title">${esc(e.note||'Untitled')}</p>
-          <span class="recent-pm">${esc(dateLabel)}</span>
-        </div>
-        <span class="recent-amt" style="color:${isInc?'var(--mint)':'var(--ink)'};">${isInc?'+':''}${formatINR(e.amount)}</span>
-        <input type="checkbox" ${checked?'checked':''} style="margin-left:10px;width:18px;height:18px;flex-shrink:0;" data-bulkacctcheck="${e.id}">
-      </div>`);
-  });
-  list.querySelectorAll('[data-bulkacctid]').forEach(row=>{
-    row.addEventListener('click', ()=>{
-      const id=row.dataset.bulkacctid;
-      if(_bulkAcctSelected.has(id)) _bulkAcctSelected.delete(id);
-      else _bulkAcctSelected.add(id);
-      const cb=row.querySelector('[data-bulkacctcheck]');
-      if(cb) cb.checked=_bulkAcctSelected.has(id);
-      document.getElementById('bulkaccount-apply-btn').classList.toggle('hidden', _bulkAcctSelected.size===0);
-    });
-  });
-  document.getElementById('bulkaccount-apply-btn').classList.toggle('hidden', _bulkAcctSelected.size===0);
-}
-async function applyBulkAccountAssign(){
-  if(!_bulkAcctSelectedAccountId || _bulkAcctSelected.size===0) return;
-  const ids=[..._bulkAcctSelected];
-  for(const id of ids){
-    const exp=await DB.getExpense(id);
-    if(exp){ exp.accountId=_bulkAcctSelectedAccountId; await DB.addExpense(exp); }
-  }
-  const count=ids.length;
-  _bulkAcctSelected=new Set();
-  await renderBulkAccountList();
-  toast(`${count} transaction${count===1?'':'s'} assigned`);
-}
-
 /* ============================== INSIGHTS ============================== */
 function dateToISO(d){ const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); }
 function addDays(d, n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
@@ -5146,56 +4184,13 @@ function monthBounds(refISO){
   const end=new Date(d.getFullYear(), d.getMonth()+1, 0); // day 0 = last day of the previous month
   return { startISO: dateToISO(start), endISO: dateToISO(end) };
 }
-// Returns the user's financial cycle start day (1–28), defaulting to 1.
-// Stored in localStorage as pt_cycle_day. When 1, behaviour is identical
-// to calendar month — so existing users see zero change until they opt in.
-function getCycleDay(){
-  const v=parseInt(localStorage.getItem('pt_cycle_day')||'1',10);
-  return (v>=1 && v<=28) ? v : 1;
-}
-// Computes the financial cycle bounds (start/end ISO dates) that contain
-// the given reference date, using the user's configured cycle start day.
-// Example: cycle day 26, today = 10 Jun → cycle is 26 May – 25 Jun.
-// When cycle day is 1, output is identical to monthBounds().
-function cycleBounds(refISO){
-  const cycleDay=getCycleDay();
-  if(cycleDay===1) return monthBounds(refISO);
-  const ref=new Date(refISO+'T00:00:00');
-  const refDay=ref.getDate();
-  let startYear=ref.getFullYear(), startMonth=ref.getMonth();
-  // If today is before the cycle start day, the cycle started last month
-  if(refDay < cycleDay) {
-    startMonth -= 1;
-    if(startMonth < 0){ startMonth=11; startYear--; }
-  }
-  const lastDayOfStartMonth=new Date(startYear, startMonth+1, 0).getDate();
-  const clampedStart=Math.min(cycleDay, lastDayOfStartMonth);
-  const cycleStart=new Date(startYear, startMonth, clampedStart);
-  // End is one day before next cycle start
-  let endYear=startYear, endMonth=startMonth+1;
-  if(endMonth>11){ endMonth=0; endYear++; }
-  const lastDayOfEndMonth=new Date(endYear, endMonth+1, 0).getDate();
-  const clampedEnd=Math.min(cycleDay, lastDayOfEndMonth);
-  const cycleEnd=new Date(endYear, endMonth, clampedEnd-1);
-  return { startISO: dateToISO(cycleStart), endISO: dateToISO(cycleEnd) };
-}
-// Same as monthsAgoBounds but uses cycleBounds. n=1 → previous cycle, etc.
-function cyclesAgoBounds(n){
-  const today=new Date();
-  const cycleDay=getCycleDay();
-  // Step back n months from current cycle start
-  const cur=cycleBounds(todayISO());
-  const ref=new Date(cur.startISO+'T00:00:00');
-  ref.setMonth(ref.getMonth()-n);
-  return cycleBounds(dateToISO(ref));
-}
 function yearBounds(refISO){
   const d=new Date(refISO+'T00:00:00');
   return { startISO: dateToISO(new Date(d.getFullYear(),0,1)), endISO: dateToISO(new Date(d.getFullYear(),11,31)) };
 }
 function stepPeriod(type, startISO, dir){
   if(type==='week') return weekBounds(dateToISO(addDays(new Date(startISO+'T00:00:00'), 7*dir)));
-  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()+dir); return cycleBounds(dateToISO(d)); }
+  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()+dir); return monthBounds(dateToISO(d)); }
   if(type==='year'){ const d=new Date(startISO+'T00:00:00'); d.setFullYear(d.getFullYear()+dir); return yearBounds(dateToISO(d)); }
   return null;
 }
@@ -5203,7 +4198,7 @@ function stepPeriod(type, startISO, dir){
 // fall back to the same number of days immediately before the chosen range.
 function previousPeriodBounds(type, startISO, endISO){
   if(type==='week') return weekBounds(dateToISO(addDays(new Date(startISO+'T00:00:00'), -7)));
-  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()-1); return cycleBounds(dateToISO(d)); }
+  if(type==='month'){ const d=new Date(startISO+'T00:00:00'); d.setMonth(d.getMonth()-1); return monthBounds(dateToISO(d)); }
   if(type==='year'){ const d=new Date(startISO+'T00:00:00'); d.setFullYear(d.getFullYear()-1); return yearBounds(dateToISO(d)); }
   const start=new Date(startISO+'T00:00:00'), end=new Date(endISO+'T00:00:00');
   const lengthDays=Math.round((end-start)/86400000)+1;
@@ -5212,13 +4207,7 @@ function previousPeriodBounds(type, startISO, endISO){
 }
 function formatPeriodLabel(type, startISO, endISO){
   if(type==='custom' && (!startISO || !endISO)) return 'Pick a date range';
-  if(type==='month'){
-    // When cycle day is 1, show familiar "June 2026" label.
-    // When cycle day ≠ 1, show "26 May – 25 Jun" so the non-calendar range is clear.
-    if(getCycleDay()===1) return new Date(startISO+'T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
-    const s=new Date(startISO+'T00:00:00'), e=new Date(endISO+'T00:00:00');
-    return `${s.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}`;
-  }
+  if(type==='month') return new Date(startISO+'T00:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
   if(type==='year') return new Date(startISO+'T00:00:00').getFullYear().toString();
   const s=new Date(startISO+'T00:00:00'), e=new Date(endISO+'T00:00:00');
   return `${s.toLocaleDateString('en-IN',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}`;
@@ -5259,7 +4248,7 @@ function applyInsightsPeriodTypeUI(){
 function setInsightsPeriodType(type){
   state.insPeriodType=type;
   if(type==='week'){ const b=weekBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
-  else if(type==='month'){ const b=cycleBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
+  else if(type==='month'){ const b=monthBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
   else if(type==='year'){ const b=yearBounds(todayISO()); state.insStartISO=b.startISO; state.insEndISO=b.endISO; }
   else { state.insStartISO=null; state.insEndISO=null; document.getElementById('ins-custom-start').value=''; document.getElementById('ins-custom-end').value=''; }
   applyInsightsPeriodTypeUI();
@@ -5280,7 +4269,6 @@ function setInsightsView(view){
   document.getElementById('ins-compare-panel').classList.toggle('hidden', view!=='compare');
   document.getElementById('ins-payment-panel').classList.toggle('hidden', view!=='payment');
   document.getElementById('ins-groups-panel').classList.toggle('hidden', view!=='groups');
-  document.getElementById('ins-groups-chip-bar').classList.toggle('hidden', view!=='groups');
   applyInsightsPeriodTypeUI();
   renderInsights();
 }
@@ -5404,48 +4392,38 @@ async function renderInsightsCompareResult(){
 }
 async function renderInsightsGroupsPanel(){
   const container=document.getElementById('ins-groups-panel');
-  const chipBar=document.getElementById('ins-groups-chip-bar');
-  const chipRow=document.getElementById('ins-groups-chip-row');
-
   if(state.groups.length===0){
-    chipBar.classList.add('hidden');
     container.innerHTML='<p class="empty-hint">No groups yet — add one from the Add/Edit screen\'s Group field.</p>';
     return;
   }
-
-  // Render chips in sticky bar
-  chipBar.classList.remove('hidden');
-  chipRow.innerHTML=state.groups.map(g=>{
+  const chipsHTML=state.groups.map(g=>{
     const selected=state.insSelectedGroupId===g.id;
     const bg=selected?'var(--grape)':'var(--surface)';
     const color=selected?'white':'var(--ink)';
     return `<button type="button" class="pay-chip" data-ins-group="${g.id}" style="background:${bg};color:${color}">${esc(g.name)}</button>`;
   }).join('');
-  chipRow.querySelectorAll('[data-ins-group]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      state.insSelectedGroupId=btn.dataset.insGroup;
-      renderInsightsGroupsPanel();
-    });
-  });
 
-  // Render results in scrollable panel
   let resultHTML='<p class="empty-hint">Pick a group above.</p>';
   if(state.insSelectedGroupId){
+    // Custom range guard
     if(state.insPeriodType==='custom' && (!state.insStartISO || !state.insEndISO)){
       resultHTML='<p class="empty-hint">Pick a from and to date above.</p>';
     } else if(state.insPeriodType==='custom' && state.insStartISO>state.insEndISO){
       resultHTML='<p class="empty-hint">The from date is after the to date.</p>';
     } else {
       const group=state.groups.find(g=>g.id===state.insSelectedGroupId);
+      // Current period expenses for this group
       const curAll=(await DB.getExpensesByDateRange(state.insStartISO, state.insEndISO))
         .filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && e.groupId===state.insSelectedGroupId)
         .sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
+      // Previous period total for delta
       const prevBounds=previousPeriodBounds(state.insPeriodType, state.insStartISO, state.insEndISO);
       const prevAll=(await DB.getExpensesByDateRange(prevBounds.startISO, prevBounds.endISO))
         .filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && e.groupId===state.insSelectedGroupId);
       const curTotal=curAll.reduce((s,e)=>s+Number(e.amount),0);
       const prevTotal=prevAll.reduce((s,e)=>s+Number(e.amount),0);
       const delta=formatDelta(curTotal, prevTotal);
+
       if(curAll.length===0 && prevTotal===0){
         resultHTML=`<p class="empty-hint">No expenses tagged to ${esc(group?group.name:'this group')} in this period.</p>`;
       } else {
@@ -5457,7 +4435,7 @@ async function renderInsightsGroupsPanel(){
               <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
               <div class="recent-info">
                 <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:'Expense'))}</p>
-                <span class="recent-pm">${dateLabel}${cat?' · '+esc(cat.name):''}</span>
+                <span class="recent-meta">${dateLabel}${cat?' · '+esc(cat.name):''}</span>
               </div>
               <span class="recent-amt">-${formatINR(e.amount)}</span>
             </div>`;
@@ -5472,7 +4450,13 @@ async function renderInsightsGroupsPanel(){
       }
     }
   }
-  container.innerHTML=`<div style="margin-top:4px;">${resultHTML}</div>`;
+  container.innerHTML = `<div class="pay-row" id="ins-groups-chip-row">${chipsHTML}</div><div style="margin-top:14px;">${resultHTML}</div>`;
+  document.querySelectorAll('#ins-groups-chip-row [data-ins-group]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.insSelectedGroupId=btn.dataset.insGroup;
+      renderInsightsGroupsPanel();
+    });
+  });
 }
 async function renderInsights(){
   document.getElementById('ins-period-label').textContent = formatPeriodLabel(state.insPeriodType, state.insStartISO, state.insEndISO);
@@ -5488,37 +4472,12 @@ async function renderInsights(){
 // on whether we're in expense or income mode. Called on open and on toggle.
 function renderAddModeUI(){
   const isIncome = state.addMode === 'income';
-  const isTransfer = state.addMode === 'transfer';
-
-  // Title
-  document.getElementById('add-screen-title').textContent =
-    isTransfer ? 'Add transfer' : isIncome ? 'Add income' : 'Add expense';
-
-  // Transfer-specific fields
-  document.getElementById('add-transfer-section').classList.toggle('hidden', !isTransfer);
-
-  // Category label + grid — hide in transfer mode
-  const catGrid=document.getElementById('add-category-grid');
-  const catLabel=catGrid.previousElementSibling;
-  catLabel.classList.toggle('hidden', isTransfer);
-  catGrid.classList.toggle('hidden', isTransfer);
-
-  // Account strip (From account for expense/income)
-  document.getElementById('add-account-section').classList.toggle('hidden', isTransfer || !state.accountsEnabled || state.accounts.length===0);
-
-  // Payment method — only for expense
-  document.getElementById('add-payment-section').classList.toggle('hidden', isIncome || isTransfer);
-
-  // Expense-only fields (warranty, split, recurring etc.)
-  document.getElementById('add-expense-only-fields').classList.toggle('hidden', isIncome || isTransfer);
-
-  if(isTransfer){
-    renderTransferAccountRows();
-  } else {
-    renderAccountPillStrip();
-    renderCategoryGrid();
-    updateNotePlaceholder();
-    renderPaymentChips();
+  document.getElementById('add-expense-only-fields').classList.toggle('hidden', isIncome);
+  document.getElementById('add-payment-section').classList.toggle('hidden', isIncome);
+  renderCategoryGrid();
+  updateNotePlaceholder();
+  renderPaymentChips();
+  if(!isIncome){
     renderExcludeForecastRow();
     renderWarrantyArea();
     renderGroupArea();
@@ -5593,9 +4552,8 @@ const INCOME_CATEGORIES=[
 // Backward-compat: records saved before income tracking have no type field,
 // treat them as expenses. Always use these helpers rather than checking
 // e.type === 'expense' directly to avoid breaking old data.
-function isExpenseEntry(e){ return (!e.type || e.type==='expense') && e.type!=='transfer'; }
+function isExpenseEntry(e){ return !e.type || e.type==='expense'; }
 function isIncomeEntry(e){ return e.type==='income'; }
-function isTransferEntry(e){ return e.type==='transfer'; }
 
 // Single-pass usage count per category, all-time — powers the "most-used
 // first" sort on the Add screen's category grid. Fetched once per Add-screen
@@ -5626,69 +4584,9 @@ function updateNotePlaceholder(){
   const cat=state.categories.find(c=>c.id===state.selectedCategoryId);
   document.getElementById('add-note').placeholder = (cat && NOTE_PLACEHOLDERS[cat.name]) || 'What was this for?';
 }
-function renderTransferAccountRows(){
-  ['from','to'].forEach(dir=>{
-    const row=document.getElementById(`add-transfer-${dir}-row`); row.innerHTML='';
-    const selectedId = dir==='from' ? state.selectedTransferFromId : state.selectedTransferToId;
-    state.accounts.forEach(a=>{
-      const selected=selectedId===a.id;
-      const icon=a.type==='cc'?'💳':'🏦';
-      row.insertAdjacentHTML('beforeend',`
-        <button type="button" class="pay-chip" data-transfer-${dir}="${a.id}"
-          style="background:${selected?'var(--grape)':'var(--surface)'};color:${selected?'white':'var(--ink)'}">
-          <span>${icon}</span>${esc(a.name)}
-        </button>`);
-    });
-    row.querySelectorAll(`[data-transfer-${dir}]`).forEach(btn=>{
-      btn.onclick=()=>{
-        if(dir==='from') state.selectedTransferFromId=btn.dataset.transferFrom;
-        else state.selectedTransferToId=btn.dataset.transferTo;
-        renderTransferAccountRows();
-      };
-    });
-  });
-}
-function renderAccountPillStrip(){
-  const section=document.getElementById('add-account-section');
-  if(!state.accountsEnabled || state.accounts.length===0){ section.classList.add('hidden'); return; }
-  section.classList.remove('hidden');
-  const row=document.getElementById('add-account-row'); row.innerHTML='';
-  state.accounts.forEach(a=>{
-    const selected=state.selectedAccountId===a.id;
-    const bg = selected ? 'var(--grape)' : 'var(--surface)';
-    const color = selected ? 'white' : 'var(--ink)';
-    const icon = a.type==='cc' ? '💳' : '🏦';
-    row.insertAdjacentHTML('beforeend', `
-      <button type="button" class="pay-chip" data-acctpill="${a.id}" style="background:${bg};color:${color}">
-        <span>${icon}</span>${esc(a.name)}
-      </button>`);
-  });
-  row.querySelectorAll('[data-acctpill]').forEach(btn=>{
-    btn.onclick=()=>{
-      state.selectedAccountId=btn.dataset.acctpill;
-      renderAccountPillStrip();
-      renderPaymentChips(); // re-filter payment methods to selected account
-    };
-  });
-}
 function renderPaymentChips(){
   const row=document.getElementById('add-payment-row'); row.innerHTML='';
-  // When accounts enabled and an account is selected, filter to that account's methods.
-  // If the account has no methods assigned yet, show all (graceful fallback).
-  let methods = state.paymentMethods;
-  if(state.accountsEnabled && state.selectedAccountId){
-    const acct=state.accounts.find(a=>a.id===state.selectedAccountId);
-    if(acct && acct.paymentMethodIds && acct.paymentMethodIds.length>0){
-      const ids=new Set(acct.paymentMethodIds);
-      const filtered=state.paymentMethods.filter(pm=>ids.has(pm.id));
-      if(filtered.length>0) methods=filtered;
-    }
-  }
-  // If currently selected payment method is not in filtered list, reset to first available
-  if(state.selectedPaymentId && !methods.find(pm=>pm.id===state.selectedPaymentId)){
-    state.selectedPaymentId = methods[0] ? methods[0].id : null;
-  }
-  methods.forEach(pm=>{
+  state.paymentMethods.forEach(pm=>{
     const selected=state.selectedPaymentId===pm.id;
     const bg = selected ? 'var(--grape)' : 'var(--surface)';
     const color = selected ? 'white' : 'var(--ink)';
@@ -6063,23 +4961,12 @@ async function openAddScreen(existing){
   state.returnScreen = getCurrentScreen();
   state.editingExpenseId = existing ? existing.id : null;
   state.editingExpense = existing || null;
-  state.addMode = (existing && existing.type==='income') ? 'income' : (existing && existing.type==='transfer') ? 'transfer' : 'expense';
-  // Transfer state
-  state.selectedTransferFromId = existing ? (existing.fromAccountId||null) : (state.accounts[0]?state.accounts[0].id:null);
-  state.selectedTransferToId = existing ? (existing.toAccountId||null) : (state.accounts[1]?state.accounts[1].id:null);
+  state.addMode = (existing && existing.type==='income') ? 'income' : 'expense';
   state.selectedCategoryId = existing ? existing.categoryId : (state.categories[0] ? state.categories[0].id : null);
   state.selectedIncomeCategoryId = existing ? (existing.incomeCategoryId || INCOME_CATEGORIES[0].id) : INCOME_CATEGORIES[0].id;
   state.catGridExpanded = false; // always start collapsed — same pattern as MORE OPTIONS below
   state.catUsageCounts = await getCategoryUsageCounts();
   state.selectedPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
-  // Account — default to last used (pt_last_account), or first account if no prior selection
-  if(state.accountsEnabled && state.accounts.length>0){
-    const lastAcct=Store.get('pt_last_account');
-    const validLast=lastAcct && state.accounts.find(a=>a.id===lastAcct);
-    state.selectedAccountId = existing ? (existing.accountId||null) : (validLast ? lastAcct : state.accounts[0].id);
-  } else {
-    state.selectedAccountId=null;
-  }
   state.pendingAttachments = [];
   state.existingAttachmentIds = existing ? ((existing.attachmentIds && existing.attachmentIds.length) ? existing.attachmentIds.slice() : (existing.attachmentId ? [existing.attachmentId] : [])) : [];
   state.existingAttachments = null;
@@ -6121,29 +5008,6 @@ async function saveExpense(){
   const amount=parseFloat(document.getElementById('add-amount').value);
   if(!amount || amount<=0){ toast('Enter a valid amount'); return; }
   const isIncome = state.addMode === 'income';
-  const isTransfer = state.addMode === 'transfer';
-
-  // Transfer path
-  if(isTransfer){
-    if(!state.selectedTransferFromId){ toast('Select a From account'); return; }
-    if(!state.selectedTransferToId){ toast('Select a To account'); return; }
-    if(state.selectedTransferFromId===state.selectedTransferToId){ toast('From and To accounts must be different'); return; }
-    const date=document.getElementById('add-date').value || todayISO();
-    const note=document.getElementById('add-note').value.trim();
-    const isEdit=!!state.editingExpenseId;
-    const id=isEdit ? state.editingExpenseId : genId();
-    const transfer={
-      id, type:'transfer', amount,
-      fromAccountId:state.selectedTransferFromId,
-      toAccountId:state.selectedTransferToId,
-      date, note, attachmentIds:[],
-      createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
-    };
-    await DB.addExpense(transfer);
-    toast(isEdit ? 'Transfer updated ✓' : 'Transfer saved ✓');
-    goToReturnScreen();
-    return;
-  }
 
   // Income path — much simpler: no warranty, no group, no recurring
   if(isIncome){
@@ -6155,12 +5019,10 @@ async function saveExpense(){
     const income={
       id, type:'income', amount,
       incomeCategoryId: state.selectedIncomeCategoryId,
-      accountId: state.accountsEnabled ? (state.selectedAccountId||null) : null,
       date, note, attachmentIds:[],
       createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
     };
     await DB.addExpense(income);
-    if(state.accountsEnabled && state.selectedAccountId) Store.set('pt_last_account', state.selectedAccountId);
     toast(isEdit ? 'Income updated ✓' : 'Income saved ✓');
     goToReturnScreen();
     return;
@@ -6247,8 +5109,7 @@ async function saveExpense(){
 
   const expense={
     id, type:'expense', amount, categoryId: state.selectedCategoryId,
-    paymentMethod: state.selectedPaymentId,
-    accountId: state.accountsEnabled ? (state.selectedAccountId||null) : null,
+    paymentMethod: state.selectedPaymentId, // stores the payment method's id, despite the field name
     date, note, attachmentIds, recurringId, groupId,
     warrantyExpiry: state.warrantyEnabled ? state.warrantyExpiry : null,
     warrantyDurationMonths: state.warrantyEnabled ? state.warrantyDurationMonths : null,
@@ -6258,30 +5119,7 @@ async function saveExpense(){
     excludeFromForecast: state.excludeFromForecast,
     createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
   };
-  await DB.addExpense(expense);
-
-  // Persist last used account for next Add screen open
-  if(state.accountsEnabled && state.selectedAccountId){
-    Store.set('pt_last_account', state.selectedAccountId);
-  }
-
-  // If the selected payment method is not in the selected account's methods,
-  // prompt to add it — non-blocking, save already happened above.
-  if(state.accountsEnabled && state.selectedAccountId && state.selectedPaymentId){
-    const acct=state.accounts.find(a=>a.id===state.selectedAccountId);
-    const pm=state.paymentMethods.find(p=>p.id===state.selectedPaymentId);
-    if(acct && pm && !(acct.paymentMethodIds||[]).includes(state.selectedPaymentId)){
-      state._pendingAcctPmAccountId=acct.id;
-      state._pendingAcctPmMethodId=pm.id;
-      document.getElementById('acct-addpm-title').textContent=`Add "${pm.name}" to ${acct.name}?`;
-      document.getElementById('acct-addpm-sub').textContent=`This payment method isn't linked to ${acct.name} yet. Add it so it appears automatically next time?`;
-      document.getElementById('acct-addpm-overlay').classList.add('show');
-      // Don't wait — return now so the toast and navigation happen immediately
-      toast(isEdit ? 'Expense updated ✓' : 'Expense saved ✓');
-      goToReturnScreen();
-      return;
-    }
-  }
+  await DB.addExpense(expense); // put() — works for both create and update since the id matches
 
   toast(isEdit ? 'Expense updated ✓' : 'Expense saved ✓');
   goToReturnScreen();
@@ -6315,18 +5153,10 @@ document.getElementById('add-amount').addEventListener('input', () => {
 document.getElementById('add-type-toggle').addEventListener('click', (e) => {
   const btn=e.target.closest('.segmented-tab'); if(!btn) return;
   const newMode=btn.dataset.addtype; if(!newMode || newMode===state.addMode) return;
-  // Transfer mode only available when accounts are enabled and 2+ accounts exist
-  if(newMode==='transfer' && (!state.accountsEnabled || state.accounts.length<2)){
-    toast('Add at least 2 accounts in Settings to use transfers');
-    return;
-  }
   state.addMode=newMode;
-  const isTransfer=newMode==='transfer';
   const isIncome=newMode==='income';
-  const titleMap={expense:'Add expense',income:'Add income',transfer:'Add transfer'};
-  const editTitleMap={expense:'Edit expense',income:'Edit income',transfer:'Edit transfer'};
-  document.getElementById('add-screen-title').textContent = state.editingExpenseId ? editTitleMap[newMode] : titleMap[newMode];
-  document.getElementById('add-save-btn').textContent = state.editingExpenseId ? 'Save changes' : (isTransfer?'Save transfer':isIncome?'Save income':'Save expense');
+  document.getElementById('add-screen-title').textContent = state.editingExpenseId ? (isIncome?'Edit income':'Edit expense') : (isIncome?'Add income':'Add expense');
+  document.getElementById('add-save-btn').textContent = state.editingExpenseId ? 'Save changes' : (isIncome?'Save income':'Save expense');
   document.querySelectorAll('#add-type-toggle .segmented-tab').forEach(b => b.classList.toggle('active', b.dataset.addtype===newMode));
   renderAddModeUI();
 });
@@ -6396,12 +5226,12 @@ document.getElementById('txn-filter-type-tabs').addEventListener('click', (e) =>
   const newType=btn.dataset.filtertype; if(!newType || newType===state.txnFilterType) return;
   state.txnFilterType=newType;
   document.querySelectorAll('#txn-filter-type-tabs .segmented-tab').forEach(b => b.classList.toggle('active', b.dataset.filtertype===newType));
-  // Hide category filter for income and transfer
-  const showCat = newType!=='income' && newType!=='transfer';
+  // Hide category filter when Income-only (income has fixed categories)
+  const showCat=newType!=='income';
   document.getElementById('txn-filter-cat-label').classList.toggle('hidden', !showCat);
   document.getElementById('txn-filter-cat-grid').classList.toggle('hidden', !showCat);
-  // Clear expense-only filter state when switching to income or transfer
-  if(newType==='income' || newType==='transfer'){
+  // Clear expense-only filter state when switching to income
+  if(newType==='income'){
     state.txnFilterPaymentIds.clear();
     state.txnFilterGroupIds.clear();
     if(state.txnFilterSplitOnly){ state.txnFilterSplitOnly=false; syncSplitFilterUI(); }
@@ -6528,22 +5358,6 @@ document.getElementById('import-confirm-btn').addEventListener('click', confirmI
 document.getElementById('settings-changepin-btn').addEventListener('click', startChangePIN);
 document.getElementById('settings-guide-btn').addEventListener('click', () => openGuideScreen('settings-screen'));
 document.getElementById('settings-forcerefresh-btn').addEventListener('click', forceRefreshApp);
-// Cycle day — save on change, clamp to 1–28, refresh all cycle-dependent views
-document.getElementById('settings-cycle-day').addEventListener('change', () => {
-  let v=parseInt(document.getElementById('settings-cycle-day').value, 10);
-  if(isNaN(v)||v<1) v=1;
-  if(v>28) v=28;
-  document.getElementById('settings-cycle-day').value=v;
-  localStorage.setItem('pt_cycle_day', String(v));
-  // Re-anchor Insights month period to the new cycle bounds
-  if(state.insPeriodType==='month'){
-    const b=cycleBounds(todayISO());
-    state.insStartISO=b.startISO; state.insEndISO=b.endISO;
-  }
-  renderInsights();
-  renderHomeBudgetsPanel();
-  toast('Cycle start day updated');
-});
 document.getElementById('guide-close-btn').addEventListener('click', closeGuideScreen);
 document.getElementById('settings-notif-row').addEventListener('click', async () => {
   if(isNotifEnabled()){
@@ -6569,24 +5383,19 @@ document.getElementById('home-whatsnew-banner').addEventListener('click', openWh
 function updateEyeButtons(){
   const icon = state.incomeRevealed ? '🙈' : '👁️';
   const title = state.incomeRevealed ? 'Mask income' : 'Show income';
-  ['home-eye-btn','txn-eye-btn','stats-eye-btn','accounts-view-eye-btn'].forEach(id => {
+  ['home-eye-btn','txn-eye-btn'].forEach(id => {
     const btn = document.getElementById(id);
     if(btn){ btn.textContent=icon; btn.title=title; }
   });
 }
-['home-eye-btn','txn-eye-btn','stats-eye-btn','accounts-view-eye-btn'].forEach(id => {
+['home-eye-btn','txn-eye-btn'].forEach(id => {
   document.getElementById(id).addEventListener('click', async ()=>{
     state.incomeRevealed = !state.incomeRevealed;
     updateEyeButtons();
     await renderHomeOverviewPanel();
     renderTransactions();
-    if(document.getElementById('accounts-view-overlay').classList.contains('show')) await renderAccountsViewSheet();
-    // Re-render forecast if it's visible so masked income values update
-    if(!document.getElementById('home-panel-forecast').classList.contains('hidden')) renderHomeForecastPanel();
   });
 });
-document.getElementById('forecast-income-nudge').addEventListener('click', openRecurringScreen);
-document.getElementById('stats-accounts-btn').addEventListener('click', openAccountsViewSheet);
 document.getElementById('settings-biometric-row').addEventListener('click', async ()=>{
   if(isBioEnabled()){
     disableBiometric();
@@ -6751,22 +5560,6 @@ document.getElementById('recurring-edit-overlay').addEventListener('click', (e) 
 document.getElementById('recurring-edit-save-btn').addEventListener('click', saveRecurringEdit);
 document.getElementById('recurring-edit-pause-btn').addEventListener('click', toggleRecurringPause);
 document.getElementById('recurring-edit-delete-btn').addEventListener('click', requestDeleteRecurring);
-// Type toggle (expense ↔ income) — only active when adding a new rule
-document.getElementById('recurring-type-tabs').addEventListener('click', (e) => {
-  const btn=e.target.closest('[data-rtype]'); if(!btn) return;
-  state.mgrRecurringType=btn.dataset.rtype;
-  // Reset category selections when switching type
-  if(state.mgrRecurringType==='expense'){
-    state.mgrRecurringCategoryId=state.categories[0] ? state.categories[0].id : null;
-  } else {
-    state.mgrRecurringIncomeCategoryId=INCOME_CATEGORIES[0].id;
-  }
-  state.mgrRecurringCatGridExpanded=false;
-  document.getElementById('recurring-type-tabs').querySelectorAll('[data-rtype]').forEach(b=>{
-    b.classList.toggle('active', b.dataset.rtype===state.mgrRecurringType);
-  });
-  renderRecurringEditCatGrid();
-});
 document.getElementById('recurring-edit-cat-grid').addEventListener('click', (e) => {
   if(e.target.closest('[data-rcatmore]')){ state.mgrRecurringCatGridExpanded=true; renderRecurringEditCatGrid(); return; }
   const btn=e.target.closest('[data-rcat]'); if(!btn) return;
@@ -6887,90 +5680,6 @@ async function forceRefreshApp(){
   }
   window.location.reload(true);
 }
-// ---- Accounts event listeners ----
-document.getElementById('settings-accounts-toggle-row').addEventListener('click', handleAccountsToggle);
-document.getElementById('settings-manage-accounts-btn').addEventListener('click', openManageAccountsScreen);
-
-// Onboarding sheet
-document.getElementById('accounts-onboarding-close-btn').addEventListener('click', ()=>{
-  closeAccountsOnboarding();
-  // User closed without finishing — don't enable
-});
-document.getElementById('accounts-onboarding-overlay').addEventListener('click', (e)=>{
-  if(e.target.id==='accounts-onboarding-overlay') closeAccountsOnboarding();
-});
-document.getElementById('accounts-onboarding-add-btn').addEventListener('click', ()=> openAccountEdit(null,'onboarding'));
-document.getElementById('accounts-onboarding-done-btn').addEventListener('click', finishAccountsOnboarding);
-
-// Account edit sheet
-document.getElementById('account-edit-close-btn').addEventListener('click', closeAccountEdit);
-document.getElementById('account-edit-overlay').addEventListener('click', (e)=>{
-  if(e.target.id==='account-edit-overlay') closeAccountEdit();
-});
-document.getElementById('account-type-tabs').addEventListener('click', (e)=>{
-  const btn=e.target.closest('[data-accttype]'); if(!btn) return;
-  document.getElementById('account-type-tabs').querySelectorAll('[data-accttype]').forEach(b=>{
-    b.classList.toggle('active', b.dataset.accttype===btn.dataset.accttype);
-  });
-  applyAccountTypeLabels(btn.dataset.accttype);
-});
-document.getElementById('account-edit-save-btn').addEventListener('click', saveAccountEdit);
-document.getElementById('account-edit-delete-btn').addEventListener('click', deleteAccountEdit);
-
-// Manage accounts overlay
-document.getElementById('manage-accounts-close-btn').addEventListener('click', closeManageAccountsScreen);
-document.getElementById('manage-accounts-overlay').addEventListener('click', (e)=>{
-  if(e.target.id==='manage-accounts-overlay') closeManageAccountsScreen();
-});
-document.getElementById('manage-accounts-add-btn').addEventListener('click', ()=> openAccountEdit(null,'settings'));
-document.getElementById('manage-accounts-bulkassign-btn').addEventListener('click', openBulkAccountScreen);
-
-// Bulk account assign screen
-document.getElementById('bulkaccount-close-btn').addEventListener('click', ()=> showScreen('settings-screen'));
-document.getElementById('bulkaccount-apply-btn').addEventListener('click', applyBulkAccountAssign);
-
-// Unknown payment method → add to account prompt
-document.getElementById('acct-addpm-confirm-btn').addEventListener('click', async ()=>{
-  document.getElementById('acct-addpm-overlay').classList.remove('show');
-  const acct=state.accounts.find(a=>a.id===state._pendingAcctPmAccountId);
-  const pmId=state._pendingAcctPmMethodId;
-  if(acct && pmId){
-    if(!acct.paymentMethodIds) acct.paymentMethodIds=[];
-    if(!acct.paymentMethodIds.includes(pmId)){
-      acct.paymentMethodIds.push(pmId);
-      await DB.putAccount(acct);
-    }
-  }
-  state._pendingAcctPmAccountId=null; state._pendingAcctPmMethodId=null;
-});
-document.getElementById('acct-addpm-cancel-btn').addEventListener('click', ()=>{
-  document.getElementById('acct-addpm-overlay').classList.remove('show');
-  state._pendingAcctPmAccountId=null; state._pendingAcctPmMethodId=null;
-});
-
-// Accounts view sheet (Insights)
-document.getElementById('accounts-view-close-btn').addEventListener('click', closeAccountsViewSheet);
-document.getElementById('accounts-view-overlay').addEventListener('click', (e)=>{
-  if(e.target.id==='accounts-view-overlay') closeAccountsViewSheet();
-});
-
-// Re-enable warning
-document.getElementById('accounts-reenable-confirm-btn').addEventListener('click', async ()=>{
-  document.getElementById('accounts-reenable-overlay').classList.remove('show');
-  state.accountsEnabled=true;
-  Store.set('pt_accounts_enabled','1');
-  renderAccountsSettingsRow();
-  renderAccountsInsightsBtn();
-  toast('Accounts re-enabled');
-});
-document.getElementById('accounts-reenable-cancel-btn').addEventListener('click', ()=>{
-  document.getElementById('accounts-reenable-overlay').classList.remove('show');
-});
-document.getElementById('home-onboard-dismiss').addEventListener('click', ()=>{
-  Store.set('pt_onboard_dismissed','1');
-  document.getElementById('home-onboard-card').classList.add('hidden');
-});
-
 function init(){
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed', err));
@@ -6984,13 +5693,6 @@ function init(){
   }
   renderBiometricRow();
   renderNotifRow();
-  document.getElementById('settings-cycle-day').value=getCycleDay();
-  // Accounts UI state — read from localStorage directly since unlockSuccess
-  // hasn't run yet at init time; unlockSuccess will set state.accountsEnabled.
-  const acctEnabled = Store.get('pt_accounts_enabled')==='1';
-  document.getElementById('settings-accounts-switch').classList.toggle('on', acctEnabled);
-  document.getElementById('settings-manage-accounts-btn').classList.toggle('hidden', !acctEnabled);
-  document.getElementById('stats-accounts-btn').classList.toggle('hidden', !acctEnabled);
 }
 init();
 </script>
