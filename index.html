@@ -5519,7 +5519,25 @@ function openAccountEdit(id, source='settings'){
   state.acctEditPaymentIds = new Set(existing ? (existing.paymentMethodIds||[]) : []);
   document.getElementById('account-edit-title').textContent = existing ? 'Edit account' : 'Add account';
   document.getElementById('account-edit-name').value = existing ? existing.name : '';
-  document.getElementById('account-edit-balance').value = existing ? (existing.openingBalance||0) : '';
+  // Balance field: for a NEW account this is the opening balance (no activity
+  // yet). For an EXISTING account, we show the CURRENT computed balance — the
+  // number the user actually sees in the view sheet and reads off their bank —
+  // not openingBalance. On save we back-compute openingBalance so the recomputed
+  // current balance lands exactly on whatever the user types (see saveAccountEdit).
+  // openAccountEdit stays synchronous (edit-sheet-open flows must not await, per
+  // the documented microtask gotcha), so we fill the field synchronously with a
+  // placeholder value first, then patch in the computed current balance via
+  // .then() once it resolves.
+  const balanceInput=document.getElementById('account-edit-balance');
+  if(existing){
+    balanceInput.value = (existing.openingBalance||0); // synchronous fallback until compute resolves
+    computeAccountBalance(existing).then(current=>{
+      // Only apply if the user is still editing this same account and hasn't typed yet
+      if(state.acctEditingId===existing.id) balanceInput.value = current;
+    }).catch(()=>{});
+  } else {
+    balanceInput.value = '';
+  }
   // Type tabs
   document.getElementById('account-type-tabs').querySelectorAll('[data-accttype]').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.accttype===type);
@@ -5543,23 +5561,38 @@ function getAccountEditType(){
 }
 function applyAccountTypeLabels(type){
   const isCc = type==='cc';
-  document.getElementById('account-balance-label').textContent = isCc ? 'CURRENT OUTSTANDING' : 'CURRENT BALANCE';
+  const isEditing = !!state.acctEditingId;
+  document.getElementById('account-balance-label').textContent = isCc
+    ? (isEditing ? 'CURRENT OUTSTANDING' : 'OPENING OUTSTANDING')
+    : (isEditing ? 'CURRENT BALANCE' : 'OPENING BALANCE');
   document.getElementById('account-balance-hint').textContent = isCc
-    ? 'Enter how much you currently owe on this card'
-    : 'Enter your current account balance';
+    ? (isEditing ? 'Enter what you currently owe (as shown by your bank) — we\u2019ll adjust automatically'
+                 : 'Enter how much you currently owe on this card')
+    : (isEditing ? 'Enter your actual current balance (as shown by your bank) — we\u2019ll adjust automatically'
+                 : 'Enter your current account balance');
 }
 async function saveAccountEdit(){
   const name=document.getElementById('account-edit-name').value.trim();
-  const balance=parseFloat(document.getElementById('account-edit-balance').value)||0;
+  const enteredBalance=parseFloat(document.getElementById('account-edit-balance').value)||0;
   const type=getAccountEditType();
   if(!name){ toast('Give the account a name'); return; }
   const existing = state.acctEditingId ? state.accounts.find(a=>a.id===state.acctEditingId) : null;
   if(existing){
-    existing.name=name; existing.openingBalance=balance;
+    // The user typed their CURRENT balance (as read from the bank). Back-compute
+    // the openingBalance so that computeAccountBalance (openingBalance + activity)
+    // lands exactly on what they typed, without re-adding transaction activity on
+    // top. activity = currentBalance - openingBalance, so:
+    //   newOpeningBalance = enteredCurrent - activity
+    //                     = enteredCurrent - (currentBalance - oldOpeningBalance)
+    const currentBalance = await computeAccountBalance(existing);
+    const activity = currentBalance - (existing.openingBalance||0);
+    existing.name=name;
+    existing.openingBalance = enteredBalance - activity;
     existing.paymentMethodIds=[...state.acctEditPaymentIds];
     await DB.putAccount(existing);
   } else {
-    const account={ id:genId(), name, type, openingBalance:balance, paymentMethodIds:[...state.acctEditPaymentIds], createdAt:Date.now() };
+    // New account: no activity yet, so the entered value IS the opening balance.
+    const account={ id:genId(), name, type, openingBalance:enteredBalance, paymentMethodIds:[...state.acctEditPaymentIds], createdAt:Date.now() };
     await DB.putAccount(account);
     state.accounts.push(account);
   }

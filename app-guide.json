@@ -2,6 +2,14 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.10",
+      "date": "2026-07-01",
+      "highlights": [
+        "Editing an account balance now works the way you'd expect: it shows your current balance (matching what you see in the accounts view and your bank), and when you correct it, transactions aren't re-added on top — the app adjusts automatically so the balance lands exactly on what you enter",
+        "Cloud restore now reliably works on a second device: connecting on a fresh device offers to restore instead of overwriting your backup, empty backups are never uploaded, and restore skips any stray empty backup to find your real data"
+      ]
+    },
+    {
       "version": "3.9",
       "date": "2026-06-30",
       "highlights": [
