@@ -3966,8 +3966,9 @@ async function applyBackupPayload(data){
     budgets: (data.budgets||[]).filter(b => b && b.id),
     accounts: (data.accounts||[]).filter(a => a && a.id),
   });
-  // Reload every in-memory cache from what's actually on disk now,
-  // rather than trusting the file's arrays directly post-filtering.
+  // Reload every in-memory cache from what's now actually on disk —
+  // critical on fresh-device restore where unlockSuccess already ran
+  // before any data existed, so state.* arrays are all empty/seeded-defaults.
   state.categories=await DB.getAllCategories();
   state.paymentMethods=await DB.getAllPaymentMethods();
   state.groups=await DB.getAllGroups();
@@ -3995,8 +3996,17 @@ async function applyBackupPayload(data){
   state.txnFilterMinAmount=null; state.txnFilterMaxAmount=null;
   state.insSelectedGroupId=null;
   Object.values(pendingDeletes).forEach(entry => { if(entry && entry.timer) clearTimeout(entry.timer); });
-  Object.keys(pendingDeletes).forEach(k => delete pendingDeletes[k]); // stale undo timers from before the wipe no longer apply
+  Object.keys(pendingDeletes).forEach(k => delete pendingDeletes[k]);
   await refreshAllExpenseViews();
+  // Always navigate to Home after a restore — ensures the user actually
+  // sees their restored data rather than staying on whatever screen triggered
+  // the restore (Settings, or the fresh-device auto-offer overlay). Also
+  // guards against the first-launch guide screen (openGuideScreen fires
+  // immediately after setup-confirm's unlockSuccess on fresh devices) from
+  // burying the restore result — by explicitly navigating to Home here, we
+  // land on the right screen regardless of what ran before.
+  showScreen('home-screen');
+  renderHome();
 }
 async function confirmImport(){
   const data=pendingImportPayload;
