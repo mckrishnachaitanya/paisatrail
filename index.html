@@ -4220,6 +4220,16 @@ const CloudBackup={
     renderCloudStatusIcons();
     try{
       const payload=await this.buildPayload(includeAllAttachments);
+      // Never upload an empty snapshot — an empty backup has no value and,
+      // via same-day-replace pruning, could clobber a good backup. If there's
+      // genuinely nothing to back up, skip silently. (A user who has truly
+      // deleted everything and wants that reflected can still do nothing —
+      // their prior good backups simply age out of the 3-day window normally.)
+      if(!Array.isArray(payload.expenses) || payload.expenses.length===0){
+        const e=new Error('NOTHING_TO_BACK_UP');
+        e.code='NOTHING_TO_BACK_UP';
+        throw e;
+      }
       const filename=this.filenameForNow();
       const existingTodayId=await this.findTodaysFileId().catch(()=>null);
       await this.uploadBackup(payload, filename);
@@ -4227,7 +4237,7 @@ const CloudBackup={
       Store.set('pt_drive_last_backup', String(Date.now()));
       Store.set('pt_drive_last_error', '');
     } catch(err){
-      Store.set('pt_drive_last_error', '1');
+      if(err && err.code!=='NOTHING_TO_BACK_UP'){ Store.set('pt_drive_last_error', '1'); }
       throw err;
     } finally {
       this.syncing=false;
@@ -4238,11 +4248,26 @@ const CloudBackup={
   async restoreLatest(){
     const files=await this.listBackups();
     if(files.length===0) throw new Error('No backup found on Drive');
-    const latest=files[0];
-    const res=await this.apiFetch(`https://www.googleapis.com/drive/v3/files/${latest.id}?alt=media`);
-    const data=await res.json();
-    await applyBackupPayload(data);
-    return data;
+    // Walk newest-first and restore the first backup that actually contains
+    // data. This guards against a stray empty backup (e.g. from the earlier
+    // connect-on-empty-device bug that uploaded an empty snapshot) sitting at
+    // the top of the list and defeating restore. If every backup is empty,
+    // fall through to restoring the newest one anyway (nothing better to do).
+    let chosen=null, chosenData=null;
+    for(const f of files){
+      let data;
+      try{
+        const res=await this.apiFetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`);
+        data=await res.json();
+      } catch(err){ continue; } // unreadable file — skip to next
+      if(chosenData===null){ chosen=f; chosenData=data; } // remember newest as fallback
+      if(data && Array.isArray(data.expenses) && data.expenses.length>0){
+        chosen=f; chosenData=data; break; // newest non-empty — use it
+      }
+    }
+    if(chosenData===null) throw new Error('No backup found on Drive');
+    await applyBackupPayload(chosenData);
+    return chosenData;
   },
 
   async getLatestBackupMeta(){
@@ -4306,13 +4331,39 @@ async function handleDriveConnectClick(){
     await CloudBackup.getToken(true);
     toast('Connected to Google Drive');
     renderDriveSettingsRow();
-    // First connect on a device with existing local data — kick off a
-    // silent backup so there's something on Drive immediately, but don't
-    // block the UI on it.
-    CloudBackup.runBackup(false).then(renderDriveSettingsRow).catch(()=>{});
+    // Decide what to do right after connecting based on whether this device
+    // already has data:
+    //   - Empty DB (fresh device / post-wipe): DO NOT back up — that would
+    //     upload an empty snapshot and, if it lands on the same calendar day
+    //     as a real backup, the same-day-replace prune logic could clobber
+    //     the good backup we're trying to restore FROM. Instead, offer to
+    //     restore, which is the whole reason someone connects on a 2nd device.
+    //   - Has data: kick off a silent backup so there's something on Drive
+    //     immediately (original behaviour).
+    const expenseCount=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).length;
+    if(expenseCount===0){
+      await offerDriveRestoreIfBackupExists();
+    } else {
+      CloudBackup.runBackup(false).then(renderDriveSettingsRow).catch(()=>{});
+    }
   } catch(err){
     toast('Could not connect to Google Drive');
   }
+}
+
+// Shared by both the fresh-device auto-check (checkDriveOnOpen) and the
+// just-connected handler: if a Drive backup exists, show the restore offer.
+async function offerDriveRestoreIfBackupExists(){
+  try{
+    const meta=await CloudBackup.getLatestBackupMeta();
+    if(meta){
+      document.getElementById('drive-autorestore-sub').textContent =
+        `A backup from ${new Date(meta.createdTime).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})} is available on Google Drive. Restore it now?`;
+      document.getElementById('drive-autorestore-overlay').classList.add('show');
+    } else {
+      toast('No backup found on this Google account yet');
+    }
+  } catch(err){ /* silent — user can still restore manually from Settings */ }
 }
 
 function openDriveBackupConfirm(){
@@ -4334,7 +4385,7 @@ async function confirmDriveBackupNow(){
     await CloudBackup.runBackup(true);
     toast('Backup complete');
   } catch(err){
-    toast('Backup failed — please try again');
+    toast(err && err.code==='NOTHING_TO_BACK_UP' ? 'Nothing to back up yet — add an expense first' : 'Backup failed — please try again');
   } finally {
     btn.style.opacity='';
     renderDriveSettingsRow();
@@ -4378,14 +4429,7 @@ async function checkDriveOnOpen(){
   if(!CloudBackup.isConnected()) return;
   const expenseCount=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).length;
   if(expenseCount===0){
-    try{
-      const meta=await CloudBackup.getLatestBackupMeta();
-      if(meta){
-        document.getElementById('drive-autorestore-sub').textContent =
-          `A backup from ${new Date(meta.createdTime).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})} is available on Google Drive. Restore it now?`;
-        document.getElementById('drive-autorestore-overlay').classList.add('show');
-      }
-    } catch(err){ /* silent — connect button remains available manually */ }
+    await offerDriveRestoreIfBackupExists();
     return;
   }
   const last=parseInt(Store.get('pt_drive_last_backup')||'0',10);
