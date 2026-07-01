@@ -54,7 +54,7 @@ input{outline:none;}
    let the sheet bleed through the lock screen. Data in open sheets is
    preserved — nothing is closed, pin screen just paints on top. */
 #pin-screen{z-index:1000;}
-.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.scroll{flex:1;overflow-y:auto;}
 
 /* ============================== PIN SCREEN ============================== */
 #pin-screen{align-items:center;justify-content:center;gap:26px;padding:40px 24px;background:var(--canvas);}
@@ -145,7 +145,7 @@ input{outline:none;}
 #home-body{padding:0 20px 28px;}
 .home-header{display:flex;align-items:center;justify-content:space-between;margin:8px 0 16px;}
 #home-sticky-top{flex-shrink:0;background:var(--paper);padding:0 20px;}
-#home-scroll-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 20px 100px;} /* isolation:isolate removed 2026-07-01, moved to .recent-row — see its comment */
+#home-scroll-body{flex:1;overflow-y:auto;padding:0 20px 100px;} /* isolation:isolate removed 2026-07-01, moved to .recent-row — see its comment */
 #home-panel-overview{padding-top:4px;}
 #home-overview-sticky.hidden{display:none;}
 .greeting{font-family:var(--font-display);font-size:17px;}
@@ -462,7 +462,7 @@ input{outline:none;}
 .edit-sheet-overlay.show{opacity:1;pointer-events:auto;}
 .edit-sheet{width:100%;max-width:480px;max-height:86vh;min-height:0;background:var(--paper);
   border-radius:26px 26px 0 0;padding:10px 22px calc(20px + env(safe-area-inset-bottom,0px));
-  display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+  display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;}
 .edit-sheet-grip{width:36px;height:4px;border-radius:4px;background:var(--border);
   margin:0 auto 14px;flex-shrink:0;}
 .edit-sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
@@ -5532,9 +5532,10 @@ function openAccountEdit(id, source='settings'){
   if(existing){
     balanceInput.value = (existing.openingBalance||0); // synchronous fallback until compute resolves
     computeAccountBalance(existing).then(current=>{
+      DebugLog.push('INFO', ['acctEdit open: opening='+(existing.openingBalance||0)+' computedCurrent='+current+' stillEditing='+(state.acctEditingId===existing.id)]);
       // Only apply if the user is still editing this same account and hasn't typed yet
       if(state.acctEditingId===existing.id) balanceInput.value = current;
-    }).catch(()=>{});
+    }).catch(err=>{ DebugLog.push('ERROR', ['acctEdit computeBalance failed', String(err)]); });
   } else {
     balanceInput.value = '';
   }
@@ -5586,6 +5587,7 @@ async function saveAccountEdit(){
     //                     = enteredCurrent - (currentBalance - oldOpeningBalance)
     const currentBalance = await computeAccountBalance(existing);
     const activity = currentBalance - (existing.openingBalance||0);
+    DebugLog.push('INFO', ['acctEdit save: entered='+enteredBalance+' oldOpening='+(existing.openingBalance||0)+' computedCurrent='+currentBalance+' activity='+activity+' newOpening='+(enteredBalance-activity)]);
     existing.name=name;
     existing.openingBalance = enteredBalance - activity;
     existing.paymentMethodIds=[...state.acctEditPaymentIds];
