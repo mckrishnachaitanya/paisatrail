@@ -586,8 +586,9 @@ input{outline:none;}
     <!-- Overview sticky content: banners, onboarding, cashflow card, donut -->
     <div id="home-overview-sticky">
       <div id="home-whatsnew-banner" class="whatsnew-banner hidden"></div>
-      <div id="home-backup-banner" class="backup-nudge-banner hidden"></div>
-      <div id="home-warranty-banner" class="warranty-soon-banner hidden"></div>
+      <!-- home-backup-banner / home-warranty-banner removed 2026-07-02: both
+           moved to the Actions pill (topbar-icons), which surfaces them
+           together instead of one-at-a-time. See renderHomeOverviewPanel. -->
       <div id="home-onboard-card" class="hidden" style="
         background:var(--surface);border:1.5px solid var(--border);border-radius:18px;
         padding:14px 16px;margin-bottom:12px;">
@@ -2697,23 +2698,12 @@ async function getWarrantiesExpiringSoon(){
   return items.filter(e => e.warrantyExpiry>=today && e.warrantyExpiry<=cutoff)
     .sort((a,b)=>a.warrantyExpiry.localeCompare(b.warrantyExpiry));
 }
-async function renderWarrantyBanner(){
-  const banner=document.getElementById('home-warranty-banner');
-  const soon=await getWarrantiesExpiringSoon();
-  if(soon.length===0){ banner.classList.add('hidden'); banner.innerHTML=''; return; }
-  let text;
-  if(soon.length===1){
-    const e=soon[0];
-    const cat=state.categories.find(c=>c.id===e.categoryId);
-    const name=e.note || (cat?cat.name:'Item');
-    text=`${name} warranty — ${formatWarrantyRemaining(e.warrantyExpiry).label}`;
-  } else {
-    text=`${soon.length} warranties expiring soon`;
-  }
-  banner.innerHTML=`<span class="warranty-soon-banner-icon">🛡️</span><span class="warranty-soon-banner-text">${esc(text)}</span><span class="warranty-soon-banner-chevron">›</span>`;
-  banner.classList.remove('hidden');
-}
-const BACKUP_NUDGE_DAYS=15; // how long since the last export before the Home banner nags again
+// renderWarrantyBanner and renderBackupNudgeBanner removed 2026-07-02 — both
+// standalone Home banners were replaced by the Actions pill (getPendingActions
+// below reads getWarrantiesExpiringSoon/shouldShowBackupNudge directly, which
+// both remain in use). Keeping two DOM-writing functions that are never called
+// would just be confusing dead code.
+const BACKUP_NUDGE_DAYS=15; // how long since the last export before the Actions pill nags again
 // Gated on there being at least one expense ever recorded — no point nagging
 // a brand-new install with nothing to back up yet.
 async function shouldShowBackupNudge(){
@@ -2722,17 +2712,6 @@ async function shouldShowBackupNudge(){
   const lastExport=parseInt(Store.get('pt_last_export')||'0');
   if(!lastExport) return true;
   return (Date.now()-lastExport) >= BACKUP_NUDGE_DAYS*86400000;
-}
-async function renderBackupNudgeBanner(){
-  const banner=document.getElementById('home-backup-banner');
-  const show=await shouldShowBackupNudge();
-  if(!show){ banner.classList.add('hidden'); banner.innerHTML=''; return; }
-  const lastExport=parseInt(Store.get('pt_last_export')||'0');
-  const text = lastExport
-    ? `Last backed up ${fmtDuration(Math.floor((Date.now()-lastExport)/86400000))} ago — tap to back up now`
-    : `You haven't backed up your data yet — tap to back up now`;
-  banner.innerHTML=`<span class="backup-nudge-banner-icon">💾</span><span class="backup-nudge-banner-text">${esc(text)}</span><span class="backup-nudge-banner-chevron">›</span>`;
-  banner.classList.remove('hidden');
 }
 // ---- Onboarding checklist ----
 // Shows on Home Overview until all 3 items are done or user dismisses.
@@ -2798,24 +2777,15 @@ async function renderOnboardingChecklist(){
 }
 
 async function renderHomeOverviewPanel(){
-  // Banner hierarchy: only one shows at a time.
-  // Priority: warranty (time-sensitive) → What's New (one-time) → backup nudge (low urgency)
-  const warrantyBanner=document.getElementById('home-warranty-banner');
+  // Banner hierarchy (2026-07-02: warranty + backup MOVED to the Actions pill,
+  // which now surfaces both simultaneously — showing them here too was
+  // redundant/duplicate nagging, see Krishna's screenshot report). What's New
+  // stays a standalone banner: it's a one-time announcement, not a recurring
+  // "action" the pill should own.
   const whatsnewBanner=document.getElementById('home-whatsnew-banner');
-  const backupBanner=document.getElementById('home-backup-banner');
-  // Reset all first
-  [warrantyBanner, whatsnewBanner, backupBanner].forEach(b=>{ b.classList.add('hidden'); b.innerHTML=''; });
-  // Evaluate candidates in priority order — stop at first match. (Note: this
-  // means only ONE of warranty/what's-new/backup shows as a standalone banner
-  // at a time — the Actions pill below is what surfaces ALL pending items
-  // together, independent of this single-banner priority system.)
-  const soon=await getWarrantiesExpiringSoon();
-  if(soon.length>0){
-    await renderWarrantyBanner();
-  } else if(await shouldShowWhatsNewBanner()){
+  whatsnewBanner.classList.add('hidden'); whatsnewBanner.innerHTML='';
+  if(await shouldShowWhatsNewBanner()){
     await renderWhatsNewBanner();
-  } else if(await shouldShowBackupNudge()){
-    await renderBackupNudgeBanner();
   }
   await renderActionsPill();
   await renderOnboardingChecklist();
@@ -7497,7 +7467,6 @@ document.getElementById('home-tabs').addEventListener('click', (e) => {
   const btn=e.target.closest('.home-tab'); if(!btn) return;
   setHomeTab(btn.dataset.hometab);
 });
-document.getElementById('home-warranty-banner').addEventListener('click', () => setHomeTab('warranties'));
 ACTIONS_PILL_IDS.forEach(id=>{
   const btn=document.getElementById(id);
   if(btn) btn.addEventListener('click', openActionsSheet);
@@ -7511,10 +7480,6 @@ document.getElementById('actions-sheet-overlay').addEventListener('click', (e) =
 document.getElementById('actions-sheet-list').addEventListener('click', (e) => {
   const row=e.target.closest('[data-actionid]'); if(!row) return;
   handleActionsSheetTap(row.dataset.actionid);
-});
-document.getElementById('home-backup-banner').addEventListener('click', async () => {
-  await exportData();
-  await renderBackupNudgeBanner();
 });
 document.getElementById('forecast-window-tabs').addEventListener('click', (e) => {
   const btn=e.target.closest('[data-forecastwindow]'); if(!btn) return;

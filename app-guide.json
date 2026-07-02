@@ -2,6 +2,13 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.14",
+      "date": "2026-07-02",
+      "highlights": [
+        "Fixed: warranty and backup reminders were showing both as a standalone Home banner AND in the new Actions pill at the same time \u2014 they now only appear in the Actions pill"
+      ]
+    },
+    {
       "version": "3.13",
       "date": "2026-07-02",
       "highlights": [
