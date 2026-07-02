@@ -2,6 +2,15 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.12",
+      "date": "2026-07-02",
+      "highlights": [
+        "New: an Actions pill in the top bar (visible on Home, List, Insights, and Settings) shows everything that needs your attention in one place \u2014 warranty alerts and backup reminders \u2014 instead of you needing to notice separate banners",
+        "Fixed: previously only one nudge could show at a time on Home, so a backup reminder could stay hidden behind a warranty alert. The Actions pill now surfaces everything pending at once",
+        "The pill disappears entirely when there's nothing to act on"
+      ]
+    },
+    {
       "version": "3.11",
       "date": "2026-07-02",
       "highlights": [

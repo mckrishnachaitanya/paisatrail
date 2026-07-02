@@ -150,6 +150,20 @@ input{outline:none;}
   background:var(--coral);border:1.5px solid var(--paper);display:none;}
 .cloud-status-btn.has-error .cloud-status-btn-errdot{display:block;}
 
+/* Actions pill — consolidated nudge center shown in topbar-icons on
+   Home/List/Insights/Settings. Hidden entirely when there are zero pending
+   actions (warranty-expiring-soon, backup-overdue). Deliberately excludes
+   initial onboarding/setup — that's a one-time linear flow, not a recurring
+   action. Tapping opens #actions-pill-overlay listing each pending item;
+   tapping an item closes the sheet and navigates to the same place its
+   original standalone banner would have. */
+.actions-pill-btn{display:flex;align-items:center;gap:5px;height:36px;padding:0 12px;
+  border-radius:18px;background:var(--grape);color:#fff;font-size:12px;font-weight:700;
+  flex-shrink:0;white-space:nowrap;}
+.actions-pill-btn:active{transform:scale(.95);}
+.actions-pill-btn.hidden{display:none;}
+.actions-pill-dot{width:6px;height:6px;border-radius:50%;background:#fff;}
+
 /* ============================== HOME ============================== */
 #home-body{padding:0 20px 28px;}
 .home-header{display:flex;align-items:center;justify-content:space-between;margin:8px 0 16px;}
@@ -555,6 +569,7 @@ input{outline:none;}
         <p class="month-label" id="home-month-label">—</p>
       </div>
       <div class="topbar-icons">
+        <button type="button" class="actions-pill-btn hidden" id="home-actions-pill"><span class="actions-pill-dot"></span><span id="home-actions-pill-text">1 Action</span></button>
         <button type="button" class="income-eye-btn" id="home-eye-btn" title="Toggle income visibility">👁️</button>
         <button type="button" class="cloud-status-btn hidden" id="home-cloud-btn" title="Cloud backup"><span class="cloud-status-btn-icon">⛅</span><span class="cloud-status-btn-errdot"></span></button>
         <button type="button" class="topbar-lock-btn" id="home-lock-btn" title="Lock app">🔒</button>
@@ -803,6 +818,7 @@ input{outline:none;}
     <div class="screen-topbar">
       <p class="topbar-title">Transactions</p>
       <div class="topbar-icons">
+        <button type="button" class="actions-pill-btn hidden" id="txn-actions-pill"><span class="actions-pill-dot"></span><span id="txn-actions-pill-text">1 Action</span></button>
         <button type="button" class="income-eye-btn" id="txn-eye-btn" title="Toggle income visibility">👁️</button>
         <button type="button" class="cloud-status-btn hidden" id="txn-cloud-btn" title="Cloud backup"><span class="cloud-status-btn-icon">⛅</span><span class="cloud-status-btn-errdot"></span></button>
         <button type="button" class="topbar-lock-btn" id="txn-lock-btn" title="Lock app">🔒</button>
@@ -886,6 +902,7 @@ input{outline:none;}
     <div class="screen-topbar">
       <p class="topbar-title">Insights</p>
       <div class="topbar-icons">
+        <button type="button" class="actions-pill-btn hidden" id="stats-actions-pill"><span class="actions-pill-dot"></span><span id="stats-actions-pill-text">1 Action</span></button>
         <button type="button" class="income-eye-btn hidden" id="stats-accounts-btn" title="View accounts">🏦</button>
         <button type="button" class="income-eye-btn" id="stats-eye-btn" title="Toggle income visibility">👁️</button>
         <button type="button" class="cloud-status-btn hidden" id="stats-cloud-btn" title="Cloud backup"><span class="cloud-status-btn-icon">⛅</span><span class="cloud-status-btn-errdot"></span></button>
@@ -948,7 +965,10 @@ input{outline:none;}
     <div style="padding:0 20px 12px;">
       <div class="screen-topbar">
         <p class="topbar-title">Settings</p>
-        <button type="button" class="topbar-lock-btn" id="settings-lock-btn" title="Lock app">🔒</button>
+        <div class="topbar-icons">
+          <button type="button" class="actions-pill-btn hidden" id="settings-actions-pill"><span class="actions-pill-dot"></span><span id="settings-actions-pill-text">1 Action</span></button>
+          <button type="button" class="topbar-lock-btn" id="settings-lock-btn" title="Lock app">🔒</button>
+        </div>
       </div>
       <p class="field-label" style="margin-top:0;">FINANCE</p>
       <div class="settings-row" style="cursor:default;">
@@ -1494,6 +1514,22 @@ input{outline:none;}
       <p style="font-size:14px;font-weight:700;color:var(--ink);">Net Worth</p>
       <p id="accounts-view-networth-value" style="font-family:var(--font-mono);font-size:16px;font-weight:700;"></p>
     </div>
+  </div>
+</div>
+
+<!-- ============================== ACTIONS PILL SHEET ==============================
+     Consolidated list of pending nudges (warranty-expiring-soon, backup-overdue).
+     Populated by renderActionsSheetList(); each row's tap handler closes this sheet
+     then reuses the same navigation the item's original standalone banner used
+     (e.g. warranty row -> Home Warranties tab, backup row -> Settings Drive section). -->
+<div id="actions-sheet-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title">Actions</p>
+      <button type="button" class="topbar-close" id="actions-sheet-close-btn">✕</button>
+    </div>
+    <div id="actions-sheet-list" style="margin-top:10px;"></div>
   </div>
 </div>
 
@@ -2506,6 +2542,7 @@ async function unlockSuccess(){
   await checkWhatsNewOnOpen();
   renderDriveSettingsRow();
   checkDriveOnOpen(); // not awaited — auto-backup/restore-offer happens in the background, never blocks unlock
+  renderActionsPill(); // independent of target screen — the pill must be correct even if the user unlocks straight into Settings/List/Insights without Home ever rendering this session
   DebugLog.snapshot(); // one snapshot per unlock — cheap, and means we have a render-state trail leading up to any issue without the user needing to remember to capture one manually
   const target = screenBeforeLock || 'home-screen';
   showScreen(target);
@@ -2702,7 +2739,10 @@ async function renderHomeOverviewPanel(){
   const backupBanner=document.getElementById('home-backup-banner');
   // Reset all first
   [warrantyBanner, whatsnewBanner, backupBanner].forEach(b=>{ b.classList.add('hidden'); b.innerHTML=''; });
-  // Evaluate candidates in priority order — stop at first match
+  // Evaluate candidates in priority order — stop at first match. (Note: this
+  // means only ONE of warranty/what's-new/backup shows as a standalone banner
+  // at a time — the Actions pill below is what surfaces ALL pending items
+  // together, independent of this single-banner priority system.)
   const soon=await getWarrantiesExpiringSoon();
   if(soon.length>0){
     await renderWarrantyBanner();
@@ -2711,6 +2751,7 @@ async function renderHomeOverviewPanel(){
   } else if(await shouldShowBackupNudge()){
     await renderBackupNudgeBanner();
   }
+  await renderActionsPill();
   await renderOnboardingChecklist();
   const todayISO_=todayISO();
   const bounds=cycleBounds(todayISO_);
@@ -4367,6 +4408,74 @@ function renderCloudStatusIcons(){
       : hadError ? 'Last backup failed — tap to view'
       : 'Cloud backup';
   });
+}
+
+// ---- Actions pill ----
+// Consolidated nudge center shown in topbar-icons on all four tabs. Reuses the
+// existing predicate functions (getWarrantiesExpiringSoon, shouldShowBackupNudge)
+// as the single source of truth — this is purely a new DISPLAY surface, not a
+// new detection mechanism, so it can never drift out of sync with what the old
+// standalone banners would have shown. Hidden entirely when there are zero
+// pending items. Deliberately excludes onboarding/setup (a one-time linear flow,
+// not a recurring action — see backlog note).
+const ACTIONS_PILL_IDS=['home-actions-pill','txn-actions-pill','stats-actions-pill','settings-actions-pill'];
+async function getPendingActions(){
+  const actions=[];
+  const warrantiesSoon=await getWarrantiesExpiringSoon();
+  if(warrantiesSoon.length>0){
+    const label = warrantiesSoon.length===1
+      ? `${(state.categories.find(c=>c.id===warrantiesSoon[0].categoryId)||{}).name || warrantiesSoon[0].note || 'Item'} warranty — ${formatWarrantyRemaining(warrantiesSoon[0].warrantyExpiry).label}`
+      : `${warrantiesSoon.length} warranties expiring soon`;
+    actions.push({ id:'warranty', icon:'🛡️', label, action:'warranty' });
+  }
+  if(await shouldShowBackupNudge()){
+    const lastExport=parseInt(Store.get('pt_last_export')||'0');
+    const label = lastExport
+      ? `Back up your data — last backed up ${fmtDuration(Math.floor((Date.now()-lastExport)/86400000))} ago`
+      : `Back up your data — you haven't yet`;
+    actions.push({ id:'backup', icon:'💾', label, action:'backup' });
+  }
+  return actions;
+}
+async function renderActionsPill(){
+  const actions=await getPendingActions();
+  const count=actions.length;
+  ACTIONS_PILL_IDS.forEach(id=>{
+    const btn=document.getElementById(id);
+    if(!btn) return;
+    btn.classList.toggle('hidden', count===0);
+    const textEl=document.getElementById(id+'-text');
+    if(textEl) textEl.textContent = count===1 ? '1 Action' : `${count} Actions`;
+  });
+}
+async function openActionsSheet(){
+  const actions=await getPendingActions();
+  const list=document.getElementById('actions-sheet-list');
+  list.innerHTML='';
+  if(actions.length===0){
+    list.innerHTML='<p class="empty-hint">You\u2019re all caught up.</p>';
+  } else {
+    actions.forEach(a=>{
+      list.insertAdjacentHTML('beforeend', `
+        <button type="button" class="settings-row" data-actionid="${a.id}" style="margin-bottom:8px;">
+          <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">${a.icon}</span>
+          <div class="settings-row-info">
+            <p class="settings-row-title">${esc(a.label)}</p>
+          </div>
+        </button>`);
+    });
+  }
+  document.getElementById('actions-sheet-overlay').classList.add('show');
+}
+async function handleActionsSheetTap(actionId){
+  document.getElementById('actions-sheet-overlay').classList.remove('show');
+  if(actionId==='warranty'){
+    showScreen('home-screen');
+    setHomeTab('warranties');
+  } else if(actionId==='backup'){
+    await exportData();
+    await renderActionsPill();
+  }
 }
 
 
@@ -7275,6 +7384,20 @@ document.getElementById('home-tabs').addEventListener('click', (e) => {
   setHomeTab(btn.dataset.hometab);
 });
 document.getElementById('home-warranty-banner').addEventListener('click', () => setHomeTab('warranties'));
+ACTIONS_PILL_IDS.forEach(id=>{
+  const btn=document.getElementById(id);
+  if(btn) btn.addEventListener('click', openActionsSheet);
+});
+document.getElementById('actions-sheet-close-btn').addEventListener('click', () => {
+  document.getElementById('actions-sheet-overlay').classList.remove('show');
+});
+document.getElementById('actions-sheet-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='actions-sheet-overlay') document.getElementById('actions-sheet-overlay').classList.remove('show');
+});
+document.getElementById('actions-sheet-list').addEventListener('click', (e) => {
+  const row=e.target.closest('[data-actionid]'); if(!row) return;
+  handleActionsSheetTap(row.dataset.actionid);
+});
 document.getElementById('home-backup-banner').addEventListener('click', async () => {
   await exportData();
   await renderBackupNudgeBanner();
