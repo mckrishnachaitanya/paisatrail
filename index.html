@@ -47,7 +47,16 @@ input{outline:none;}
 
 /* ============================== SCREEN SYSTEM ============================== */
 .screen{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;overflow:hidden;
-  opacity:1;transition:opacity .2s;z-index:10;}
+  opacity:1;transition:opacity .2s;z-index:10;
+  /* transform:translateZ(0) forces each .screen onto its own compositor layer
+     with stable rasterization. On this Android tablet Chrome spontaneously
+     snaps devicePixelRatio between 1.874 and a fractional 2.00142, and at the
+     fractional value the full-viewport position:fixed fill was mis-rounding and
+     leaving large blank/white areas (the "flickering"/blank-background bug —
+     see handover doc tablet investigation). Promoting the layer makes the
+     browser rasterize the fill consistently regardless of fractional DPR.
+     Android-safe; no effect on the phone. */
+  transform:translateZ(0);}
 .screen.is-hidden{opacity:0;pointer-events:none;z-index:0;}
 /* Pin screen must sit above all overlays (edit-sheet-overlay z-index:900,
    confirm-overlay z-index:800) so locking while a sheet is open doesn't
