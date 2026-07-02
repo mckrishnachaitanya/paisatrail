@@ -2,6 +2,15 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.11",
+      "date": "2026-07-02",
+      "highlights": [
+        "Correcting an account balance now works properly: enter your real balance from the bank, and PaisaTrail adds a single visible \u2696\ufe0f Balance Adjustment entry to make up the difference \u2014 so your balance always matches reality even if a few transactions were never logged",
+        "Balance adjustments stay out of your insights and forecasts (their date and cause can't be known), but appear in the account's transaction list as an audit trail",
+        "Balance adjustment entries are marked as system entries and can't be edited (delete and re-reconcile if needed)"
+      ]
+    },
+    {
       "version": "3.10",
       "date": "2026-07-01",
       "highlights": [
