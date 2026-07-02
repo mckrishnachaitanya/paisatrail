@@ -1619,6 +1619,15 @@ input{outline:none;}
   </div>
 </div>
 
+<div id="recon-explain-overlay" class="confirm-overlay">
+  <div class="confirm-sheet">
+    <div class="confirm-sheet-icon">⚖️</div>
+    <p class="confirm-sheet-title">Balance adjusted</p>
+    <p class="confirm-sheet-sub">The balance you entered didn't match what PaisaTrail had calculated — usually because a few transactions weren't logged. We've added a one-off <b>Balance Adjustment</b> entry to make up the difference, so your balance now matches your bank.<br><br>Because we can't know exactly what caused the gap or when it happened, this entry won't show up in your insights or forecasts. You'll find it in the account's transaction list.</p>
+    <button type="button" class="save-btn" id="recon-explain-btn">Got it</button>
+  </div>
+</div>
+
 <!-- ============================== DEBUG LOG PANEL ==============================
      Deliberately uses display:none/display:flex toggling rather than the
      opacity:0/pointer-events:none pattern used by every other overlay in this
@@ -2708,7 +2717,7 @@ async function renderHomeOverviewPanel(){
   const startISO=bounds.startISO;
   const endISO=todayISO_;
 
-  const all=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id]);
+  const all=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id] && !isReconEntry(e));
   const expenses=all.filter(isExpenseEntry);
   const incomes=all.filter(isIncomeEntry);
   const expenseTotal=expenses.reduce((s,e)=>s+Number(e.amount),0);
@@ -3035,6 +3044,26 @@ async function renderTransactions(){
       }
       const isInc=isIncomeEntry(e);
       const isTxfr=isTransferEntry(e);
+      if(isReconEntry(e)){
+        // System balance-adjustment entry. Distinct ⚖️ icon, clear "system" subtitle,
+        // shown with a muted amount and a small tag so it's never mistaken for a real
+        // expense/income months later. Direction: for savings an income recon adds,
+        // for cc an expense recon adds to outstanding — but for display we just show
+        // the signed effect the user will recognise.
+        const reconIsInc=isIncomeEntry(e);
+        const reconAmtText = reconIsInc ? `+${formatINR(e.amount)}` : `-${formatINR(e.amount)}`;
+        container.insertAdjacentHTML('beforeend', `
+          <div class="recent-row" data-id="${e.id}">
+            <div class="recent-icon" style="background:rgba(134,87,224,0.14);">⚖️</div>
+            <div class="recent-info">
+              <p class="recent-title">Balance adjustment<span class="manage-default-tag">System</span></p>
+              <span class="recent-pm">Reconciled to your real balance</span>
+            </div>
+            <span class="recent-amt" style="color:var(--muted);">${reconAmtText}</span>
+            <button class="txn-delete" data-del="${e.id}">🗑️</button>
+          </div>`);
+        return;
+      }
       if(isTxfr){
         const fromAcct=state.accounts.find(a=>a.id===e.fromAccountId);
         const toAcct=state.accounts.find(a=>a.id===e.toAccountId);
@@ -3205,6 +3234,13 @@ async function clearTxnFilters(){
 async function openEditFromId(id){
   const exp=await DB.getExpense(id);
   if(!exp){ toast('That expense was not found'); return; }
+  if(isReconEntry(exp)){
+    // Reconciliation entries are system balance corrections — editing the amount
+    // would silently desync the account balance. Not editable. (Deleting is fine:
+    // it just reverts the correction, and the user can reconcile again.)
+    toast('Balance adjustments can\u2019t be edited — delete it or reconcile again');
+    return;
+  }
   openAddScreen(exp);
 }
 async function handleTxnDelete(id){
@@ -3350,7 +3386,7 @@ function openCategoriesScreen(){
 function renderCategoriesScreen(){
   const list=document.getElementById('categories-list'); list.innerHTML='';
   if(state.categories.length===0){ list.innerHTML='<p class="empty-hint">No categories yet.</p>'; return; }
-  state.categories.forEach(cat=>{
+  state.categories.filter(cat=>!cat.isReserved).forEach(cat=>{
     list.insertAdjacentHTML('beforeend', `
       <button type="button" class="settings-row" data-catid="${cat.id}" style="margin-bottom:8px;">
         <span class="settings-row-icon" style="background:${cat.color}22;">${cat.icon}</span>
@@ -3732,7 +3768,7 @@ async function updateTagRangePreview(){
     tagRangeMatchedCache=[];
     return;
   }
-  const all=(await DB.getExpensesByDateRange(state.tagStartISO, state.tagEndISO)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+  const all=(await DB.getExpensesByDateRange(state.tagStartISO, state.tagEndISO)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e));
   tagRangeMatchedCache = all.filter(e => !e.groupId); // only ungrouped — already-grouped expenses are left alone here; Pick manually can still override them
   const groupedCount = all.length - tagRangeMatchedCache.length;
   if(tagRangeMatchedCache.length===0){
@@ -3749,7 +3785,7 @@ async function updateTagRangePreview(){
 }
 
 async function renderTagManualList(){
-  const list=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+  const list=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e));
   list.sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
   tagManualListCache=list;
   const container=document.getElementById('tag-manual-list'); container.innerHTML='';
@@ -5071,7 +5107,7 @@ async function renderHomeForecastPanel(){
     const bounds=cycleBounds(today);
     windowEndISO=bounds.endISO;
     remainingDays=Math.max(0, Math.round((new Date(windowEndISO+'T00:00:00') - new Date(today+'T00:00:00'))/86400000));
-    spentSoFar=(await DB.getExpensesByDateRange(bounds.startISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
+    spentSoFar=(await DB.getExpensesByDateRange(bounds.startISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
   } else {
     windowEndISO=dateToISO(addDays(new Date(today+'T00:00:00'), FORECAST_ROLLING_WINDOW_DAYS));
     remainingDays=FORECAST_ROLLING_WINDOW_DAYS;
@@ -5129,7 +5165,7 @@ async function renderHomeForecastPanel(){
     if(isMonth){
       const bounds=cycleBounds(today);
       const incomeEntries=(await DB.getExpensesByDateRange(bounds.startISO, today))
-        .filter(e=>!pendingDeletes[e.id] && isIncomeEntry(e) && !e.recurringId);
+        .filter(e=>!pendingDeletes[e.id] && isIncomeEntry(e) && !e.recurringId && !isReconEntry(e));
       incomeLoggedSoFar=incomeEntries.reduce((s,e)=>s+Number(e.amount),0);
     }
 
@@ -5196,7 +5232,7 @@ async function renderHomeForecastPanel(){
 async function getMonthToDateExpenses(){
   const today=todayISO();
   const cycleStartISO=cycleBounds(today).startISO;
-  return (await DB.getExpensesByDateRange(cycleStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+  return (await DB.getExpensesByDateRange(cycleStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e));
 }
 // Unlike Forecast's "estimated other spending," budgets intentionally
 // include recurring-generated expenses in the spent total — a recurring
@@ -5234,7 +5270,7 @@ function getAvailableBudgetTargets(){
   const hasOverall=state.budgets.some(b=>!b.categoryId);
   const targets=[];
   if(!hasOverall) targets.push({id:null, name:'Overall', icon:'💰', color:'#8657E0'});
-  state.categories.forEach(cat=>{ if(!usedCategoryIds.has(cat.id)) targets.push({id:cat.id, name:cat.name, icon:cat.icon, color:cat.color}); });
+  state.categories.forEach(cat=>{ if(!usedCategoryIds.has(cat.id) && !cat.isReserved) targets.push({id:cat.id, name:cat.name, icon:cat.icon, color:cat.color}); });
   return targets;
 }
 function budgetDisplayInfo(budget){
@@ -5261,7 +5297,7 @@ function monthsAgoBounds(n){
 // suggestion for a newer install. targetCategoryId is null for "Overall".
 async function getBudgetHistoryData(targetCategoryId){
   const m1=monthsAgoBounds(1), m2=monthsAgoBounds(2), m3=monthsAgoBounds(3);
-  const expenses=(await DB.getExpensesByDateRange(m3.startISO, m1.endISO)).filter(e=>!pendingDeletes[e.id] && isExpenseEntry(e));
+  const expenses=(await DB.getExpensesByDateRange(m3.startISO, m1.endISO)).filter(e=>!pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e));
   const inBounds=(e,b)=> e.date>=b.startISO && e.date<=b.endISO;
   const sumFor=(b)=> expenses.filter(e=>inBounds(e,b) && (targetCategoryId ? e.categoryId===targetCategoryId : true)).reduce((s,e)=>s+Number(e.amount),0);
   const monthActive=(b)=> expenses.some(e=>inBounds(e,b));
@@ -5541,10 +5577,9 @@ function openAccountEdit(id, source='settings'){
   if(existing){
     balanceInput.value = (existing.openingBalance||0); // synchronous fallback until compute resolves
     computeAccountBalance(existing).then(current=>{
-      DebugLog.push('INFO', ['acctEdit open: opening='+(existing.openingBalance||0)+' computedCurrent='+current+' stillEditing='+(state.acctEditingId===existing.id)]);
       // Only apply if the user is still editing this same account and hasn't typed yet
       if(state.acctEditingId===existing.id) balanceInput.value = current;
-    }).catch(err=>{ DebugLog.push('ERROR', ['acctEdit computeBalance failed', String(err)]); });
+    }).catch(()=>{});
   } else {
     balanceInput.value = '';
   }
@@ -5581,6 +5616,23 @@ function applyAccountTypeLabels(type){
     : (isEditing ? 'Enter your actual current balance (as shown by your bank) — we\u2019ll adjust automatically'
                  : 'Enter your current account balance');
 }
+// Finds or lazily creates the reserved "Balance Adjustment" category used for
+// reconciliation entries. Created on first reconcile rather than seeded for
+// everyone, so users who never reconcile never see it. Uses a stable known id
+// so it survives backup/restore and is recognisable in code. Marked
+// isReserved:true so Manage Categories can hide it (cosmetic) and so it's
+// never offered in the normal add-expense category picker.
+const RECON_CATEGORY_ID='pt_recon_category';
+async function getOrCreateReconCategory(){
+  let cat=state.categories.find(c=>c.id===RECON_CATEGORY_ID);
+  if(!cat){
+    cat={ id:RECON_CATEGORY_ID, name:'Balance Adjustment', icon:'⚖️', color:'#8657E0', isDefault:false, isReserved:true };
+    await DB.putCategory(cat);
+    state.categories.push(cat);
+  }
+  return cat;
+}
+
 async function saveAccountEdit(){
   const name=document.getElementById('account-edit-name').value.trim();
   const enteredBalance=parseFloat(document.getElementById('account-edit-balance').value)||0;
@@ -5588,19 +5640,21 @@ async function saveAccountEdit(){
   if(!name){ toast('Give the account a name'); return; }
   const existing = state.acctEditingId ? state.accounts.find(a=>a.id===state.acctEditingId) : null;
   if(existing){
-    // The user typed their CURRENT balance (as read from the bank). Back-compute
-    // the openingBalance so that computeAccountBalance (openingBalance + activity)
-    // lands exactly on what they typed, without re-adding transaction activity on
-    // top. activity = currentBalance - openingBalance, so:
-    //   newOpeningBalance = enteredCurrent - activity
-    //                     = enteredCurrent - (currentBalance - oldOpeningBalance)
+    // Reconciliation model: the user typed their CURRENT balance (as read from
+    // the bank). We DON'T touch openingBalance. Instead, if the entered balance
+    // differs from what the app computes, we create ONE system adjustment entry
+    // for the difference so that computeAccountBalance lands exactly on what the
+    // user typed. The gap represents un-logged real activity (or errors) the app
+    // can't decompose — see handover doc for the full design rationale.
     const currentBalance = await computeAccountBalance(existing);
-    const activity = currentBalance - (existing.openingBalance||0);
-    DebugLog.push('INFO', ['acctEdit save: entered='+enteredBalance+' oldOpening='+(existing.openingBalance||0)+' computedCurrent='+currentBalance+' activity='+activity+' newOpening='+(enteredBalance-activity)]);
+    const diff = enteredBalance - currentBalance; // signed, in "current balance" space
     existing.name=name;
-    existing.openingBalance = enteredBalance - activity;
     existing.paymentMethodIds=[...state.acctEditPaymentIds];
     await DB.putAccount(existing);
+    if(Math.abs(diff) >= 0.005){ // non-zero (guard against float noise)
+      await createReconciliationEntry(existing, diff);
+      showReconExplanationIfFirstTime();
+    }
   } else {
     // New account: no activity yet, so the entered value IS the opening balance.
     const account={ id:genId(), name, type, openingBalance:enteredBalance, paymentMethodIds:[...state.acctEditPaymentIds], createdAt:Date.now() };
@@ -5614,6 +5668,51 @@ async function saveAccountEdit(){
     renderManageAccountsList();
   }
   toast(existing ? 'Account updated' : 'Account added');
+}
+
+// Creates the single system adjustment entry that closes the gap between the
+// app-computed balance and the user-entered real balance. Entry type is chosen
+// so that computeAccountBalance moves the balance by exactly `diff`:
+//   savings: income adds, expense subtracts  -> diff>0 => income, diff<0 => expense
+//   cc:      expense adds to outstanding, income subtracts -> diff>0 => expense, diff<0 => income
+// dated today, linked to the account, reserved category, isReconciliation flag.
+async function createReconciliationEntry(account, diff){
+  const isCc = account.type==='cc';
+  const amount = Math.abs(diff);
+  let entryType;
+  if(isCc){ entryType = diff>0 ? 'expense' : 'income'; }
+  else    { entryType = diff>0 ? 'income'  : 'expense'; }
+  const cat=await getOrCreateReconCategory();
+  const entry={
+    id: genId(),
+    type: entryType,
+    amount,
+    categoryId: cat.id,
+    paymentMethod: null,
+    accountId: account.id,
+    date: todayISO(),
+    note: 'Balance adjustment',
+    attachmentIds: [],
+    recurringId: null,
+    groupId: null,
+    warrantyExpiry: null, warrantyDurationMonths: null,
+    splitTotal: null, splitWith: '', splitSettled: false,
+    excludeFromForecast: true, // reconciliation entries never affect forecasts
+    isReconciliation: true,     // structural flag: excluded from insights/forecast, not editable
+    createdAt: Date.now(),
+  };
+  await DB.addExpense(entry);
+}
+
+// One-time explanation the first time a user reconciles, so they understand the
+// adjustment fixes the balance but won't appear in insights/forecasts.
+function showReconExplanationIfFirstTime(){
+  if(Store.get('pt_recon_explained')==='1') return;
+  Store.set('pt_recon_explained','1');
+  // Deferred slightly so it appears after the edit sheet closes.
+  setTimeout(()=>{
+    document.getElementById('recon-explain-overlay').classList.add('show');
+  }, 350);
 }
 async function deleteAccountEdit(){
   const id=state.acctEditingId; if(!id) return;
@@ -5937,7 +6036,7 @@ function formatDelta(current, previous){
   return { label:`${pct>0?'▲':'▼'} ${Math.abs(pct)}%`, cls: pct>0?'up':'down' };
 }
 async function getCategoryTotalsForPeriod(startISO, endISO){
-  const expenses=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+  const expenses=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e));
   const byCat={};
   expenses.forEach(e=>{ byCat[e.categoryId]=(byCat[e.categoryId]||0)+Number(e.amount); });
   return byCat;
@@ -6063,7 +6162,7 @@ function renderInsightsCompareCatGrid(){
   // across navigation, same as the period type and view.
   if(!state.insCompareCategoryId && state.categories.length) state.insCompareCategoryId=state.categories[0].id;
   const grid=document.getElementById('ins-compare-cat-grid'); grid.innerHTML='';
-  state.categories.forEach(cat=>{
+  state.categories.filter(cat=>!cat.isReserved).forEach(cat=>{
     const selected=state.insCompareCategoryId===cat.id;
     const bg = selected ? cat.color+'26' : 'var(--surface)';
     const border = selected ? cat.color : 'transparent';
@@ -6249,7 +6348,7 @@ function renderCategoryGrid(){
   } else {
     const COLLAPSE_AT=6; // 2 rows of 3 — keeps the common case to a single glance
     const counts=state.catUsageCounts || {};
-    const sorted=state.categories.slice().sort((a,b) => (counts[b.id]||0) - (counts[a.id]||0));
+    const sorted=state.categories.filter(c=>!c.isReserved).slice().sort((a,b) => (counts[b.id]||0) - (counts[a.id]||0));
     // Never hide the currently-selected category (e.g. editing an old expense
     // whose category isn't a frequent one) — auto-expand instead of burying it.
     if(sorted.length>COLLAPSE_AT && !state.catGridExpanded && state.selectedCategoryId
@@ -6298,6 +6397,14 @@ const INCOME_CATEGORIES=[
 function isExpenseEntry(e){ return (!e.type || e.type==='expense') && e.type!=='transfer'; }
 function isIncomeEntry(e){ return e.type==='income'; }
 function isTransferEntry(e){ return e.type==='transfer'; }
+// Reconciliation entries: system-generated balance corrections. They MUST count
+// toward account balance (that's their whole point) and appear in the account's
+// transaction list (audit trail), but MUST be excluded from all analytics —
+// insights, forecasts, budgets, home overview income/expense/net totals, and
+// category/group breakdowns — because their date is "today" (fictional for the
+// real activity they represent) and their nature is unknowable. Analytics filters
+// add `&& !isReconEntry(e)`; balance/list code does not.
+function isReconEntry(e){ return !!e.isReconciliation; }
 
 // Single-pass usage count per category, all-time — powers the "most-used
 // first" sort on the Add screen's category grid. Fetched once per Add-screen
@@ -7247,6 +7354,12 @@ document.getElementById('settings-drive-disconnect-btn').addEventListener('click
 
 document.getElementById('drive-autorestore-cancel-btn').addEventListener('click', () => {
   document.getElementById('drive-autorestore-overlay').classList.remove('show');
+});
+document.getElementById('recon-explain-btn').addEventListener('click', () => {
+  document.getElementById('recon-explain-overlay').classList.remove('show');
+});
+document.getElementById('recon-explain-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='recon-explain-overlay') document.getElementById('recon-explain-overlay').classList.remove('show');
 });
 document.getElementById('drive-autorestore-overlay').addEventListener('click', (e) => {
   if(e.target.id==='drive-autorestore-overlay') document.getElementById('drive-autorestore-overlay').classList.remove('show');
