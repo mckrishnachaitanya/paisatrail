@@ -100,7 +100,13 @@ Bulk assign: Settings → Manage accounts → "Bulk assign past transactions" �
 
 **What's New:** `releaseNotes` in `app-guide.json` (newest first). Mint Home banner (priority-gated). One-time SW-based notification (`reg.showNotification()` required for Android; falls back to `new Notification()` for desktop). `pt_last_seen_version` written only when user opens What's New.
 
-**Other:** Backup nudge (15-day, `pt_last_export`, priority-gated). Soft-delete + undo. Split expenses. Attachments (base64, chunked). Export/import `schemaVersion:5` — includes accounts and a `preferences` object (`cycleDay`, `accountsEnabled`, `accountsHadData`). On import, preferences are restored automatically so cycle day and accounts toggle survive a device restore. Older backups without `preferences` import cleanly with no regression.
+**Other:** Backup nudge (15-day, `pt_last_export`, priority-gated). Soft-delete + undo. Split expenses. Attachments (base64, chunked). Export/import `schemaVersion:6` (bumped 2026-07-02 for the `incomeCategories` addition — old `schemaVersion:5` backups import cleanly, backfilled with the 7 default income categories, see Data Model section) — includes accounts and a `preferences` object (`cycleDay`, `accountsEnabled`, `accountsHadData`). On import, preferences are restored automatically so cycle day and accounts toggle survive a device restore. Older backups without `preferences` import cleanly with no regression.
+
+**Balance reconciliation (2026-07-02):** editing an account's balance no longer back-computes `openingBalance`; instead creates one visible ⚖️ "Balance Adjustment" system entry for the gap (income/expense per sign, savings/cc-aware), excluded from insights/forecasts via `isReconEntry`, non-editable, deletable. See Data Model section for full detail.
+
+**Actions pill (2026-07-02):** consolidated nudge center (warranty + backup) in the topbar on all 4 tabs, replacing the old single-banner-at-a-time limitation on Home. See Data Model section area / dedicated note for detail.
+
+**User-manageable income categories (2026-07-02):** the 7 income categories (Salary, Freelance, etc.) moved from a hardcoded JS constant to a full IndexedDB store with add/edit/delete parity to expense categories, plus quick-add from the income picker. See Data Model section for full detail.
 
 **Dropped:** Dark mode.
 
@@ -117,14 +123,26 @@ Bulk assign: Settings → Manage accounts → "Bulk assign past transactions" �
 
 **Accounts:** `{id, name, type ('savings'|'cc'), openingBalance, paymentMethodIds[], createdAt}`
 
-**Categories:** id, name, icon, color, isDefault. **Payment methods:** id, name, icon. **Groups:** id, name. **Budgets:** id, categoryId (null=Overall), monthlyLimit, createdAt. **Attachments:** id, expenseId, type, fileName, mimeType, data (ArrayBuffer).
+**Categories:** id, name, icon, color, isDefault, isReserved (optional — see reconciliation's `pt_recon_category`). **Income categories** (2026-07-02, own `incomeCategories` store — see below): id, name, icon, color, isDefault. **Payment methods:** id, name, icon. **Groups:** id, name. **Budgets:** id, categoryId (null=Overall), monthlyLimit, createdAt. **Attachments:** id, expenseId, type, fileName, mimeType, data (ArrayBuffer).
 
-**DB version: 5** (accounts store added at v5; budgets at v4).
+**DB version: 6** (v6, 2026-07-02: added `incomeCategories` store + `incomeCategoryId` index on `expenses`, for user-manageable income categories, replacing the old hardcoded `INCOME_CATEGORIES` JS constant — see the dedicated note below. accounts store added at v5; budgets at v4).
 
 Type guards — apply consistently, income and transfers must never reach budgets/forecast/warranty/insights/split:
 - `isExpenseEntry(e)` → `(!e.type || e.type==='expense') && e.type!=='transfer'`
 - `isIncomeEntry(e)` → `e.type==='income'`
 - `isTransferEntry(e)` → `e.type==='transfer'`
+- `isReconEntry(e)` → `!!e.isReconciliation` (system balance-adjustment entries — see reconciliation note)
+
+**Income categories became user-manageable (2026-07-02, v6):** Previously `INCOME_CATEGORIES` was a hardcoded JS constant (7 fixed entries: Salary/Freelance/Business/Rental/Gift/Investment/Other), not stored in IndexedDB, with no add/edit/delete UI. Now mirrors expense categories exactly: own `incomeCategories` object store, `state.incomeCategories` loaded on unlock/restore, full parity CRUD (`DB.getAllIncomeCategories`/`putIncomeCategory`/`deleteIncomeCategory`/`countExpensesByIncomeCategory`).
+
+- **Backward compatibility (critical):** the 7 defaults are seeded via `DB.seedDefaults()` using their OLD FIXED IDS (`inc-salary`, `inc-freelance`, etc.) — NOT `genId()`. This is essential: existing income entries already have `incomeCategoryId:'inc-salary'` baked in from before this migration, and using fixed ids means they keep resolving correctly with zero data migration needed. Verified via Playwright (old-style entry with `incomeCategoryId:'inc-salary'` still resolves to name "Salary" post-migration).
+- **`incomeCategoryId` index** added to the `expenses` store in the v6 upgrade — needed for `countExpensesByIncomeCategory` (mirrors the existing `categoryId` index). Since `expenses` already existed pre-v6 for upgraders, the index is added via `e.target.transaction.objectStore('expenses').createIndex(...)` in the `else` branch of the upgrade handler (existing stores can still gain new indexes during a version bump; only NEW stores need `createObjectStore`).
+- **Editing UI: shared, not duplicated.** `openCategoryEdit(id, type)` now takes a second param (`'category'` default, or `'incomeCategory'`), reading/writing `state.categories` or `state.incomeCategories` accordingly — same edit sheet markup, same icon/color picker, same `saveCategoryEdit`/`requestDeleteCategory` functions, branching internally on `state.mgrEditingType`. This avoids a second parallel set of edit functions.
+- **Manage Categories screen:** gained an Expense/Income `segmented-tabs` toggle (`#categories-type-tabs`, `state.categoriesScreenType`, defaults to `'expense'` every time the screen opens). `renderCategoriesScreen()` branches on this to render either list; row clicks route to `openCategoryEdit(id, 'category')` or `openCategoryEdit(id, 'incomeCategory')` based on which `data-*` attribute is present (`data-catid` vs `data-incomecatid`).
+- **Quick-add in the picker:** the income category grid on the Add screen (`renderCategoryGrid`'s income branch) has an extra "➕ Add new" chip (`#add-income-cat-btn`) that opens the same edit sheet (`openCategoryEdit(null,'incomeCategory')`); the delegated click handler on `#add-category-grid` checks for this id FIRST, before falling through to the generic expense-chip handling, since the new chip also carries class `cat-chip`.
+- **Deletion is non-destructive**, same rule as expense categories: past income entries keep their now-dangling `incomeCategoryId` and render gracefully via the existing `cat?cat.icon:fallback` pattern everywhere. No orphan-budget cleanup needed for income (budgets are expense-only, `categoryId`). Delete confirmation count/wording (`openManageDeleteConfirm`) now branches per-type so it says "income entries" not "expenses" when deleting an income category.
+- **Backup/restore:** `incomeCategories` added to `exportData()`, `CloudBackup.buildPayload()`, `DB.replaceAllData()`, and `applyBackupPayload()`. **Old backups (pre-v6, no `incomeCategories` field at all)** are handled by calling `DB.seedDefaults()` immediately after `replaceAllData()` inside `applyBackupPayload` — this backfills the 7 fixed-id defaults if the store ends up empty, so restoring an old backup never leaves income categories missing. Verified via Playwright: normal round-trip preserves a custom category; simulated old-schema restore (no `incomeCategories` key) correctly backfills all 7 defaults.
+- **`INCOME_CATEGORIES` constant removed entirely** — every call site (~15) now reads `state.incomeCategories`.
 
 ---
 

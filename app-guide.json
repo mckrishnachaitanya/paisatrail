@@ -2,6 +2,15 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.13",
+      "date": "2026-07-02",
+      "highlights": [
+        "Income categories are now fully customizable \u2014 add your own (like Interest or Refunds) right from the income picker with a tap on \"Add new\", or manage them from Settings \u2192 Manage categories using the new Expense/Income toggle",
+        "The 7 built-in income categories (Salary, Freelance, Business, Rental, Gift, Investment, Other) can now be renamed, recolored, or deleted too",
+        "Deleting a category never deletes your past entries \u2014 they just become unlinked, same as expense categories always worked"
+      ]
+    },
+    {
       "version": "3.12",
       "date": "2026-07-02",
       "highlights": [
