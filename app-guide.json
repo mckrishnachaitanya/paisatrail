@@ -2,6 +2,13 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.19",
+      "date": "2026-07-03",
+      "highlights": [
+        "Fixed: the Home category legend's scroll cap wasn't actually kicking in (v3.18's height estimate was too generous) \u2014 now correctly shows 5 rows and scrolls for the rest"
+      ]
+    },
+    {
       "version": "3.18",
       "date": "2026-07-03",
       "highlights": [
