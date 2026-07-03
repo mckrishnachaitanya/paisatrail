@@ -2,6 +2,13 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.20",
+      "date": "2026-07-03",
+      "highlights": [
+        "Fixed a rare glitch where the Home category legend could render empty even though the chart above it showed data correctly \u2014 a nested flex+scroll layout quirk on some Android devices"
+      ]
+    },
+    {
       "version": "3.19",
       "date": "2026-07-03",
       "highlights": [
