@@ -2,6 +2,13 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.18",
+      "date": "2026-07-03",
+      "highlights": [
+        "Home overview: the category legend now lists every category the donut chart shows, not just the top 5 \u2014 scrolls if there are more than 5"
+      ]
+    },
+    {
       "version": "3.17",
       "date": "2026-07-03",
       "highlights": [
