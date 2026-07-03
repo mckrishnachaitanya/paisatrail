@@ -2,6 +2,17 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.16",
+      "date": "2026-07-03",
+      "highlights": [
+        "High expense alerts: flag any recurring rule (school fees, insurance premiums) to get an Actions pill nudge a configurable number of days before it's due",
+        "New Quarterly option for recurring transactions, alongside Weekly/Monthly/Yearly",
+        "Auto-add on due date can now be turned off per rule \u2014 useful for bills with a grace period, where the app shouldn't assume you've paid just because the date arrived. Confirm manually via \"Mark as paid\" from the Actions sheet whenever you actually pay",
+        "High expense alert rows in the Actions sheet can be snoozed (1 day / 3 days / 1 week) without leaving the sheet or affecting other pending items",
+        "Forecast still counts an unconfirmed high-expense bill as a projected cost \u2014 it only becomes a logged actual once you mark it paid"
+      ]
+    },
+    {
       "version": "3.15",
       "date": "2026-07-03",
       "highlights": [
@@ -233,8 +244,8 @@
     {
       "id": "recurring",
       "icon": "🔁",
-      "title": "Recurring expenses",
-      "body": "For things that repeat — rent, subscriptions, EMIs — set it up once and the app logs it automatically going forward (weekly, monthly, or yearly), so you don't have to re-enter it every time."
+      "title": "Recurring transactions",
+      "body": "For things that repeat — rent, subscriptions, EMIs, quarterly school fees, annual insurance premiums — set it up once and the app can log it automatically going forward (weekly, monthly, quarterly, or yearly), so you don't have to re-enter it every time. For bills with a grace period, turn off \"Auto-add on due date\" so the app waits for you to confirm payment yourself via \"Mark as paid\" instead of assuming it's paid the moment the date arrives. Turn on \"High expense alert\" on any rule to get a nudge in your Actions list a set number of days before it's due — snooze it for a day, 3 days, or a week if you're not ready to deal with it yet."
     }
   ]
 }

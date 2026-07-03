@@ -1430,6 +1430,15 @@ input{outline:none;}
       <p class="field-label">ACCOUNT (OPTIONAL)</p>
       <div class="pay-row" id="recurring-edit-account-row" style="flex-wrap:wrap;gap:8px;"></div>
     </div>
+    <p class="field-label">AUTO-ADD ON DUE DATE</p>
+    <div class="pay-row" id="recurring-edit-autoadd-row"></div>
+    <p class="empty-hint" style="text-align:left;padding:4px 0 0;">Turn off for bills with a grace period — you'll confirm manually once you've actually paid.</p>
+    <p class="field-label" style="margin-top:14px;">HIGH EXPENSE ALERT</p>
+    <div class="pay-row" id="recurring-edit-alert-row"></div>
+    <div id="recurring-edit-alert-days-wrap" class="hidden">
+      <p class="field-label">DAYS BEFORE TO NOTIFY</p>
+      <input type="number" inputmode="numeric" class="sheet-input" id="recurring-edit-alert-days" placeholder="15" min="1" max="60" step="1">
+    </div>
     <button type="button" class="save-btn" id="recurring-edit-save-btn" style="margin-top:18px;">Save recurring transaction</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-pause-btn" style="color:var(--grape);">Pause</button>
     <button type="button" class="text-danger-btn hidden" id="recurring-edit-delete-btn">Delete</button>
@@ -1535,6 +1544,25 @@ input{outline:none;}
       <button type="button" class="topbar-close" id="actions-sheet-close-btn">✕</button>
     </div>
     <div id="actions-sheet-list" style="margin-top:10px;"></div>
+  </div>
+</div>
+
+<!-- ============================== HIGH EXPENSE ALERT DETAIL SHEET ==============================
+     Opened from an Actions sheet row when action==='highexpense'. Lets the user resolve a
+     flagged upcoming-expense nudge without leaving the sheet flow: confirm payment, snooze,
+     or (only if they actually want to edit settings) jump to the rule itself. -->
+<div id="highexpense-detail-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title" id="highexpense-detail-title">Upcoming expense</p>
+      <button type="button" class="topbar-close" id="highexpense-detail-close-btn">✕</button>
+    </div>
+    <p class="empty-hint" id="highexpense-detail-sub" style="text-align:left;padding:0 0 14px;"></p>
+    <button type="button" class="warranty-toggle-btn" id="highexpense-detail-markpaid-btn"><span>✅</span><span>Mark as paid</span></button>
+    <p class="field-label" style="margin-top:16px;">SNOOZE</p>
+    <div class="pay-row" id="highexpense-detail-snooze-row"></div>
+    <button type="button" class="text-danger-btn" id="highexpense-detail-viewrule-btn" style="color:var(--grape);margin-top:14px;">View rule</button>
   </div>
 </div>
 
@@ -2358,6 +2386,9 @@ const state = {
   mgrRecurringType:'expense',     // 'expense'|'income' — type of recurring rule being added/edited
   mgrRecurringIncomeCategoryId:null, // selected income category when mgrRecurringType==='income'
   mgrRecurringAccountId:null,     // selected account id for recurring rule; null = no account assigned
+  mgrRecurringAutoAdd:true,       // whether the rule auto-generates its expense/income entry on the due date, or waits for manual "Mark as paid"
+  mgrRecurringAlertEnabled:false, // whether the high-expense alert nudge is on for this rule
+  markPaidRuleId:null,            // set while the Add screen is open specifically to confirm payment for a flagged recurring rule (see openMarkAsPaidScreen); cleared once saved
   budgets:[],                     // in-memory cache of all budgets, mirrors state.recurringRules
   mgrBudgetCategoryId:null,       // categoryId selected while adding a new budget (null = the special "Overall" target); locked/unused once editing an existing budget
   budgetEditHistory:null,         // {lastMonthSpent, lastMonthActive, suggested, targetIsOverall} for whichever target is selected in the open budget sheet — null until fetched, refetched on target change
@@ -4520,6 +4551,22 @@ function renderCloudStatusIcons(){
 // pending items. Deliberately excludes onboarding/setup (a one-time linear flow,
 // not a recurring action — see backlog note).
 const ACTIONS_PILL_IDS=['home-actions-pill','txn-actions-pill','stats-actions-pill','settings-actions-pill'];
+const HIGH_EXPENSE_SNOOZE_OPTIONS=[{days:1,label:'1 day'},{days:3,label:'3 days'},{days:7,label:'1 week'}];
+// Rules flagged highExpenseAlert, not currently snoozed, whose due date falls
+// within alertDaysBefore days from today. Deliberately includes overdue rules
+// too (nextDueISO in the past) — that's the autoAdd:false "due, unconfirmed"
+// state (see catchUpSingleRule), and it should keep nudging until confirmed,
+// not silently drop off just because the date passed.
+function getHighExpenseAlerts(){
+  const today=todayISO();
+  return state.recurringRules.filter(r=>{
+    if(!r.active || !r.highExpenseAlert) return false;
+    if(r.snoozedUntilISO && r.snoozedUntilISO>=today) return false;
+    const days=r.alertDaysBefore||15;
+    const windowEndISO=dateToISO(addDays(new Date(today+'T00:00:00'), days));
+    return r.nextDueISO<=windowEndISO;
+  });
+}
 async function getPendingActions(){
   const actions=[];
   const warrantiesSoon=await getWarrantiesExpiringSoon();
@@ -4529,6 +4576,13 @@ async function getPendingActions(){
       : `${warrantiesSoon.length} warranties expiring soon`;
     actions.push({ id:'warranty', icon:'🛡️', label, action:'warranty' });
   }
+  getHighExpenseAlerts().forEach(rule=>{
+    const today=todayISO();
+    const daysDiff=Math.round((new Date(rule.nextDueISO+'T00:00:00') - new Date(today+'T00:00:00'))/86400000);
+    const dueLabel = daysDiff===0 ? 'today' : daysDiff===1 ? 'tomorrow' : daysDiff>1 ? `in ${daysDiff} days` : `${Math.abs(daysDiff)} day${Math.abs(daysDiff)===1?'':'s'} overdue`;
+    const amountLabel = rule.type==='income' ? maskIncome(rule.amount) : formatINR(rule.amount);
+    actions.push({ id:'highexp-'+rule.id, icon:'🔔', label:`${rule.name} due ${dueLabel} · ${amountLabel}`, action:'highexpense', ruleId:rule.id });
+  });
   if(await shouldShowBackupNudge()){
     const lastExport=parseInt(Store.get('pt_last_export')||'0');
     const label = lastExport
@@ -4558,7 +4612,7 @@ async function openActionsSheet(){
   } else {
     actions.forEach(a=>{
       list.insertAdjacentHTML('beforeend', `
-        <button type="button" class="settings-row" data-actionid="${a.id}" style="margin-bottom:8px;">
+        <button type="button" class="settings-row" data-actionid="${a.id}" data-action="${a.action}" data-ruleid="${a.ruleId||''}" style="margin-bottom:8px;">
           <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">${a.icon}</span>
           <div class="settings-row-info">
             <p class="settings-row-title">${esc(a.label)}</p>
@@ -4568,15 +4622,64 @@ async function openActionsSheet(){
   }
   document.getElementById('actions-sheet-overlay').classList.add('show');
 }
-async function handleActionsSheetTap(actionId){
+async function handleActionsSheetTap(action, ruleId){
+  if(action==='highexpense'){
+    document.getElementById('actions-sheet-overlay').classList.remove('show');
+    openHighExpenseDetailSheet(ruleId);
+    return;
+  }
   document.getElementById('actions-sheet-overlay').classList.remove('show');
-  if(actionId==='warranty'){
+  if(action==='warranty'){
     showScreen('home-screen');
     setHomeTab('warranties');
-  } else if(actionId==='backup'){
+  } else if(action==='backup'){
     await exportData();
     await renderActionsPill();
   }
+}
+
+// ---- High-expense alert detail sheet ----
+// Opened from an Actions sheet row so the user resolves it in-flow: confirm
+// payment, snooze, or (only if they actually want to edit the rule) navigate
+// away. Everything except "View rule" keeps them inside the sheet flow.
+let highExpenseDetailRuleId=null;
+function openHighExpenseDetailSheet(ruleId){
+  highExpenseDetailRuleId=ruleId;
+  const rule=state.recurringRules.find(r=>r.id===ruleId);
+  if(!rule) return;
+  const amountLabel = rule.type==='income' ? maskIncome(rule.amount) : formatINR(rule.amount);
+  const dateLabel=new Date(rule.nextDueISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  document.getElementById('highexpense-detail-title').textContent = rule.name;
+  document.getElementById('highexpense-detail-sub').textContent = `${amountLabel} · Due ${dateLabel}`;
+  const snoozeRow=document.getElementById('highexpense-detail-snooze-row'); snoozeRow.innerHTML='';
+  HIGH_EXPENSE_SNOOZE_OPTIONS.forEach(opt=>{
+    snoozeRow.insertAdjacentHTML('beforeend', `<button type="button" class="pay-chip" data-snooze="${opt.days}">${opt.label}</button>`);
+  });
+  document.getElementById('highexpense-detail-overlay').classList.add('show');
+}
+function closeHighExpenseDetailSheet(){
+  document.getElementById('highexpense-detail-overlay').classList.remove('show');
+  highExpenseDetailRuleId=null;
+}
+async function snoozeHighExpenseAlert(days){
+  const rule=state.recurringRules.find(r=>r.id===highExpenseDetailRuleId);
+  if(!rule) return;
+  rule.snoozedUntilISO=dateToISO(addDays(new Date(todayISO()+'T00:00:00'), days));
+  await DB.putRecurring(rule);
+  closeHighExpenseDetailSheet();
+  await renderActionsPill();
+  toast(`Snoozed for ${days===1?'1 day':days===7?'1 week':days+' days'}`);
+}
+function markHighExpenseAsPaidFromDetail(){
+  const ruleId=highExpenseDetailRuleId;
+  closeHighExpenseDetailSheet();
+  openMarkAsPaidScreen(ruleId);
+}
+function viewHighExpenseRule(){
+  const ruleId=highExpenseDetailRuleId;
+  closeHighExpenseDetailSheet();
+  openRecurringScreen();
+  openRecurringEdit(ruleId);
 }
 
 
@@ -4844,7 +4947,7 @@ async function checkWhatsNewOnOpen(){
 /* ============================== RECURRING EXPENSES ============================== */
 
 
-const RECURRING_FREQUENCIES=[{v:'weekly',label:'Weekly'},{v:'monthly',label:'Monthly'},{v:'yearly',label:'Yearly'}];
+const RECURRING_FREQUENCIES=[{v:'weekly',label:'Weekly'},{v:'monthly',label:'Monthly'},{v:'quarterly',label:'Quarterly'},{v:'yearly',label:'Yearly'}];
 const RECURRING_CATCHUP_CAP=24; // max occurrences backfilled per rule per pass, so an install reopened after a long gap doesn't flood the list
 function recurringFrequencyLabel(freq){
   return (RECURRING_FREQUENCIES.find(f=>f.v===freq)||{}).label || freq;
@@ -4868,6 +4971,11 @@ function advanceRecurringDate(rule, fromISO){
   if(rule.frequency==='yearly'){
     return clampToValidDate(from.getFullYear()+1, startDay.getMonth(), startDay.getDate());
   }
+  if(rule.frequency==='quarterly'){
+    let targetMonth=from.getMonth()+3, targetYear=from.getFullYear();
+    while(targetMonth>11){ targetMonth-=12; targetYear++; }
+    return clampToValidDate(targetYear, targetMonth, startDay.getDate());
+  }
   // monthly (default)
   let targetMonth=from.getMonth()+1, targetYear=from.getFullYear();
   if(targetMonth>11){ targetMonth=0; targetYear++; }
@@ -4881,6 +4989,13 @@ async function catchUpSingleRule(rule){
   const today=todayISO();
   let count=0;
   const isIncomeRule = rule.type === 'income';
+  // autoAdd:false rules (e.g. a premium with a grace period) never
+  // auto-generate — nextDueISO stays frozen at the expected due date until
+  // the user explicitly confirms via "Mark as paid" (see finalizeMarkPaidIfNeeded),
+  // which is what actually advances the schedule. This is deliberate: silently
+  // logging an expense before the user has actually paid would be wrong for
+  // these specific bills, which is the whole reason this toggle exists.
+  if(rule.autoAdd===false) return generated;
   while(rule.active && rule.nextDueISO<=today && count<RECURRING_CATCHUP_CAP){
     const entry = isIncomeRule ? {
       id:genId(), amount:rule.amount,
@@ -4931,6 +5046,53 @@ async function runRecurringCatchUpAll(){
     await refreshAllExpenseViews();
     toast(buildCatchUpToastMessage(allGenerated));
   }
+}
+// Opens a pre-filled Add screen for a flagged (autoAdd:false) recurring rule
+// so the user can confirm the actual paid amount/date rather than the app
+// silently logging it. Reuses openAddScreen(null) — a genuinely new expense,
+// not an edit — then overrides fields from the rule and tags markPaidRuleId
+// so saveExpense knows to advance the rule's schedule once saved.
+async function openMarkAsPaidScreen(ruleId){
+  const rule=state.recurringRules.find(r=>r.id===ruleId);
+  if(!rule) return;
+  await openAddScreen(null);
+  const isIncome = rule.type==='income';
+  state.addMode = isIncome ? 'income' : 'expense';
+  document.querySelectorAll('#add-type-toggle .segmented-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.addtype===state.addMode);
+  });
+  state.markPaidRuleId = ruleId;
+  if(!isIncome) state.recurringLinkedId = ruleId; // drives recurringId on the expense save path; income path links via markPaidRuleId directly (see saveExpense)
+  document.getElementById('add-amount').value = rule.amount;
+  document.getElementById('add-note').value = rule.name;
+  document.getElementById('add-date').value = todayISO();
+  if(isIncome){
+    state.selectedIncomeCategoryId = rule.incomeCategoryId || state.incomeCategories[0].id;
+  } else {
+    state.selectedCategoryId = rule.categoryId;
+  }
+  state.selectedPaymentId = rule.paymentMethod;
+  if(rule.groupId){ state.groupEnabled=true; state.groupMode='existing'; state.selectedGroupId=rule.groupId; }
+  if(state.accountsEnabled && rule.accountId) state.selectedAccountId = rule.accountId;
+  renderAddModeUI();
+  document.getElementById('add-screen-title').textContent = 'Confirm payment';
+  document.getElementById('add-save-btn').textContent = 'Save & confirm';
+}
+// Advances the flagged rule's schedule once its "Mark as paid" expense is
+// actually saved — this, not the calendar, is what moves nextDueISO forward
+// for autoAdd:false rules (see catchUpSingleRule). Snooze is cleared too,
+// since a fresh cycle shouldn't inherit the last one's snooze.
+async function finalizeMarkPaidIfNeeded(){
+  if(!state.markPaidRuleId) return;
+  const rule=state.recurringRules.find(r=>r.id===state.markPaidRuleId);
+  if(rule){
+    rule.nextDueISO=advanceRecurringDate(rule, rule.nextDueISO);
+    if(rule.endDate && rule.nextDueISO>rule.endDate) rule.active=false;
+    rule.snoozedUntilISO=null;
+    await DB.putRecurring(rule);
+  }
+  state.markPaidRuleId=null;
+  await renderActionsPill();
 }
 async function getExpensesByRecurringId(id){
   return (await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id] && e.recurringId===id);
@@ -4996,16 +5158,20 @@ function renderRecurringScreen(){
       ? state.incomeCategories.find(c=>c.id===r.incomeCategoryId)
       : state.categories.find(c=>c.id===r.categoryId);
     const dateLabel=new Date(r.nextDueISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
-    const subLine = r.active
-      ? `${isIncomeRule?'+':''}${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Next ${dateLabel}`
-      : `${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Paused`;
+    const awaitingConfirm = r.active && r.autoAdd===false && r.nextDueISO<=todayISO();
+    const subLine = !r.active
+      ? `${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Paused`
+      : awaitingConfirm
+        ? `${isIncomeRule?'+':''}${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Awaiting confirmation`
+        : `${isIncomeRule?'+':''}${formatINR(r.amount)} · ${recurringFrequencyLabel(r.frequency)} · Next ${dateLabel}`;
     const iconBg = cat ? cat.color+'22' : '#9088A822';
     const icon = cat ? cat.icon : (isIncomeRule ? '💰' : '🔁');
+    const alertBadge = r.highExpenseAlert ? ' <span style="font-size:10px;vertical-align:middle;">🔔</span>' : '';
     list.insertAdjacentHTML('beforeend', `
       <button type="button" class="settings-row" data-recurringid="${r.id}" style="margin-bottom:8px;">
         <span class="settings-row-icon" style="background:${iconBg};">${icon}</span>
         <div class="settings-row-info">
-          <p class="settings-row-title">${esc(r.name)}${isIncomeRule?' <span style="font-size:10px;background:rgba(46,196,182,.15);color:var(--mint);padding:1px 6px;border-radius:6px;font-weight:700;vertical-align:middle;">INCOME</span>':''}</p>
+          <p class="settings-row-title">${esc(r.name)}${isIncomeRule?' <span style="font-size:10px;background:rgba(46,196,182,.15);color:var(--mint);padding:1px 6px;border-radius:6px;font-weight:700;vertical-align:middle;">INCOME</span>':''}${alertBadge}</p>
           <span class="settings-row-sub">${esc(subLine)}</span>
         </div>
         <span class="settings-row-chevron">›</span>
@@ -5115,6 +5281,34 @@ function renderRecurringEditAccountRow(){
     btn.onclick=()=>{ state.mgrRecurringAccountId=btn.dataset.racct==='none'?null:btn.dataset.racct; renderRecurringEditAccountRow(); };
   });
 }
+function renderRecurringEditAutoAddRow(){
+  const row=document.getElementById('recurring-edit-autoadd-row'); row.innerHTML='';
+  [{v:true,label:'On'},{v:false,label:'Off'}].forEach(opt=>{
+    const selected=state.mgrRecurringAutoAdd===opt.v;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    row.insertAdjacentHTML('beforeend', `<button type="button" class="pay-chip" data-autoadd="${opt.v}" style="background:${bg};color:${color}">${opt.label}</button>`);
+  });
+  row.querySelectorAll('[data-autoadd]').forEach(btn=>{
+    btn.onclick=()=>{ state.mgrRecurringAutoAdd = btn.dataset.autoadd==='true'; renderRecurringEditAutoAddRow(); };
+  });
+}
+function renderRecurringEditAlertRow(){
+  const row=document.getElementById('recurring-edit-alert-row'); row.innerHTML='';
+  [{v:false,label:'Off'},{v:true,label:'On'}].forEach(opt=>{
+    const selected=state.mgrRecurringAlertEnabled===opt.v;
+    const bg = selected ? 'var(--grape)' : 'var(--surface)';
+    const color = selected ? 'white' : 'var(--ink)';
+    row.insertAdjacentHTML('beforeend', `<button type="button" class="pay-chip" data-alerton="${opt.v}" style="background:${bg};color:${color}">${opt.label}</button>`);
+  });
+  document.getElementById('recurring-edit-alert-days-wrap').classList.toggle('hidden', !state.mgrRecurringAlertEnabled);
+  row.querySelectorAll('[data-alerton]').forEach(btn=>{
+    btn.onclick=()=>{
+      state.mgrRecurringAlertEnabled = btn.dataset.alerton==='true';
+      renderRecurringEditAlertRow();
+    };
+  });
+}
 function openRecurringEdit(id){
   state.mgrEditingType='recurring';
   state.mgrEditingId=id;
@@ -5142,6 +5336,9 @@ function openRecurringEdit(id){
   state.mgrRecurringFrequency = existing ? existing.frequency : 'monthly';
   state.mgrRecurringGroupId = existing ? (existing.groupId || null) : null;
   state.mgrRecurringAccountId = existing ? (existing.accountId || null) : null;
+  state.mgrRecurringAutoAdd = existing ? (existing.autoAdd!==false) : true;
+  state.mgrRecurringAlertEnabled = existing ? !!existing.highExpenseAlert : false;
+  document.getElementById('recurring-edit-alert-days').value = existing && existing.alertDaysBefore ? existing.alertDaysBefore : 15;
   state.mgrRecurringCatGridExpanded = false;
   // Use cached usage counts if available; fetch async in background to update sort order
   getCategoryUsageCounts().then(counts=>{ state.catUsageCounts=counts; renderRecurringEditCatGrid(); }).catch(()=>{});
@@ -5149,6 +5346,8 @@ function openRecurringEdit(id){
   renderRecurringEditPayRow();
   renderRecurringEditGroupRow();
   renderRecurringEditAccountRow();
+  renderRecurringEditAutoAddRow();
+  renderRecurringEditAlertRow();
 
   // Frequency and start date only make sense to set once, at creation —
   // changing either after occurrences already exist would scramble the
@@ -5183,6 +5382,13 @@ async function saveRecurringEdit(){
   const endDate=document.getElementById('recurring-edit-end').value || null;
   const existing=state.mgrEditingId ? state.recurringRules.find(r=>r.id===state.mgrEditingId) : null;
 
+  // High-expense alert: validate days-before only while the toggle is on.
+  const alertEnabled=state.mgrRecurringAlertEnabled;
+  const alertDaysRaw=parseInt(document.getElementById('recurring-edit-alert-days').value, 10);
+  if(alertEnabled && (!Number.isFinite(alertDaysRaw) || alertDaysRaw<=0)){ toast('Enter how many days before to notify'); return; }
+  const alertDaysBefore=alertEnabled ? Math.min(Math.max(alertDaysRaw,1),60) : null;
+  const autoAdd=state.mgrRecurringAutoAdd;
+
   if(existing){
     existing.name=name; existing.amount=amount;
     existing.categoryId=isIncome ? null : state.mgrRecurringCategoryId;
@@ -5190,10 +5396,15 @@ async function saveRecurringEdit(){
     existing.paymentMethod=state.mgrRecurringPaymentId;
     existing.endDate=endDate; existing.groupId=state.mgrRecurringGroupId||null;
     existing.accountId=state.mgrRecurringAccountId||null;
+    existing.autoAdd=autoAdd;
+    existing.highExpenseAlert=alertEnabled;
+    existing.alertDaysBefore=alertDaysBefore;
+    if(!alertEnabled) existing.snoozedUntilISO=null; // stale snooze shouldn't linger once the alert itself is off
     if(existing.endDate && existing.nextDueISO>existing.endDate) existing.active=false;
     await DB.putRecurring(existing);
     closeRecurringEdit();
     renderRecurringScreen();
+    await renderActionsPill();
     toast(isIncome ? 'Recurring income updated' : 'Recurring expense updated');
   } else {
     const startDate=document.getElementById('recurring-edit-start').value || todayISO();
@@ -5206,12 +5417,14 @@ async function saveRecurringEdit(){
       frequency:state.mgrRecurringFrequency, startDate, endDate, nextDueISO:startDate, active:true, createdAt:Date.now(),
       groupId:state.mgrRecurringGroupId||null,
       accountId:state.mgrRecurringAccountId||null,
+      autoAdd, highExpenseAlert:alertEnabled, alertDaysBefore, snoozedUntilISO:null,
     };
     await DB.putRecurring(rule);
     state.recurringRules.push(rule);
-    await catchUpSingleRule(rule); // backfills immediately if startDate is today or in the past
+    await catchUpSingleRule(rule); // backfills immediately if startDate is today or in the past (no-op when autoAdd is false)
     closeRecurringEdit();
     renderRecurringScreen();
+    await renderActionsPill();
     toast(isIncome ? 'Recurring income added' : 'Recurring expense added');
   }
   await refreshAllExpenseViews();
@@ -7115,6 +7328,7 @@ async function openAddScreen(existing){
   state.recurringLinkedId = existing ? (existing.recurringId || null) : null;
   state.recurringEnabled = false;
   state.recurringFrequency = 'monthly';
+  state.markPaidRuleId = null; // any in-flight "Mark as paid" confirmation is stale once a normal add/edit opens
   state.activeOptKey = null; // always start collapsed — even when editing an expense that already has Warranty/Group/etc set (the mint dot on its chip signals that, no need to force it open)
 
   const isIncome = state.addMode === 'income';
@@ -7171,10 +7385,12 @@ async function saveExpense(){
       incomeCategoryId: state.selectedIncomeCategoryId,
       accountId: state.accountsEnabled ? (state.selectedAccountId||null) : null,
       date, note, attachmentIds:[],
+      recurringId: state.markPaidRuleId || null,
       createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
     };
     await DB.addExpense(income);
     if(state.accountsEnabled && state.selectedAccountId) Store.set('pt_last_account', state.selectedAccountId);
+    await finalizeMarkPaidIfNeeded();
     toast(isEdit ? 'Income updated ✓' : 'Income saved ✓');
     goToReturnScreen();
     return;
@@ -7273,6 +7489,7 @@ async function saveExpense(){
     createdAt: isEdit ? (state.editingExpense ? state.editingExpense.createdAt : Date.now()) : Date.now(),
   };
   await DB.addExpense(expense);
+  await finalizeMarkPaidIfNeeded();
 
   // Persist last used account for next Add screen open
   if(state.accountsEnabled && state.selectedAccountId){
@@ -7493,8 +7710,18 @@ document.getElementById('actions-sheet-overlay').addEventListener('click', (e) =
 });
 document.getElementById('actions-sheet-list').addEventListener('click', (e) => {
   const row=e.target.closest('[data-actionid]'); if(!row) return;
-  handleActionsSheetTap(row.dataset.actionid);
+  handleActionsSheetTap(row.dataset.action, row.dataset.ruleid || null);
 });
+document.getElementById('highexpense-detail-close-btn').addEventListener('click', closeHighExpenseDetailSheet);
+document.getElementById('highexpense-detail-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='highexpense-detail-overlay') closeHighExpenseDetailSheet();
+});
+document.getElementById('highexpense-detail-markpaid-btn').addEventListener('click', markHighExpenseAsPaidFromDetail);
+document.getElementById('highexpense-detail-snooze-row').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-snooze]'); if(!btn) return;
+  snoozeHighExpenseAlert(parseInt(btn.dataset.snooze,10));
+});
+document.getElementById('highexpense-detail-viewrule-btn').addEventListener('click', viewHighExpenseRule);
 document.getElementById('forecast-window-tabs').addEventListener('click', (e) => {
   const btn=e.target.closest('[data-forecastwindow]'); if(!btn) return;
   setForecastWindow(btn.dataset.forecastwindow);
