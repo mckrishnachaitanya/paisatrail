@@ -2,6 +2,16 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.17",
+      "date": "2026-07-03",
+      "highlights": [
+        "New: tap any account in the Accounts sheet (\ud83c\udfe6) to see its full transfer history \u2014 every transfer in and out, with direction, date, and amount",
+        "Editing an existing entry now locks the Expense/Income/Transfer switch so you can't accidentally change its type mid-edit",
+        "Fixed: editing a transfer showed \"Add transfer\" in the title instead of \"Edit transfer\"",
+        "Internal cleanup: consolidated two near-identical tab-switcher implementations into one, removed a small amount of dead code"
+      ]
+    },
+    {
       "version": "3.16",
       "date": "2026-07-03",
       "highlights": [

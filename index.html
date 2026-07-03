@@ -209,10 +209,6 @@ input{outline:none;}
 .section-title{font-family:var(--font-display);font-size:14px;}
 .section-link{font-size:11px;color:var(--grape);font-weight:700;}
 
-.home-tabs{display:flex;gap:4px;background:var(--chip);border-radius:16px;padding:4px;margin-bottom:18px;}
-.home-tab{flex:1;text-align:center;padding:9px 0;border-radius:13px;font-size:12px;font-weight:700;
-  color:var(--muted);transition:background .15s,color .15s;}
-.home-tab.active{background:var(--grape);color:#fff;}
 .warranty-status{font-family:var(--font-mono);font-size:10px;font-weight:700;padding:5px 10px;
   border-radius:20px;white-space:nowrap;flex-shrink:0;}
 .warranty-status.active{background:rgba(46,196,182,.16);color:var(--mint);}
@@ -435,9 +431,12 @@ input{outline:none;}
 .guide-section[open] .guide-section-summary::after{transform:rotate(90deg);}
 .guide-section-body{padding:0 14px 16px 50px;font-size:13px;line-height:1.5;color:var(--muted);white-space:pre-line;}
 
-/* Reusable segmented control — Bulk delete's mode switch today, Insights'
-   period/view switches later. Visually mirrors .home-tabs but kept
-   separate since that one's specifically Home's Overview/Warranties tab. */
+/* Reusable segmented control — used for every tab/mode switch in the app
+   (Home's Overview/Warranties/Forecast/Budgets, Bulk delete's mode switch,
+   Insights' period/view switches, Add screen's Expense/Income/Transfer,
+   etc). Previously Home had its own near-identical .home-tabs/.home-tab
+   pair; consolidated into this one (2026-07-03) since the two were
+   pixel-identical — Home's version just adds margin-bottom:18px inline. */
 .segmented-tabs{display:flex;gap:4px;background:var(--chip);border-radius:16px;padding:4px;}
 .segmented-tab{flex:1;text-align:center;padding:9px 0;border-radius:13px;font-size:12px;font-weight:700;
   color:var(--muted);transition:background .15s,color .15s;}
@@ -576,11 +575,11 @@ input{outline:none;}
       </div>
     </div>
 
-    <div class="home-tabs" id="home-tabs">
-      <button type="button" class="home-tab active" data-hometab="overview">Overview</button>
-      <button type="button" class="home-tab" data-hometab="warranties">Warranties</button>
-      <button type="button" class="home-tab" data-hometab="forecast">Forecast</button>
-      <button type="button" class="home-tab" data-hometab="budgets">Budgets</button>
+    <div class="segmented-tabs" id="home-tabs" style="margin-bottom:18px;">
+      <button type="button" class="segmented-tab active" data-hometab="overview">Overview</button>
+      <button type="button" class="segmented-tab" data-hometab="warranties">Warranties</button>
+      <button type="button" class="segmented-tab" data-hometab="forecast">Forecast</button>
+      <button type="button" class="segmented-tab" data-hometab="budgets">Budgets</button>
     </div>
 
     <!-- Overview sticky content: banners, onboarding, cashflow card, donut -->
@@ -1528,6 +1527,22 @@ input{outline:none;}
       <p style="font-size:14px;font-weight:700;color:var(--ink);">Net Worth</p>
       <p id="accounts-view-networth-value" style="font-family:var(--font-mono);font-size:16px;font-weight:700;"></p>
     </div>
+  </div>
+</div>
+
+<!-- ============================== ACCOUNT TRANSFER HISTORY SHEET ==============================
+     Opened by tapping an account row inside the Accounts view sheet (🏦). Shows every
+     transfer in/out of that specific account — the piece of Transfers Phase 2 that
+     didn't already exist (editing transfers turned out to already work via the
+     generic Add/Edit screen, verified 2026-07-03). -->
+<div id="account-transfers-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title" id="account-transfers-title">Transfers</p>
+      <button type="button" class="topbar-close" id="account-transfers-close-btn">✕</button>
+    </div>
+    <div id="account-transfers-list" style="margin-top:10px;"></div>
   </div>
 </div>
 
@@ -2966,7 +2981,7 @@ function applyHomeTabUI(){
   document.getElementById('home-overview-sticky').classList.toggle('hidden', !isOverview);
   // Non-overview tabs need their own scroll padding since sticky overview is hidden
   document.getElementById('home-scroll-body').style.paddingTop = isOverview ? '' : '12px';
-  document.querySelectorAll('#home-tabs .home-tab').forEach(btn=>{
+  document.querySelectorAll('#home-tabs .segmented-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.hometab===state.homeTab);
   });
 }
@@ -5874,8 +5889,6 @@ function requestDeleteBudget(){
 // pt_accounts_enabled: '1' = feature on, '0'/absent = feature off.
 // pt_accounts_had_data: '1' = user has previously set up accounts (used to detect re-enable).
 
-function isAccountsEnabled(){ return state.accountsEnabled; }
-
 // Called when Settings accounts toggle is tapped.
 async function handleAccountsToggle(){
   if(state.accountsEnabled){
@@ -6249,7 +6262,7 @@ async function renderAccountsViewSheet(){
     const maskedBal = state.incomeRevealed ? formatINR(Math.abs(bal)) : '₹••••••';
     const negPrefix = !isCc && bal<0 && state.incomeRevealed ? '-' : '';
     list.insertAdjacentHTML('beforeend', `
-      <div style="display:flex;align-items:center;justify-content:space-between;
+      <button type="button" data-acctid="${a.id}" style="display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;
                   padding:14px 16px;background:var(--surface);border-radius:16px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:12px;">
           <div style="width:40px;height:40px;border-radius:12px;flex-shrink:0;
@@ -6260,16 +6273,60 @@ async function renderAccountsViewSheet(){
             <p style="font-size:11px;color:var(--muted);margin-top:2px;">${isCc?'Credit Card':'Savings Account'}</p>
           </div>
         </div>
-        <div style="text-align:right;">
-          <p style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${balColor};">${negPrefix}${maskedBal}</p>
-          <p style="font-size:10px;color:var(--muted);margin-top:2px;">${balLabel}</p>
+        <div style="text-align:right;display:flex;align-items:center;gap:8px;">
+          <div>
+            <p style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${balColor};">${negPrefix}${maskedBal}</p>
+            <p style="font-size:10px;color:var(--muted);margin-top:2px;">${balLabel}</p>
+          </div>
+          <span class="settings-row-chevron">›</span>
         </div>
-      </div>`);
+      </button>`);
   });
   const nwEl=document.getElementById('accounts-view-networth-value');
   const maskedNW = state.incomeRevealed ? formatINR(Math.abs(netWorth)) : '₹••••••';
   nwEl.textContent = state.incomeRevealed ? ((netWorth>=0?'':'-')+maskedNW) : maskedNW;
   nwEl.style.color = netWorth>=0 ? 'var(--mint)' : 'var(--coral)';
+}
+
+// ---- Account transfer history sheet ----
+async function openAccountTransfersSheet(accountId){
+  const account=state.accounts.find(a=>a.id===accountId);
+  if(!account) return;
+  document.getElementById('account-transfers-title').textContent = `${account.name} — Transfers`;
+  await renderAccountTransfersSheet(account);
+  document.getElementById('account-transfers-overlay').classList.add('show');
+}
+function closeAccountTransfersSheet(){
+  document.getElementById('account-transfers-overlay').classList.remove('show');
+}
+async function renderAccountTransfersSheet(account){
+  const list=document.getElementById('account-transfers-list'); list.innerHTML='<p class="empty-hint" style="padding:8px 0;">Loading…</p>';
+  const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31'))
+    .filter(e => !pendingDeletes[e.id] && isTransferEntry(e) && (e.fromAccountId===account.id || e.toAccountId===account.id))
+    .sort((a,b)=> b.date.localeCompare(a.date) || (b.createdAt-a.createdAt));
+  list.innerHTML='';
+  if(all.length===0){
+    list.innerHTML='<p class="empty-hint">No transfers in or out of this account yet.</p>';
+    return;
+  }
+  all.forEach(t=>{
+    const isOut = t.fromAccountId===account.id;
+    const otherId = isOut ? t.toAccountId : t.fromAccountId;
+    const other=state.accounts.find(a=>a.id===otherId);
+    const dateLabel=new Date(t.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    const amtColor = isOut ? 'var(--coral)' : 'var(--mint)';
+    const amtPrefix = isOut ? '-' : '+';
+    const direction = isOut ? `To ${other?other.name:'?'}` : `From ${other?other.name:'?'}`;
+    list.insertAdjacentHTML('beforeend', `
+      <div class="recent-row" style="pointer-events:none;">
+        <div class="recent-icon" style="background:rgba(134,87,224,0.14);">⇄</div>
+        <div class="recent-info">
+          <p class="recent-title">${esc(t.note||'Transfer')}</p>
+          <span class="recent-pm">${esc(direction)} · ${dateLabel}</span>
+        </div>
+        <span class="recent-amt" style="color:${amtColor};">${amtPrefix}${formatINR(t.amount)}</span>
+      </div>`);
+  });
 }
 
 // ---- Bulk account assign ----
@@ -6708,15 +6765,28 @@ async function renderInsights(){
 }
 
 /* ============================== ADD EXPENSE ============================== */
+// Single source of truth for the Add screen's title + save button text —
+// depends only on state.addMode and whether state.editingExpenseId is set.
+// Previously this logic was duplicated 3x (openAddScreen, renderAddModeUI,
+// the type-toggle click handler) with each copy missing a different case
+// (openAddScreen's version didn't handle transfer at all; renderAddModeUI's
+// version didn't handle edit at all) — editing a transfer visibly showed
+// "Add transfer" as a result. Called from renderAddModeUI so both the
+// initial open and every mode-toggle tap stay correct automatically.
+const ADD_SCREEN_TYPE_LABELS = { expense:'expense', income:'income', transfer:'transfer' };
+function updateAddScreenTitleAndSaveBtn(){
+  const label = ADD_SCREEN_TYPE_LABELS[state.addMode] || 'expense';
+  const isEdit = !!state.editingExpenseId;
+  document.getElementById('add-screen-title').textContent = isEdit ? `Edit ${label}` : `Add ${label}`;
+  document.getElementById('add-save-btn').textContent = isEdit ? 'Save changes' : `Save ${label}`;
+}
 // Single function that re-renders everything on the Add screen that depends
 // on whether we're in expense or income mode. Called on open and on toggle.
 function renderAddModeUI(){
   const isIncome = state.addMode === 'income';
   const isTransfer = state.addMode === 'transfer';
 
-  // Title
-  document.getElementById('add-screen-title').textContent =
-    isTransfer ? 'Add transfer' : isIncome ? 'Add income' : 'Add expense';
+  updateAddScreenTitleAndSaveBtn();
 
   // Transfer-specific fields
   document.getElementById('add-transfer-section').classList.toggle('hidden', !isTransfer);
@@ -7332,16 +7402,21 @@ async function openAddScreen(existing){
   state.activeOptKey = null; // always start collapsed — even when editing an expense that already has Warranty/Group/etc set (the mint dot on its chip signals that, no need to force it open)
 
   const isIncome = state.addMode === 'income';
-  document.getElementById('add-screen-title').textContent = existing ? (isIncome ? 'Edit income' : 'Edit expense') : (isIncome ? 'Add income' : 'Add expense');
-  document.getElementById('add-save-btn').textContent = existing ? 'Save changes' : (isIncome ? 'Save income' : 'Save expense');
   document.getElementById('add-delete-btn').classList.toggle('hidden', !existing);
   document.getElementById('add-amount').value = existing ? existing.amount : '';
   document.getElementById('add-note').value = existing ? (existing.note || '') : '';
   document.getElementById('add-date').value = existing ? existing.date : todayISO();
-  // Sync the Expense/Income toggle to the current mode
-  document.querySelectorAll('#add-type-toggle .segmented-tab').forEach(btn => {
+  // Sync the Expense/Income/Transfer toggle to the current mode — locked
+  // read-only while editing an existing entry, same reasoning as the
+  // recurring-rule type lock: converting an entry's type mid-edit (e.g. a
+  // transfer, which carries fromAccountId/toAccountId instead of a
+  // category) is confusing and semantically messy, not a real use case.
+  const typeToggle = document.getElementById('add-type-toggle');
+  typeToggle.querySelectorAll('.segmented-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.addtype === state.addMode);
   });
+  typeToggle.style.pointerEvents = existing ? 'none' : '';
+  typeToggle.style.opacity = existing ? '0.5' : '';
   renderAddModeUI();
   showScreen('add-screen');
 }
@@ -7552,12 +7627,6 @@ document.getElementById('add-type-toggle').addEventListener('click', (e) => {
     return;
   }
   state.addMode=newMode;
-  const isTransfer=newMode==='transfer';
-  const isIncome=newMode==='income';
-  const titleMap={expense:'Add expense',income:'Add income',transfer:'Add transfer'};
-  const editTitleMap={expense:'Edit expense',income:'Edit income',transfer:'Edit transfer'};
-  document.getElementById('add-screen-title').textContent = state.editingExpenseId ? editTitleMap[newMode] : titleMap[newMode];
-  document.getElementById('add-save-btn').textContent = state.editingExpenseId ? 'Save changes' : (isTransfer?'Save transfer':isIncome?'Save income':'Save expense');
   document.querySelectorAll('#add-type-toggle .segmented-tab').forEach(b => b.classList.toggle('active', b.dataset.addtype===newMode));
   renderAddModeUI();
 });
@@ -7695,7 +7764,7 @@ document.getElementById('txn-filter-split-status-tabs').addEventListener('click'
 });
 
 document.getElementById('home-tabs').addEventListener('click', (e) => {
-  const btn=e.target.closest('.home-tab'); if(!btn) return;
+  const btn=e.target.closest('.segmented-tab'); if(!btn) return;
   setHomeTab(btn.dataset.hometab);
 });
 ACTIONS_PILL_IDS.forEach(id=>{
@@ -8287,6 +8356,14 @@ document.getElementById('acct-addpm-cancel-btn').addEventListener('click', ()=>{
 document.getElementById('accounts-view-close-btn').addEventListener('click', closeAccountsViewSheet);
 document.getElementById('accounts-view-overlay').addEventListener('click', (e)=>{
   if(e.target.id==='accounts-view-overlay') closeAccountsViewSheet();
+});
+document.getElementById('accounts-view-list').addEventListener('click', (e) => {
+  const row=e.target.closest('[data-acctid]'); if(!row) return;
+  openAccountTransfersSheet(row.dataset.acctid);
+});
+document.getElementById('account-transfers-close-btn').addEventListener('click', closeAccountTransfersSheet);
+document.getElementById('account-transfers-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='account-transfers-overlay') closeAccountTransfersSheet();
 });
 
 // Re-enable warning
