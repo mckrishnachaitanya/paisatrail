@@ -4388,7 +4388,7 @@ const CloudBackup={
     return match ? match.id : null;
   },
 
-  async runBackup(includeAllAttachments){
+  async runBackup(includeAllAttachments, isManual){
     this.syncing=true;
     renderCloudStatusIcons();
     try{
@@ -4408,9 +4408,13 @@ const CloudBackup={
       await this.uploadBackup(payload, filename);
       await this.pruneOldBackups(existingTodayId);
       Store.set('pt_drive_last_backup', String(Date.now()));
+      Store.set('pt_drive_last_backup_mode', isManual ? 'manual' : 'auto');
       Store.set('pt_drive_last_error', '');
     } catch(err){
-      if(err && err.code!=='NOTHING_TO_BACK_UP'){ Store.set('pt_drive_last_error', '1'); }
+      if(err && err.code!=='NOTHING_TO_BACK_UP'){
+        Store.set('pt_drive_last_error', '1');
+        Store.set('pt_drive_last_error_at', String(Date.now()));
+      }
       throw err;
     } finally {
       this.syncing=false;
@@ -4468,10 +4472,20 @@ function renderDriveSettingsRow(){
   const sub=document.getElementById('settings-drive-sub');
   if(connected){
     sub.textContent='Connected — backs up automatically once a day';
-    const last=parseInt(Store.get('pt_drive_last_backup')||'0',10);
-    document.getElementById('settings-drive-lastbackup-sub').textContent = last
-      ? `Includes all attachments · Last backup ${new Date(last).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}`
-      : 'Includes all attachments';
+    const subEl=document.getElementById('settings-drive-lastbackup-sub');
+    const hadError=Store.get('pt_drive_last_error')==='1';
+    if(hadError){
+      const failedAt=parseInt(Store.get('pt_drive_last_error_at')||'0',10);
+      subEl.textContent = failedAt
+        ? `Backup failed ${new Date(failedAt).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})} — tap to retry`
+        : 'Backup failed — tap to retry';
+    } else {
+      const last=parseInt(Store.get('pt_drive_last_backup')||'0',10);
+      const mode=Store.get('pt_drive_last_backup_mode')==='manual' ? 'Manual' : 'Automatic';
+      subEl.textContent = last
+        ? `Includes all attachments · Last backup ${new Date(last).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})} · ${mode}`
+        : 'Includes all attachments';
+    }
   } else {
     sub.textContent='Automatically save your data to Google Drive';
   }
@@ -4585,7 +4599,7 @@ async function handleDriveConnectClick(){
     if(expenseCount===0){
       await offerDriveRestoreIfBackupExists();
     } else {
-      CloudBackup.runBackup(false).then(renderDriveSettingsRow).catch(()=>{});
+      CloudBackup.runBackup(false, false).then(renderDriveSettingsRow).catch(()=>{});
     }
   } catch(err){
     toast('Could not connect to Google Drive');
@@ -4623,7 +4637,7 @@ async function confirmDriveBackupNow(){
   subEl.textContent='Backing up… don\u2019t close the app';
   btn.style.opacity='0.6';
   try{
-    await CloudBackup.runBackup(true);
+    await CloudBackup.runBackup(true, true);
     toast('Backup complete');
   } catch(err){
     toast(err && err.code==='NOTHING_TO_BACK_UP' ? 'Nothing to back up yet — add an expense first' : 'Backup failed — please try again');
@@ -4675,7 +4689,7 @@ async function checkDriveOnOpen(){
   }
   const last=parseInt(Store.get('pt_drive_last_backup')||'0',10);
   if(Date.now() - last > DRIVE_AUTO_INTERVAL_MS){
-    CloudBackup.runBackup(false).then(renderDriveSettingsRow).catch(()=>{});
+    CloudBackup.runBackup(false, false).then(renderDriveSettingsRow).catch(()=>{});
   }
 }
 
@@ -7635,12 +7649,17 @@ document.getElementById('home-whatsnew-banner').addEventListener('click', openWh
 });
 
 // Cloud status icon — tappable, jumps to Settings → Cloud Backup section.
-// Only visible when Drive is connected (see renderCloudStatusIcons).
+// Only visible when Drive is connected (see renderCloudStatusIcons). If the
+// last attempt failed, skip the extra confirm dialog and retry immediately —
+// the user already knows why they're here (usually a stale token needing
+// re-auth), so confirmDriveBackupNow's own getToken(false)->getToken(true)
+// fallback surfaces the sign-in popup directly.
 ['home-cloud-btn','txn-cloud-btn','stats-cloud-btn'].forEach(id => {
   const btn=document.getElementById(id);
   if(btn) btn.addEventListener('click', () => {
     showScreen('settings-screen');
     setTimeout(()=>{ document.getElementById('settings-drive-connect-btn').scrollIntoView({behavior:'smooth'}); }, 300);
+    if(Store.get('pt_drive_last_error')==='1') confirmDriveBackupNow();
   });
 });
 
