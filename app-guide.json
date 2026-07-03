@@ -2,6 +2,13 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.21",
+      "date": "2026-07-03",
+      "highlights": [
+        "Fixed: Home screen content (Recent list, Warranties, Forecast, Budgets) was inset 20px further than the tab bar above it on both sides \u2014 a leftover double-padding bug. Everything now lines up edge-to-edge with the tabs"
+      ]
+    },
+    {
       "version": "3.20",
       "date": "2026-07-03",
       "highlights": [

@@ -168,7 +168,7 @@ input{outline:none;}
 #home-body{padding:0 20px 28px;}
 .home-header{display:flex;align-items:center;justify-content:space-between;margin:8px 0 16px;}
 #home-sticky-top{flex-shrink:0;background:var(--paper);padding:0 20px;}
-#home-scroll-body{flex:1;overflow-y:auto;padding:0 20px 100px;} /* isolation:isolate removed 2026-07-01, moved to .recent-row — see its comment */
+#home-scroll-body{flex:1;overflow-y:auto;padding:0 0 100px;} /* isolation:isolate removed 2026-07-01, moved to .recent-row — see its comment. Horizontal padding removed 2026-07-03: #home-body (its only child) already applies 0 20px, so this was double-padding the Recent list to 40px each side while #home-sticky-top only applies 20px — rows were visibly inset vs. the tab bar above them. */
 #home-panel-overview{padding-top:4px;}
 #home-overview-sticky.hidden{display:none;}
 .greeting{font-family:var(--font-display);font-size:17px;}
