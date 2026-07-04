@@ -2,6 +2,13 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.23",
+      "date": "2026-07-04",
+      "highlights": [
+        "Insights view tabs (Categories/Compare/Payment/Groups/Trend) now scroll sideways instead of squeezing 5 labels into one row \u2014 tap Trend and it scrolls fully into view"
+      ]
+    },
+    {
       "version": "3.22",
       "date": "2026-07-04",
       "highlights": [

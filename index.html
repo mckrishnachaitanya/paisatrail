@@ -454,6 +454,17 @@ input{outline:none;}
 .segmented-tab{flex:1;text-align:center;padding:9px 0;border-radius:13px;font-size:12px;font-weight:700;
   color:var(--muted);transition:background .15s,color .15s;}
 .segmented-tab.active{background:var(--grape);color:#fff;}
+/* Insights view-tabs only (5 items: Categories/Compare/Payment/Groups/Trend) —
+   equal-width flex like every other segmented-tabs row would squeeze each
+   label into ~60px, too tight for "Categories"/"Compare" at this weight.
+   Scoped to this one id rather than changing the shared .segmented-tab rule,
+   so every other segmented-tabs row in the app (Home, filters, etc) keeps its
+   original equal-width behavior. Note: no -webkit-overflow-scrolling:touch
+   here — that property was deliberately removed elsewhere as part of the
+   tablet rendering fix, don't reintroduce it. */
+#ins-view-tabs{overflow-x:auto;justify-content:flex-start;}
+#ins-view-tabs::-webkit-scrollbar{display:none;}
+#ins-view-tabs .segmented-tab{flex:none;padding:9px 16px;white-space:nowrap;}
 
 /* ============================== BULK DELETE ============================== */
 .danger-btn{width:100%;padding:15px;border-radius:18px;background:var(--coral);color:#fff;
@@ -6586,7 +6597,11 @@ function stepInsightsPeriod(dir){
 function setInsightsView(view){
   state.insView=view;
   document.querySelectorAll('#ins-view-tabs .segmented-tab').forEach(btn=>{
-    btn.classList.toggle('active', btn.dataset.insview===view);
+    const isActive=btn.dataset.insview===view;
+    btn.classList.toggle('active', isActive);
+    // Row scrolls horizontally now (5 tabs won't all fit) — make sure
+    // tapping a tab that's partially off-screen brings it fully into view.
+    if(isActive) btn.scrollIntoView({behavior:'smooth', block:'nearest', inline:'nearest'});
   });
   document.getElementById('ins-categories-panel').classList.toggle('hidden', view!=='categories');
   document.getElementById('ins-compare-panel').classList.toggle('hidden', view!=='compare');
