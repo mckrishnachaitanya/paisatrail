@@ -340,6 +340,18 @@ input{outline:none;}
 .pay-chip{display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:20px;
   background:var(--surface);font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0;}
 
+/* Insights → Trend bar chart. Fixed-height flex row so bar heights are a
+   simple percentage of a known container height; horizontal scroll kicks in
+   naturally once min-width * count exceeds the screen (12-cycle view). */
+.trend-chart{display:flex;align-items:flex-end;gap:10px;height:150px;padding:0 2px 4px;overflow-x:auto;}
+.trend-chart::-webkit-scrollbar{display:none;}
+.trend-bar-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+  flex:1;min-width:34px;height:100%;gap:6px;}
+.trend-bar-val{font-size:10px;font-weight:700;color:var(--muted);white-space:nowrap;}
+.trend-bar{width:100%;max-width:28px;border-radius:8px 8px 4px 4px;background:var(--grape);min-height:4px;}
+.trend-bar-col.selected .trend-bar{background:var(--coral);}
+.trend-bar-label{font-size:11px;font-weight:700;color:var(--ink);white-space:nowrap;}
+
 .warranty-toggle-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
   padding:13px;border-radius:18px;border:2px dashed var(--border);font-size:13px;font-weight:700;
   color:var(--ink);}
@@ -936,6 +948,7 @@ input{outline:none;}
       <button type="button" class="segmented-tab" data-insview="compare">Compare</button>
       <button type="button" class="segmented-tab" data-insview="payment">Payment</button>
       <button type="button" class="segmented-tab" data-insview="groups">Groups</button>
+      <button type="button" class="segmented-tab" data-insview="trend">Trend</button>
     </div>
     <!-- Group chips — sticky, shown only when Groups view active -->
     <div id="ins-groups-chip-bar" class="hidden" style="padding:8px 0 4px;">
@@ -950,6 +963,11 @@ input{outline:none;}
     </div>
     <div id="ins-payment-panel" class="hidden" style="margin-top:16px;"></div>
     <div id="ins-groups-panel" class="hidden" style="margin-top:16px;"></div>
+    <div id="ins-trend-panel" class="hidden" style="margin-top:16px;">
+      <div class="pay-row" id="ins-trend-lookback-row" style="margin-bottom:14px;"></div>
+      <div class="trend-chart" id="ins-trend-chart"></div>
+      <div id="ins-trend-drilldown" style="margin-top:18px;"></div>
+    </div>
   </div>
   <div class="bottom-nav">
     <div class="nav-item" data-nav="home"><span>🏠</span><span class="nav-label">Home</span></div>
@@ -1863,6 +1881,15 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&am
 function genId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function todayISO(){ const d=new Date(); const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); }
 function formatINR(n){ const num=Number(n)||0; return '₹' + num.toLocaleString('en-IN',{maximumFractionDigits:2}); }
+// Compact form for tight spaces like Trend bar-chart labels (₹12.3k, ₹4.5L,
+// ₹1.2Cr) — formatINR's full digit-grouped form is too wide for a 34px column.
+function formatCompactINR(n){
+  const num=Number(n)||0;
+  if(num>=10000000) return '₹'+(num/10000000).toFixed(num>=100000000?0:1).replace(/\.0$/,'')+'Cr';
+  if(num>=100000) return '₹'+(num/100000).toFixed(num>=1000000?0:1).replace(/\.0$/,'')+'L';
+  if(num>=1000) return '₹'+(num/1000).toFixed(num>=10000?0:1).replace(/\.0$/,'')+'k';
+  return '₹'+Math.round(num);
+}
 function maskIncome(n){ return state.incomeRevealed ? formatINR(n) : '₹••••••'; }
 function splitTitlePrefix(e){ return (e.splitTotal!=null) ? '✂️ ' : ''; }
 function addMonthsISO(dateISO, months){
@@ -2361,9 +2388,11 @@ const state = {
   insPeriodType:'month',     // 'week'|'month'|'year'|'custom' — persists across navigation, like state.homeTab
   insStartISO:cycleBounds(todayISO()).startISO, // current period's bounds (inclusive) — only recomputed when the user steps/changes type, never reset on nav
   insEndISO:cycleBounds(todayISO()).endISO,
-  insView:'categories',      // 'categories'|'compare'|'payment'|'groups' — which Insights sub-view is showing; persists across navigation
+  insView:'categories',      // 'categories'|'compare'|'payment'|'groups'|'trend' — which Insights sub-view is showing; persists across navigation
   insCompareCategoryId:null, // selected category for Compare — lazily defaults to the first category the first time Compare is viewed, then persists
   insSelectedGroupId:null,   // selected group for the Groups view — persists once chosen, no lazy default (there may be no groups yet)
+  insTrendCycles:6,          // 3|6|12 — how many recent cycles the Trend bar chart shows; persists like forecastLookbackDays
+  insTrendSelectedISO:null,  // startISO of the cycle currently drilled into on the Trend chart — null until first render picks the latest cycle
   mgrEditingType:null,   // 'category'|'paymentMethod' — which manager sheet is open, null when closed
   mgrEditingId:null,     // id being edited in the open category/payment-method sheet, null when adding a new one
   mgrSelectedIcon:null,  // icon chosen in the open sheet
@@ -6564,7 +6593,15 @@ function setInsightsView(view){
   document.getElementById('ins-payment-panel').classList.toggle('hidden', view!=='payment');
   document.getElementById('ins-groups-panel').classList.toggle('hidden', view!=='groups');
   document.getElementById('ins-groups-chip-bar').classList.toggle('hidden', view!=='groups');
-  applyInsightsPeriodTypeUI();
+  document.getElementById('ins-trend-panel').classList.toggle('hidden', view!=='trend');
+  // Trend always spans multiple cycles by definition, so the Week/Month/Year/
+  // Custom period controls (built for a single-period view) don't apply —
+  // hide them rather than leaving a control on screen that Trend ignores.
+  const isTrend=view==='trend';
+  document.getElementById('ins-period-type-tabs').classList.toggle('hidden', isTrend);
+  document.getElementById('ins-period-stepper').classList.toggle('hidden', isTrend || state.insPeriodType==='custom');
+  document.getElementById('ins-custom-range').classList.toggle('hidden', isTrend || state.insPeriodType!=='custom');
+  if(!isTrend) applyInsightsPeriodTypeUI();
   renderInsights();
 }
 
@@ -6757,6 +6794,96 @@ async function renderInsightsGroupsPanel(){
   }
   container.innerHTML=`<div style="margin-top:4px;">${resultHTML}</div>`;
 }
+// Sum of expenses in a range — same exclusions used everywhere else
+// (income never counted, recon adjustments never counted, pending local
+// deletes never counted). Deliberately doesn't group by category; Trend's
+// bar chart only needs one number per cycle, category breakdown is a
+// separate drill-in fetch only for whichever single bar is selected.
+async function getExpenseTotalForPeriod(startISO, endISO){
+  const expenses=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e));
+  return expenses.reduce((s,e)=>s+Number(e.amount),0);
+}
+function setInsightsTrendCycles(n){
+  state.insTrendCycles=n;
+  state.insTrendSelectedISO=null; // re-pick the latest cycle for the new window on next render
+  renderInsightsTrendPanel();
+}
+async function renderInsightsTrendPanel(){
+  const lookbackRow=document.getElementById('ins-trend-lookback-row');
+  lookbackRow.innerHTML=[3,6,12].map(n=>{
+    const selected=n===state.insTrendCycles;
+    const bg=selected?'var(--grape)':'var(--surface)';
+    const color=selected?'white':'var(--ink)';
+    return `<button type="button" class="pay-chip" data-trend-cycles="${n}" style="background:${bg};color:${color}">Last ${n}</button>`;
+  }).join('');
+  lookbackRow.querySelectorAll('[data-trend-cycles]').forEach(btn=>{
+    btn.addEventListener('click', ()=> setInsightsTrendCycles(Number(btn.dataset.trendCycles)));
+  });
+
+  // Oldest-to-newest so the chart reads left-to-right chronologically,
+  // ending with the current (possibly in-progress) cycle on the right.
+  const n=state.insTrendCycles;
+  const cycles=[];
+  for(let i=n-1;i>=0;i--){
+    const bounds = i===0 ? cycleBounds(todayISO()) : cyclesAgoBounds(i);
+    cycles.push(bounds);
+  }
+  const totals=await Promise.all(cycles.map(b=>getExpenseTotalForPeriod(b.startISO, b.endISO)));
+  const maxTotal=Math.max(...totals, 1); // avoid divide-by-zero when every cycle is empty
+
+  // Keep the previous selection if it's still one of the visible bars
+  // (e.g. user just re-picked the same cycle count), otherwise default to
+  // the most recent cycle — that's almost always what someone opening this
+  // view wants to see first.
+  if(!state.insTrendSelectedISO || !cycles.some(c=>c.startISO===state.insTrendSelectedISO)){
+    state.insTrendSelectedISO=cycles[cycles.length-1].startISO;
+  }
+
+  const chart=document.getElementById('ins-trend-chart');
+  chart.innerHTML=cycles.map((b,i)=>{
+    const total=totals[i];
+    const heightPct=Math.max((total/maxTotal)*100, total>0?4:2);
+    const label=new Date(b.startISO+'T00:00:00').toLocaleDateString('en-IN',{month:'short'});
+    const selected=b.startISO===state.insTrendSelectedISO;
+    return `
+      <div class="trend-bar-col${selected?' selected':''}" data-trend-idx="${i}">
+        <span class="trend-bar-val">${total>0?formatCompactINR(total):''}</span>
+        <div class="trend-bar" style="height:${heightPct}%;"></div>
+        <span class="trend-bar-label">${esc(label)}</span>
+      </div>`;
+  }).join('');
+  chart.querySelectorAll('[data-trend-idx]').forEach(col=>{
+    col.addEventListener('click', ()=>{
+      state.insTrendSelectedISO=cycles[Number(col.dataset.trendIdx)].startISO;
+      renderInsightsTrendPanel();
+    });
+  });
+
+  // Drill-in: category breakdown for whichever single cycle is selected —
+  // no previous-period comparison here, Compare already covers that job.
+  const selIdx=cycles.findIndex(c=>c.startISO===state.insTrendSelectedISO);
+  const selBounds=cycles[selIdx];
+  const selLabel=formatPeriodLabel('month', selBounds.startISO, selBounds.endISO);
+  const catTotals=await getCategoryTotalsForPeriod(selBounds.startISO, selBounds.endISO);
+  const rows=Object.entries(catTotals).filter(([,amt])=>amt>0).map(([catId,amt])=>{
+    const cat=state.categories.find(c=>c.id===catId);
+    return { name: cat?cat.name:'Other', icon: cat?cat.icon:'❔', color: cat?cat.color:'#9088A8', amount:amt };
+  }).sort((a,b)=>b.amount-a.amount);
+
+  const drilldown=document.getElementById('ins-trend-drilldown');
+  if(rows.length===0){
+    drilldown.innerHTML=`<p class="empty-hint">No expenses in ${esc(selLabel)}.</p>`;
+    return;
+  }
+  const grandTotal=rows.reduce((s,r)=>s+r.amount,0);
+  drilldown.innerHTML = `<p class="spend-count" style="margin:0 0 12px;color:var(--muted);">${formatINR(grandTotal)} total in ${esc(selLabel)}</p>` +
+    rows.map(r=>`
+      <div class="ins-cat-row">
+        <div class="ins-cat-icon" style="background:${r.color}22">${r.icon}</div>
+        <div class="ins-cat-info"><p class="ins-cat-name">${esc(r.name)}</p></div>
+        <p class="ins-cat-amt">${formatINR(r.amount)}</p>
+      </div>`).join('');
+}
 async function renderInsights(){
   document.getElementById('ins-period-label').textContent = formatPeriodLabel(state.insPeriodType, state.insStartISO, state.insEndISO);
   document.getElementById('ins-next-btn').disabled = state.insPeriodType!=='custom' && state.insEndISO>=todayISO();
@@ -6764,6 +6891,7 @@ async function renderInsights(){
   else if(state.insView==='compare'){ renderInsightsCompareCatGrid(); await renderInsightsCompareResult(); }
   else if(state.insView==='payment') await renderInsightsPaymentPanel();
   else if(state.insView==='groups') await renderInsightsGroupsPanel();
+  else if(state.insView==='trend') await renderInsightsTrendPanel();
 }
 
 /* ============================== ADD EXPENSE ============================== */

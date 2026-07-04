@@ -2,6 +2,14 @@
   "version": 1,
   "releaseNotes": [
     {
+      "version": "3.22",
+      "date": "2026-07-04",
+      "highlights": [
+        "New Insights → Trend view: bar chart of your spending over the last 3, 6, or 12 cycles, so you can see whether spending is going up or down over time",
+        "Tap any bar in the Trend chart to see that cycle's category breakdown"
+      ]
+    },
+    {
       "version": "3.21",
       "date": "2026-07-03",
       "highlights": [
@@ -265,7 +273,7 @@
       "id": "insights",
       "icon": "📊",
       "title": "Insights",
-      "body": "Dig into your spending patterns — by category, by payment method, by group, or by comparing one period to another, like this week vs last week, or this month vs last month. All four views (Categories, Compare, Payment, Groups) share the same Week / Month / Year / Custom period selector and stepper, so you can scope any view to any period and step through history."
+      "body": "Dig into your spending patterns — by category, by payment method, by group, or by comparing one period to another, like this week vs last week, or this month vs last month. Categories, Compare, Payment, and Groups share the same Week / Month / Year / Custom period selector and stepper, so you can scope any view to any period and step through history. Trend is different — it shows a bar chart of your total spending across your last 3, 6, or 12 cycles in one view, so you can see whether spending is trending up or down over time; tap any bar to see that cycle's category breakdown."
     },
     {
       "id": "settings",
