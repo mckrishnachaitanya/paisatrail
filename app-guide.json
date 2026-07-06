@@ -1,6 +1,14 @@
 {
-  "version": "3.24",
+  "version": "3.25",
   "releaseNotes": [
+    {
+      "version": "3.25",
+      "date": "2026-07-06",
+      "highlights": [
+        "Under-the-hood cleanup — removed leftover styling from retired features, keeping the app lean",
+        "Slightly faster first launch — fonts now begin downloading earlier"
+      ]
+    },
     {
       "version": "3.24",
       "date": "2026-07-06",
