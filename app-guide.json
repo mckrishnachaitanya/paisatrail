@@ -1,11 +1,19 @@
 {
-  "version": 1,
+  "version": "3.24",
   "releaseNotes": [
+    {
+      "version": "3.24",
+      "date": "2026-07-06",
+      "highlights": [
+        "Fixed the tablet rendering issue where large background areas could go blank or flicker — hidden pop-up sheets no longer weigh on the display even when closed",
+        "Sheets and confirmation pop-ups open and close with the same smooth fade as before"
+      ]
+    },
     {
       "version": "3.23",
       "date": "2026-07-04",
       "highlights": [
-        "Insights view tabs (Categories/Compare/Payment/Groups/Trend) now scroll sideways instead of squeezing 5 labels into one row \u2014 tap Trend and it scrolls fully into view"
+        "Insights view tabs (Categories/Compare/Payment/Groups/Trend) now scroll sideways instead of squeezing 5 labels into one row — tap Trend and it scrolls fully into view"
       ]
     },
     {
@@ -20,35 +28,35 @@
       "version": "3.21",
       "date": "2026-07-03",
       "highlights": [
-        "Fixed: Home screen content (Recent list, Warranties, Forecast, Budgets) was inset 20px further than the tab bar above it on both sides \u2014 a leftover double-padding bug. Everything now lines up edge-to-edge with the tabs"
+        "Fixed: Home screen content (Recent list, Warranties, Forecast, Budgets) was inset 20px further than the tab bar above it on both sides — a leftover double-padding bug. Everything now lines up edge-to-edge with the tabs"
       ]
     },
     {
       "version": "3.20",
       "date": "2026-07-03",
       "highlights": [
-        "Fixed a rare glitch where the Home category legend could render empty even though the chart above it showed data correctly \u2014 a nested flex+scroll layout quirk on some Android devices"
+        "Fixed a rare glitch where the Home category legend could render empty even though the chart above it showed data correctly — a nested flex+scroll layout quirk on some Android devices"
       ]
     },
     {
       "version": "3.19",
       "date": "2026-07-03",
       "highlights": [
-        "Fixed: the Home category legend's scroll cap wasn't actually kicking in (v3.18's height estimate was too generous) \u2014 now correctly shows 5 rows and scrolls for the rest"
+        "Fixed: the Home category legend's scroll cap wasn't actually kicking in (v3.18's height estimate was too generous) — now correctly shows 5 rows and scrolls for the rest"
       ]
     },
     {
       "version": "3.18",
       "date": "2026-07-03",
       "highlights": [
-        "Home overview: the category legend now lists every category the donut chart shows, not just the top 5 \u2014 scrolls if there are more than 5"
+        "Home overview: the category legend now lists every category the donut chart shows, not just the top 5 — scrolls if there are more than 5"
       ]
     },
     {
       "version": "3.17",
       "date": "2026-07-03",
       "highlights": [
-        "New: tap any account in the Accounts sheet (\ud83c\udfe6) to see its full transfer history \u2014 every transfer in and out, with direction, date, and amount",
+        "New: tap any account in the Accounts sheet (🏦) to see its full transfer history — every transfer in and out, with direction, date, and amount",
         "Editing an existing entry now locks the Expense/Income/Transfer switch so you can't accidentally change its type mid-edit",
         "Fixed: editing a transfer showed \"Add transfer\" in the title instead of \"Edit transfer\"",
         "Internal cleanup: consolidated two near-identical tab-switcher implementations into one, removed a small amount of dead code"
@@ -60,9 +68,9 @@
       "highlights": [
         "High expense alerts: flag any recurring rule (school fees, insurance premiums) to get an Actions pill nudge a configurable number of days before it's due",
         "New Quarterly option for recurring transactions, alongside Weekly/Monthly/Yearly",
-        "Auto-add on due date can now be turned off per rule \u2014 useful for bills with a grace period, where the app shouldn't assume you've paid just because the date arrived. Confirm manually via \"Mark as paid\" from the Actions sheet whenever you actually pay",
+        "Auto-add on due date can now be turned off per rule — useful for bills with a grace period, where the app shouldn't assume you've paid just because the date arrived. Confirm manually via \"Mark as paid\" from the Actions sheet whenever you actually pay",
         "High expense alert rows in the Actions sheet can be snoozed (1 day / 3 days / 1 week) without leaving the sheet or affecting other pending items",
-        "Forecast still counts an unconfirmed high-expense bill as a projected cost \u2014 it only becomes a logged actual once you mark it paid"
+        "Forecast still counts an unconfirmed high-expense bill as a projected cost — it only becomes a logged actual once you mark it paid"
       ]
     },
     {
@@ -77,23 +85,23 @@
       "version": "3.14",
       "date": "2026-07-02",
       "highlights": [
-        "Fixed: warranty and backup reminders were showing both as a standalone Home banner AND in the new Actions pill at the same time \u2014 they now only appear in the Actions pill"
+        "Fixed: warranty and backup reminders were showing both as a standalone Home banner AND in the new Actions pill at the same time — they now only appear in the Actions pill"
       ]
     },
     {
       "version": "3.13",
       "date": "2026-07-02",
       "highlights": [
-        "Income categories are now fully customizable \u2014 add your own (like Interest or Refunds) right from the income picker with a tap on \"Add new\", or manage them from Settings \u2192 Manage categories using the new Expense/Income toggle",
+        "Income categories are now fully customizable — add your own (like Interest or Refunds) right from the income picker with a tap on \"Add new\", or manage them from Settings → Manage categories using the new Expense/Income toggle",
         "The 7 built-in income categories (Salary, Freelance, Business, Rental, Gift, Investment, Other) can now be renamed, recolored, or deleted too",
-        "Deleting a category never deletes your past entries \u2014 they just become unlinked, same as expense categories always worked"
+        "Deleting a category never deletes your past entries — they just become unlinked, same as expense categories always worked"
       ]
     },
     {
       "version": "3.12",
       "date": "2026-07-02",
       "highlights": [
-        "New: an Actions pill in the top bar (visible on Home, List, Insights, and Settings) shows everything that needs your attention in one place \u2014 warranty alerts and backup reminders \u2014 instead of you needing to notice separate banners",
+        "New: an Actions pill in the top bar (visible on Home, List, Insights, and Settings) shows everything that needs your attention in one place — warranty alerts and backup reminders — instead of you needing to notice separate banners",
         "Fixed: previously only one nudge could show at a time on Home, so a backup reminder could stay hidden behind a warranty alert. The Actions pill now surfaces everything pending at once",
         "The pill disappears entirely when there's nothing to act on"
       ]
@@ -102,7 +110,7 @@
       "version": "3.11",
       "date": "2026-07-02",
       "highlights": [
-        "Correcting an account balance now works properly: enter your real balance from the bank, and PaisaTrail adds a single visible \u2696\ufe0f Balance Adjustment entry to make up the difference \u2014 so your balance always matches reality even if a few transactions were never logged",
+        "Correcting an account balance now works properly: enter your real balance from the bank, and PaisaTrail adds a single visible ⚖️ Balance Adjustment entry to make up the difference — so your balance always matches reality even if a few transactions were never logged",
         "Balance adjustments stay out of your insights and forecasts (their date and cause can't be known), but appear in the account's transaction list as an audit trail",
         "Balance adjustment entries are marked as system entries and can't be edited (delete and re-reconcile if needed)"
       ]

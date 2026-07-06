@@ -477,10 +477,26 @@ input{outline:none;}
 .bulkdelete-checkbox.checked{background:var(--grape);border-color:var(--grape);}
 .bulkdelete-checkbox.checked::after{content:'✓';}
 
+/* Hidden state switched from opacity:0/pointer-events:none to display:none
+   (2026-07-06, tablet rendering fix). Bisect against a known-good build showed
+   the always-mounted full-viewport overlay count grew 11 → 23 between the last
+   clean tablet render and the broken one; each hidden overlay was a
+   position:fixed inset:0 + backdrop-filter layer the compositor had to carry
+   even while invisible, and at the tablet's fractional DPR (~2.001) that load
+   crossed a rasterization threshold (blank/white background fills — see
+   handover doc). display:none removes hidden overlays from layout/compositing
+   entirely; @starting-style + `display .2s allow-discrete` (Chrome 117+)
+   preserves the fade in AND out with zero JS changes — .show toggling works
+   as before. Older browsers degrade to instant show/hide, which is fine.
+   pointer-events juggling kept as harmless defense in depth. This is the same
+   pattern the Debug Log panel already used deliberately. Do NOT revert new
+   overlays to the opacity:0 hidden pattern. */
 .confirm-overlay{position:fixed;inset:0;z-index:800;background:rgba(36,31,61,.55);
-  backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;
-  padding:24px;opacity:0;pointer-events:none;transition:opacity .2s;}
-.confirm-overlay.show{opacity:1;pointer-events:auto;}
+  backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;
+  padding:24px;opacity:0;pointer-events:none;
+  transition:opacity .2s,display .2s allow-discrete;}
+.confirm-overlay.show{display:flex;opacity:1;pointer-events:auto;}
+@starting-style{.confirm-overlay.show{opacity:0;}}
 .confirm-sheet{width:100%;max-width:340px;background:var(--paper);border-radius:24px;
   padding:28px 22px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;}
 .confirm-sheet-icon{width:56px;height:56px;border-radius:18px;background:rgba(255,107,91,.14);
@@ -502,10 +518,14 @@ input{outline:none;}
    deliberately distinct from .confirm-sheet (centered, short, used for
    yes/no confirmations) since this holds a name field plus an icon grid
    and needs more room, with its own scroll area on short screens. */
+/* Hidden state = display:none — same tablet rendering fix and rationale as
+   .confirm-overlay above. */
 .edit-sheet-overlay{position:fixed;inset:0;z-index:900;background:rgba(36,31,61,.55);
-  backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;
-  opacity:0;pointer-events:none;transition:opacity .2s;}
-.edit-sheet-overlay.show{opacity:1;pointer-events:auto;}
+  backdrop-filter:blur(6px);display:none;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s,display .2s allow-discrete;}
+.edit-sheet-overlay.show{display:flex;opacity:1;pointer-events:auto;}
+@starting-style{.edit-sheet-overlay.show{opacity:0;}}
 .edit-sheet{width:100%;max-width:480px;max-height:86vh;min-height:0;background:var(--paper);
   border-radius:26px 26px 0 0;padding:10px 22px calc(20px + env(safe-area-inset-bottom,0px));
   display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;}
