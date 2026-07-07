@@ -1,6 +1,21 @@
 {
-  "version": "3.27",
+  "version": "3.29",
   "releaseNotes": [
+    {
+      "version": "3.29",
+      "date": "2026-07-07",
+      "highlights": [
+        "New: a one-time '📊 [Month] summary is ready' nudge appears in Actions once a cycle closes — tap it for a quick glance at total spent, your top category, and how it compares to the cycle before"
+      ]
+    },
+    {
+      "version": "3.28",
+      "date": "2026-07-07",
+      "highlights": [
+        "New home-screen shortcuts (long-press the app icon): Add Expense, Add Income, and View Transactions — jump straight in after unlocking",
+        "A soft heads-up now appears on the Add screen if a very similar expense (same amount, same category, within a day) already exists — just a hint, never blocks saving"
+      ]
+    },
     {
       "version": "3.27",
       "date": "2026-07-06",

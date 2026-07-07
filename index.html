@@ -764,6 +764,9 @@ body.inc-revealed .minc-mask{display:none;}
           <input id="add-amount" type="number" inputmode="decimal" placeholder="0" min="0" step="0.01">
         </div>
       </div>
+      <!-- Soft duplicate-expense hint (v3.28) — informational only, never
+           blocks Save. See checkDuplicateExpense() for matching logic. -->
+      <p class="empty-hint hidden" id="add-dup-hint" style="text-align:left;padding:6px 2px 0;"></p>
       <div class="perforation">
         <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
         <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
@@ -1636,6 +1639,26 @@ body.inc-revealed .minc-mask{display:none;}
   </div>
 </div>
 
+<!-- ============================== CYCLE-END SUMMARY (v3.29) ============================== -->
+<!-- Small standalone glance, opened from the Actions pill once a cycle
+     closes. Deliberately NOT a deep-link to Insights → Trend or Compare —
+     see the handover doc's design-reasoning note; neither view answers
+     "how did this cycle go" in one glance the way this sheet does. -->
+<div id="cycle-summary-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title" id="cycle-summary-title">Cycle summary</p>
+      <button type="button" class="topbar-close" id="cycle-summary-close-btn">✕</button>
+    </div>
+    <p class="field-label" style="margin-top:0;">TOTAL SPENT</p>
+    <p class="spend-amount" id="cycle-summary-total"></p>
+    <p class="ins-delta" id="cycle-summary-delta" style="margin:4px 0 18px;"></p>
+    <p class="field-label">TOP CATEGORY</p>
+    <div class="ins-cat-row" id="cycle-summary-top-cat"></div>
+  </div>
+</div>
+
 <!-- ============================== RE-ENABLE WARNING OVERLAY ============================== -->
 <div id="accounts-reenable-overlay" class="confirm-overlay">
   <div class="confirm-sheet">
@@ -1950,6 +1973,12 @@ function splitTitlePrefix(e){ return (e.splitTotal!=null) ? '✂️ ' : ''; }
 function addMonthsISO(dateISO, months){
   const d=new Date((dateISO||todayISO())+'T00:00:00');
   d.setMonth(d.getMonth()+months);
+  const tz=d.getTimezoneOffset()*60000;
+  return new Date(d-tz).toISOString().slice(0,10);
+}
+function addDaysISO(dateISO, days){
+  const d=new Date((dateISO||todayISO())+'T00:00:00');
+  d.setDate(d.getDate()+days);
   const tz=d.getTimezoneOffset()*60000;
   return new Date(d-tz).toISOString().slice(0,10);
 }
@@ -2677,13 +2706,20 @@ async function handlePINDigit(d){
   } else if(state.pinMode==='setup-confirm'){
     if(entered!==pinTemp){ pinError('PINs do not match'); state.pinMode='setup'; return; }
     Store.set('pt_pin', await Crypto.hashPIN(entered));
+    // Capture BEFORE unlockSuccess() — it consumes (nulls) pendingShortcutAction
+    // itself. A shortcut launch takes priority over the onboarding Guide
+    // screen on this one-in-a-lifetime "first PIN ever set" launch; without
+    // this check openGuideScreen() below would stomp on the Add/List screen
+    // the shortcut just opened. The guide is always reachable from Settings
+    // afterward, so skipping it here loses nothing but a coincidence.
+    const hadShortcut=!!pendingShortcutAction;
     await unlockSuccess();
     // First-ever launch only — this branch is unreachable any other way
     // (PIN change/unlock never pass through 'setup-confirm'). Shown once;
     // Store flag prevents it firing again even if setup somehow re-runs.
     if(!Store.get('pt_guide_shown')){
       Store.set('pt_guide_shown','1');
-      openGuideScreen('home-screen');
+      if(!hadShortcut) openGuideScreen('home-screen');
     }
   } else if(state.pinMode==='unlock'){
     if(!(await verifyAgainstStoredPIN(entered))) return;
@@ -2746,6 +2782,16 @@ async function unlockSuccess(){
   if(target==='home-screen') renderHome(); // add-screen etc. keep their existing in-progress DOM as-is
   screenBeforeLock=null;
   resetAutoLock();
+  // App-shortcut launch — runs once, after everything above so state is
+  // fully populated. Overrides the normal target screen deliberately (that's
+  // the whole point of a shortcut). Cleared immediately so re-locking and
+  // unlocking again in the same session doesn't repeat it.
+  if(pendingShortcutAction){
+    const action=pendingShortcutAction; pendingShortcutAction=null;
+    if(action==='add-expense'){ await openAddScreen(); }
+    else if(action==='add-income'){ await openAddScreen(); setAddMode('income'); }
+    else if(action==='view-transactions'){ showScreen('transactions-screen'); renderTransactions(); }
+  }
 }
 
 /* ============================== IDLE AUTO-LOCK ============================== */
@@ -4700,6 +4746,20 @@ async function getPendingActions(){
       : `Back up your data — you haven't yet`;
     actions.push({ id:'backup', icon:'💾', label, action:'backup' });
   }
+  // Cycle-end summary (v3.29) — nudges once a completed cycle hasn't been
+  // acknowledged yet. Re-evaluated fresh every render (no stored content,
+  // only a stored "last acknowledged cycle" flag), so if the user never taps
+  // it, it automatically relabels itself to whichever cycle most recently
+  // closed rather than nagging about a stale one or stacking multiple
+  // entries — there is only ever one of these at a time by construction.
+  const lastCycle=cyclesAgoBounds(1);
+  if(Store.get('pt_last_cycle_summary_shown')!==lastCycle.startISO){
+    const cycleTotal=await getExpenseTotalForPeriod(lastCycle.startISO, lastCycle.endISO);
+    if(cycleTotal>0){ // nothing to summarize if the completed cycle had no spend at all
+      const monthLabel=new Date(lastCycle.startISO+'T00:00:00').toLocaleDateString('en-IN',{month:'long'});
+      actions.push({ id:'cyclesummary', icon:'📊', label:`${monthLabel} summary is ready`, action:'cyclesummary' });
+    }
+  }
   return actions;
 }
 async function renderActionsPill(){
@@ -4745,6 +4805,8 @@ async function handleActionsSheetTap(action, ruleId){
   } else if(action==='backup'){
     await exportData();
     await renderActionsPill();
+  } else if(action==='cyclesummary'){
+    await openCycleSummarySheet();
   }
 }
 
@@ -4770,6 +4832,51 @@ function openHighExpenseDetailSheet(ruleId){
 function closeHighExpenseDetailSheet(){
   document.getElementById('highexpense-detail-overlay').classList.remove('show');
   highExpenseDetailRuleId=null;
+}
+
+// ---- Cycle-end summary sheet (v3.29) ----
+// Small standalone glance opened from the Actions pill — total spent, top
+// category, and a one-line delta vs. the cycle before that, for whichever
+// cycle most recently closed. Every number here comes from helpers Trend and
+// Compare already use; nothing new at the data layer.
+async function openCycleSummarySheet(){
+  const lastCycle=cyclesAgoBounds(1);
+  const priorCycle=cyclesAgoBounds(2);
+  const [total, catTotals, priorTotal] = await Promise.all([
+    getExpenseTotalForPeriod(lastCycle.startISO, lastCycle.endISO),
+    getCategoryTotalsForPeriod(lastCycle.startISO, lastCycle.endISO),
+    getExpenseTotalForPeriod(priorCycle.startISO, priorCycle.endISO),
+  ]);
+  document.getElementById('cycle-summary-title').textContent =
+    `${new Date(lastCycle.startISO+'T00:00:00').toLocaleDateString('en-IN',{month:'long'})} summary`;
+  document.getElementById('cycle-summary-total').textContent = formatINR(total);
+  const delta=formatDelta(total, priorTotal);
+  const deltaEl=document.getElementById('cycle-summary-delta');
+  deltaEl.textContent = `${delta.label} ${previousPeriodPhrase('month')}`;
+  deltaEl.className = `ins-delta ${delta.cls}`;
+  const topCatEl=document.getElementById('cycle-summary-top-cat');
+  const entries=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+  if(entries.length===0){
+    topCatEl.innerHTML = `<p class="empty-hint" style="padding:0;">No expenses this cycle.</p>`;
+  } else {
+    const [catId, amt]=entries[0];
+    const cat=state.categories.find(c=>c.id===catId);
+    topCatEl.innerHTML = `
+      <div class="ins-cat-icon" style="background:${cat?cat.color:'#9088A8'}22">${cat?cat.icon:'❔'}</div>
+      <div class="ins-cat-info"><p class="ins-cat-name">${esc(cat?cat.name:'Other')}</p></div>
+      <p class="ins-cat-amt">${formatINR(amt)}</p>`;
+  }
+  // Acknowledging = opening the sheet. This is what makes the Actions-pill
+  // entry disappear; if a later cycle closes before the user ever taps it,
+  // getPendingActions() naturally relabels to that newer cycle instead
+  // (see the comment there) rather than this flag ever needing to track more
+  // than "the single most recent cycle already seen".
+  Store.set('pt_last_cycle_summary_shown', lastCycle.startISO);
+  await renderActionsPill();
+  document.getElementById('cycle-summary-overlay').classList.add('show');
+}
+function closeCycleSummarySheet(){
+  document.getElementById('cycle-summary-overlay').classList.remove('show');
 }
 async function snoozeHighExpenseAlert(days){
   const rule=state.recurringRules.find(r=>r.id===highExpenseDetailRuleId);
@@ -7021,6 +7128,12 @@ function renderAddModeUI(){
     renderAttachmentArea();
     renderOptRow();
   }
+  // Duplicate hint only applies to expenses — hide it immediately on any
+  // other mode; re-check immediately when (re)entering expense mode (covers
+  // both opening the Add screen fresh and switching the Expense/Income/
+  // Transfer toggle back to Expense).
+  if(isIncome || isTransfer) document.getElementById('add-dup-hint').classList.add('hidden');
+  else checkDuplicateExpense();
 }
 function renderExcludeForecastRow(){
   const sw=document.getElementById('exclude-forecast-switch');
@@ -7556,6 +7669,34 @@ async function renderAttachmentArea(){
   document.getElementById('attach-file-btn').onclick=()=>{ beginPickerSuppression(); document.getElementById('attach-file-input').click(); };
   renderOptRow();
 }
+// ---- Duplicate-expense soft hint (v3.28) ----
+// Live, informational only — never blocks Save. Fires on amount/category/date
+// change while in expense mode. Debounced since it's a DB read on every
+// keystroke otherwise. Excludes the entry currently being edited so opening
+// an existing expense for edit doesn't immediately "detect" itself.
+let dupCheckTimer=null;
+function scheduleDuplicateCheck(){
+  clearTimeout(dupCheckTimer);
+  dupCheckTimer=setTimeout(checkDuplicateExpense, 350);
+}
+async function checkDuplicateExpense(){
+  const hintEl=document.getElementById('add-dup-hint');
+  if(state.addMode!=='expense'){ hintEl.classList.add('hidden'); return; }
+  const amount=parseFloat(document.getElementById('add-amount').value);
+  const categoryId=state.selectedCategoryId;
+  const dateISO=document.getElementById('add-date').value || todayISO();
+  if(!amount || amount<=0 || !categoryId){ hintEl.classList.add('hidden'); return; }
+  const startISO=addDaysISO(dateISO,-1), endISO=addDaysISO(dateISO,1);
+  const matches=(await DB.getExpensesByDateRange(startISO,endISO)).filter(e =>
+    !pendingDeletes[e.id] && isExpenseEntry(e) && e.id!==state.editingExpenseId &&
+    e.categoryId===categoryId && Number(e.amount)===amount);
+  if(matches.length===0){ hintEl.classList.add('hidden'); return; }
+  // Prefer showing the same-day match if there is one, else whichever's closest.
+  const best=matches.find(e=>e.date===dateISO) || matches[0];
+  const cat=state.categories.find(c=>c.id===categoryId);
+  hintEl.textContent = `🔁 A similar ${formatINR(amount)} ${cat?cat.name:'expense'} exists — ${formatGroupLabel(best.date)}`;
+  hintEl.classList.remove('hidden');
+}
 async function openAddScreen(existing){
   state.returnScreen = getCurrentScreen();
   state.editingExpenseId = existing ? existing.id : null;
@@ -7815,9 +7956,21 @@ document.getElementById('add-amount').addEventListener('input', () => {
     state.splitShareManual=true;
     renderSplitArea();
   }
+  scheduleDuplicateCheck();
 });
+document.getElementById('add-date').addEventListener('input', scheduleDuplicateCheck);
 
 // Expense / Income mode toggle on the Add screen
+// Single entry point for changing Expense/Income/Transfer mode — used by the
+// toggle click handler below AND by the app-shortcut launch path in
+// unlockSuccess() (v3.28), so both stay in sync with exactly one
+// implementation of "what changing mode actually does."
+function setAddMode(mode){
+  if(mode===state.addMode) return;
+  state.addMode=mode;
+  document.querySelectorAll('#add-type-toggle .segmented-tab').forEach(b => b.classList.toggle('active', b.dataset.addtype===mode));
+  renderAddModeUI();
+}
 document.getElementById('add-type-toggle').addEventListener('click', (e) => {
   const btn=e.target.closest('.segmented-tab'); if(!btn) return;
   const newMode=btn.dataset.addtype; if(!newMode || newMode===state.addMode) return;
@@ -7826,9 +7979,7 @@ document.getElementById('add-type-toggle').addEventListener('click', (e) => {
     toast('Add at least 2 accounts in Settings to use transfers');
     return;
   }
-  state.addMode=newMode;
-  document.querySelectorAll('#add-type-toggle .segmented-tab').forEach(b => b.classList.toggle('active', b.dataset.addtype===newMode));
-  renderAddModeUI();
+  setAddMode(newMode);
 });
 
 // Income category chip clicks (expense chip clicks are already wired below via data-cat)
@@ -7843,6 +7994,7 @@ document.getElementById('add-category-grid').addEventListener('click', (e) => {
   state.selectedCategoryId=btn.dataset.cat;
   renderCategoryGrid();
   updateNotePlaceholder();
+  scheduleDuplicateCheck();
 });
 document.getElementById('add-delete-btn').addEventListener('click', () => {
   if(!state.editingExpense) return;
@@ -7982,6 +8134,7 @@ document.getElementById('actions-sheet-list').addEventListener('click', (e) => {
   handleActionsSheetTap(row.dataset.action, row.dataset.ruleid || null);
 });
 document.getElementById('highexpense-detail-close-btn').addEventListener('click', closeHighExpenseDetailSheet);
+document.getElementById('cycle-summary-close-btn').addEventListener('click', closeCycleSummarySheet);
 document.getElementById('highexpense-detail-overlay').addEventListener('click', (e) => {
   if(e.target.id==='highexpense-detail-overlay') closeHighExpenseDetailSheet();
 });
@@ -8581,6 +8734,27 @@ document.getElementById('home-onboard-dismiss').addEventListener('click', ()=>{
   document.getElementById('home-onboard-card').classList.add('hidden');
 });
 
+// App-shortcut launch support (v3.28) — read once at boot, consumed by
+// unlockSuccess() below so it fires AFTER PIN/biometric, never before:
+// state.categories/paymentMethods/accounts/groups are only populated inside
+// unlockSuccess(), so the Add screen can't render correctly any earlier, and
+// skipping the unlock gate would defeat the PIN's purpose anyway.
+// history.replaceState strips the query param so a manual page refresh
+// doesn't re-trigger the same shortcut action.
+let pendingShortcutAction=null;
+(function readShortcutAction(){
+  const action=new URLSearchParams(location.search).get('action');
+  if(action){
+    pendingShortcutAction=action;
+    // Purely cosmetic (avoids re-triggering the shortcut on manual refresh)
+    // — must NEVER be allowed to throw and take the rest of app boot down
+    // with it. replaceState can reject in some contexts (e.g. was observed
+    // failing under a file:// origin during testing); if it does, the
+    // shortcut still works this launch, it just won't be re-stripped from
+    // the URL, which is a harmless cosmetic miss, not a functional one.
+    try{ history.replaceState(null, '', './'); }catch(err){ /* non-fatal, see above */ }
+  }
+})();
 function init(){
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed', err));

@@ -12,5 +12,25 @@
     { "src": "./icons/icon.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
     { "src": "./icons/icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" },
     { "src": "./icons/icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Expense",
+      "short_name": "Add Expense",
+      "url": "./?action=add-expense",
+      "icons": [{ "src": "./icons/icon.svg", "sizes": "192x192", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Add Income",
+      "short_name": "Add Income",
+      "url": "./?action=add-income",
+      "icons": [{ "src": "./icons/icon.svg", "sizes": "192x192", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "View Transactions",
+      "short_name": "Transactions",
+      "url": "./?action=view-transactions",
+      "icons": [{ "src": "./icons/icon.svg", "sizes": "192x192", "type": "image/svg+xml" }]
+    }
   ]
 }
