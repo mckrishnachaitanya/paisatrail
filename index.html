@@ -45,6 +45,18 @@ button,input{font-family:inherit;}
 button{cursor:pointer;background:none;border:none;color:inherit;}
 input{outline:none;}
 .hidden{display:none !important;}
+/* Class-based income masking (v3.27): every maskable amount renders BOTH the
+   real value (.minc-real) and ₹•••••• (.minc-mask) as sibling spans; a single
+   `inc-revealed` class on <body> decides which is visible. The 👁️ eye toggle
+   is therefore one class flip — zero re-renders, zero IndexedDB reads, no
+   flicker, and every masked value on every screen updates simultaneously.
+   Real amounts exist in the DOM while masked (hidden via CSS) — acceptable:
+   masking guards the *display* from shoulder-surfing, not device memory.
+   Emit these spans via maskIncomeHTML(); see the standing rule at its
+   definition. */
+.minc-real{display:none;}
+body.inc-revealed .minc-real{display:inline;}
+body.inc-revealed .minc-mask{display:none;}
 
 /* ============================== SCREEN SYSTEM ============================== */
 .screen{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;overflow:hidden;
@@ -1914,7 +1926,26 @@ function formatCompactINR(n){
   if(num>=1000) return '₹'+(num/1000).toFixed(num>=10000?0:1).replace(/\.0$/,'')+'k';
   return '₹'+Math.round(num);
 }
+/* STANDING RULE (updated v3.27): any value derived from income that renders
+   into HTML must go through maskIncomeHTML() below, which emits BOTH the real
+   and masked representations; CSS (body.inc-revealed) picks one. This is what
+   makes the 👁️ toggle a pure class flip with no re-renders.
+   maskIncome() (string version) remains ONLY for string-context labels that
+   are rebuilt fresh each time they're shown (e.g. Actions-pill labels rendered
+   through esc(), textContent subtitles) — those snapshot the reveal state at
+   open time, which is correct because the eye isn't reachable while they're
+   on screen. Do not use maskIncome() in any persistent HTML template. */
 function maskIncome(n){ return state.incomeRevealed ? formatINR(n) : '₹••••••'; }
+function maskIncomeHTML(realText, maskText){
+  return `<span class="minc"><span class="minc-real">${realText}</span><span class="minc-mask">${maskText||'₹••••••'}</span></span>`;
+}
+// Single entry point for changing reveal state — keeps state, the <body>
+// class that drives CSS masking, and the eye-button icons in sync.
+function setIncomeRevealed(v){
+  state.incomeRevealed=v;
+  document.body.classList.toggle('inc-revealed', v);
+  updateEyeButtons();
+}
 function splitTitlePrefix(e){ return (e.splitTotal!=null) ? '✂️ ' : ''; }
 function addMonthsISO(dateISO, months){
   const d=new Date((dateISO||todayISO())+'T00:00:00');
@@ -2692,8 +2723,7 @@ function cancelChangePIN(){
 let screenBeforeLock=null;
 async function unlockSuccess(){
   state.unlocked=true;
-  state.incomeRevealed=false;
-  updateEyeButtons();
+  setIncomeRevealed(false);
   await DB.seedDefaults();
   state.categories=await DB.getAllCategories();
   state.incomeCategories=await DB.getAllIncomeCategories();
@@ -2730,8 +2760,7 @@ function lockVault(){
   if(!state.unlocked) return;
   screenBeforeLock = SCREENS.find(s => s!=='pin-screen' && !document.getElementById(s).classList.contains('is-hidden')) || 'home-screen';
   state.unlocked=false;
-  state.incomeRevealed=false;
-  updateEyeButtons();
+  setIncomeRevealed(false);
   clearTimeout(autoLockTimer);
   enterUnlockScreen();
 }
@@ -2901,10 +2930,12 @@ async function renderHomeOverviewPanel(){
   const incomeTotal=incomes.reduce((s,e)=>s+Number(e.amount),0);
   const net=incomeTotal - expenseTotal;
 
-  document.getElementById('home-income-total').textContent = incomeTotal>0 ? `+${maskIncome(incomeTotal)}` : '+₹0';
+  document.getElementById('home-income-total').innerHTML = incomeTotal>0 ? `+${maskIncomeHTML(formatINR(incomeTotal))}` : '+₹0';
   document.getElementById('home-expense-total').textContent = formatINR(expenseTotal);
   const netEl=document.getElementById('home-net-total');
-  netEl.textContent = state.incomeRevealed ? (net>=0?'+':'')+formatINR(Math.abs(net)) : '₹••••••';
+  // Net is income-derived, so it masks too; the sign is only part of the
+  // revealed representation (masked shows a plain ₹••••••, as before).
+  netEl.innerHTML = maskIncomeHTML((net>=0?'+':'')+formatINR(Math.abs(net)));
   netEl.style.color = net>=0 ? '#7FFFEC' : '#FFB4B4';
   // Label: if cycle day is 1, show familiar "June 2026"; otherwise show the cycle range
   const cycleDay=getCycleDay();
@@ -2961,7 +2992,7 @@ async function renderHomeOverviewPanel(){
       const cat=isInc ? state.incomeCategories.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
       const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
-      const amtText=isInc ? maskIncome(e.amount) : `-${formatINR(e.amount)}`;
+      const amtText=isInc ? maskIncomeHTML(formatINR(e.amount)) : `-${formatINR(e.amount)}`;
       if(isInc){
         list.insertAdjacentHTML('beforeend', `
           <div class="swipe-wrap" data-id="${e.id}">
@@ -3269,7 +3300,7 @@ async function renderTransactions(){
       const cat=isInc ? state.incomeCategories.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
       const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
-      const amtText=isInc ? maskIncome(e.amount) : `-${formatINR(e.amount)}`;
+      const amtText=isInc ? maskIncomeHTML(formatINR(e.amount)) : `-${formatINR(e.amount)}`;
       const defaultLabel=isInc ? 'Income' : 'Expense';
       const fallbackIcon=isInc ? '💰' : '❔';
       // When viewing the split filter, swap the usual payment-method
@@ -5680,20 +5711,20 @@ async function renderHomeForecastPanel(){
     savingsBreakdown.insertAdjacentHTML('beforeend',
       `<div class="legend-row" style="color:rgba(255,255,255,0.8);">
         <span>Projected income</span>
-        <span>${maskIncome(projectedIncome)}</span>
+        <span>${maskIncomeHTML(formatINR(projectedIncome))}</span>
       </div>`);
     if(isMonth && incomeLoggedSoFar>0){
       savingsBreakdown.insertAdjacentHTML('beforeend',
         `<div class="legend-row" style="color:rgba(255,255,255,0.6);font-size:12px;">
           <span style="padding-left:10px;">└ Logged so far</span>
-          <span>${maskIncome(incomeLoggedSoFar)}</span>
+          <span>${maskIncomeHTML(formatINR(incomeLoggedSoFar))}</span>
         </div>`);
     }
     if(projectedRecurringIncome>0){
       savingsBreakdown.insertAdjacentHTML('beforeend',
         `<div class="legend-row" style="color:rgba(255,255,255,0.6);font-size:12px;">
           <span style="padding-left:10px;">└ Recurring due</span>
-          <span>${maskIncome(projectedRecurringIncome)}</span>
+          <span>${maskIncomeHTML(formatINR(projectedRecurringIncome))}</span>
         </div>`);
     }
     savingsBreakdown.insertAdjacentHTML('beforeend',
@@ -5702,12 +5733,12 @@ async function renderHomeForecastPanel(){
         <span>${formatINR(projectedTotal)}</span>
       </div>`);
 
-    document.getElementById('forecast-savings-amount').textContent=maskIncome(Math.abs(projectedSavings));
+    // Negative (overspending) keeps its minus in BOTH representations —
+    // that's the pre-v3.27 behavior (masked showed -₹••••••).
+    const savingsPrefix = projectedSavings<0 ? '-' : '';
+    document.getElementById('forecast-savings-amount').innerHTML =
+      maskIncomeHTML(savingsPrefix+formatINR(Math.abs(projectedSavings)), savingsPrefix+'₹••••••');
     document.getElementById('forecast-savings-amount').style.color=savingsColor;
-    // Prefix minus if overspending
-    if(projectedSavings<0){
-      document.getElementById('forecast-savings-amount').textContent='-'+maskIncome(Math.abs(projectedSavings));
-    }
   }
 
   const list=document.getElementById('forecast-upcoming-list'); list.innerHTML='';
@@ -6323,8 +6354,10 @@ async function renderAccountsViewSheet(){
     const icon = isCc ? '💳' : '🏦';
     const balLabel = isCc ? 'outstanding' : 'balance';
     const balColor = isCc ? 'var(--coral)' : (bal<0 ? 'var(--coral)' : 'var(--ink)');
-    const maskedBal = state.incomeRevealed ? formatINR(Math.abs(bal)) : '₹••••••';
-    const negPrefix = !isCc && bal<0 && state.incomeRevealed ? '-' : '';
+    // Balance is income-derived (masked): dual-span, CSS picks. The minus
+    // for overdrawn savings accounts is only in the revealed representation
+    // (masked shows plain ₹••••••, as before).
+    const balHTML = maskIncomeHTML(`${!isCc && bal<0 ? '-' : ''}${formatINR(Math.abs(bal))}`);
     list.insertAdjacentHTML('beforeend', `
       <button type="button" data-acctid="${a.id}" style="display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;
                   padding:14px 16px;background:var(--surface);border-radius:16px;margin-bottom:10px;">
@@ -6339,7 +6372,7 @@ async function renderAccountsViewSheet(){
         </div>
         <div style="text-align:right;display:flex;align-items:center;gap:8px;">
           <div>
-            <p style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${balColor};">${negPrefix}${maskedBal}</p>
+            <p style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:${balColor};">${balHTML}</p>
             <p style="font-size:10px;color:var(--muted);margin-top:2px;">${balLabel}</p>
           </div>
           <span class="settings-row-chevron">›</span>
@@ -6347,8 +6380,8 @@ async function renderAccountsViewSheet(){
       </button>`);
   });
   const nwEl=document.getElementById('accounts-view-networth-value');
-  const maskedNW = state.incomeRevealed ? formatINR(Math.abs(netWorth)) : '₹••••••';
-  nwEl.textContent = state.incomeRevealed ? ((netWorth>=0?'':'-')+maskedNW) : maskedNW;
+  // Net worth: minus only in the revealed representation, as before.
+  nwEl.innerHTML = maskIncomeHTML((netWorth>=0?'':'-')+formatINR(Math.abs(netWorth)));
   nwEl.style.color = netWorth>=0 ? 'var(--mint)' : 'var(--coral)';
 }
 
@@ -8137,14 +8170,12 @@ function updateEyeButtons(){
   });
 }
 ['home-eye-btn','txn-eye-btn','stats-eye-btn','accounts-view-eye-btn'].forEach(id => {
-  document.getElementById(id).addEventListener('click', async ()=>{
-    state.incomeRevealed = !state.incomeRevealed;
-    updateEyeButtons();
-    await renderHomeOverviewPanel();
-    renderTransactions();
-    if(document.getElementById('accounts-view-overlay').classList.contains('show')) await renderAccountsViewSheet();
-    // Re-render forecast if it's visible so masked income values update
-    if(!document.getElementById('home-panel-forecast').classList.contains('hidden')) renderHomeForecastPanel();
+  document.getElementById(id).addEventListener('click', ()=>{
+    // Pure class flip — CSS (body.inc-revealed + .minc spans) swaps every
+    // masked value on every screen simultaneously. No re-renders, no DB
+    // reads; this used to rebuild Home, the transactions list, and the
+    // accounts sheet (with a "Calculating balances…" flash) per tap.
+    setIncomeRevealed(!state.incomeRevealed);
   });
 });
 document.getElementById('forecast-income-nudge').addEventListener('click', openRecurringScreen);

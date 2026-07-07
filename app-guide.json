@@ -1,6 +1,13 @@
 {
-  "version": "3.26",
+  "version": "3.27",
   "releaseNotes": [
+    {
+      "version": "3.27",
+      "date": "2026-07-06",
+      "highlights": [
+        "The 👁️ income reveal is now instant — tapping the eye no longer refreshes the screen or shows “Calculating balances…”; values everywhere flip between masked and revealed with no flicker"
+      ]
+    },
     {
       "version": "3.26",
       "date": "2026-07-06",
