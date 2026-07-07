@@ -1,6 +1,13 @@
 {
-  "version": "3.29",
+  "version": "3.30",
   "releaseNotes": [
+    {
+      "version": "3.30",
+      "date": "2026-07-07",
+      "highlights": [
+        "Transactions filter: new 'Account' row lets you view transactions from a specific account — includes a 'No account' option to find entries never tied to one (e.g. logged before Accounts was set up)"
+      ]
+    },
     {
       "version": "3.29",
       "date": "2026-07-07",
@@ -320,7 +327,7 @@
       "id": "transactions",
       "icon": "📋",
       "title": "Transactions",
-      "body": "Every expense and income entry you’ve ever logged, grouped by date. Search or filter by type, category, payment method, group, date, or amount — tap any entry to edit it, or tap the trash icon to delete."
+      "body": "Every expense and income entry you’ve ever logged, grouped by date. Search or filter by type, category, payment method, account, group, date, or amount — tap any entry to edit it, or tap the trash icon to delete."
     },
     {
       "id": "insights",

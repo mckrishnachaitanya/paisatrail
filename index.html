@@ -913,6 +913,8 @@ body.inc-revealed .minc-mask{display:none;}
     <div class="cat-grid" id="txn-filter-cat-grid"></div>
     <p class="field-label" id="txn-filter-pay-label">PAYMENT METHOD</p>
     <div class="pay-row" id="txn-filter-pay-row"></div>
+    <p class="field-label" id="txn-filter-account-label">ACCOUNT</p>
+    <div class="pay-row" id="txn-filter-account-row"></div>
     <p class="field-label">DATE RANGE</p>
     <div class="ins-custom-range" style="margin-top:0;">
       <div>
@@ -2502,6 +2504,7 @@ const state = {
   txnFilterSplitOnly:false,       // true = show only split expenses
   txnFilterSplitStatus:'unsettled', // 'unsettled' | 'all' — sub-filter within split-only view, only matters when txnFilterSplitOnly is true
   txnFilterGroupIds:new Set(),       // group ids filtered IN on Transactions; empty = no restriction; 'UNGROUPED' is a sentinel for expenses with no group
+  txnFilterAccountIds:new Set(),     // account ids filtered IN on Transactions; empty = no restriction; 'NOACCOUNT' is a sentinel for entries with no accountId (expense/income) or no from/to account (transfer)
   addMode:'expense',              // 'expense' | 'income' — current mode of the Add/Edit screen
   selectedIncomeCategoryId:null,  // selected income category while in income mode
   catUsageCounts:{},              // {categoryId: count} — fetched once per Add-screen open, used to sort the category grid by frequency
@@ -3248,6 +3251,18 @@ async function getFilteredTransactions(){
       return e.groupId && state.txnFilterGroupIds.has(e.groupId);
     });
   }
+  if(state.txnFilterAccountIds.size>0){
+    list=list.filter(e=>{
+      if(isTransferEntry(e)){
+        const hasAnyAccount = e.fromAccountId || e.toAccountId;
+        if(state.txnFilterAccountIds.has('NOACCOUNT') && !hasAnyAccount) return true;
+        return (e.fromAccountId && state.txnFilterAccountIds.has(e.fromAccountId)) ||
+               (e.toAccountId && state.txnFilterAccountIds.has(e.toAccountId));
+      }
+      if(state.txnFilterAccountIds.has('NOACCOUNT') && !e.accountId) return true;
+      return e.accountId && state.txnFilterAccountIds.has(e.accountId);
+    });
+  }
   if(search){
     list=list.filter(e=>{
       if(isIncomeEntry(e)){
@@ -3265,10 +3280,10 @@ async function getFilteredTransactions(){
   return list;
 }
 function hasActiveTxnFilters(){
-  return state.txnFilterType!=='all' || state.txnFilterCategoryIds.size>0 || state.txnFilterPaymentIds.size>0 || !!state.txnFilterStartISO || !!state.txnFilterEndISO || state.txnFilterMinAmount!=null || state.txnFilterMaxAmount!=null || state.txnFilterSplitOnly || state.txnFilterGroupIds.size>0;
+  return state.txnFilterType!=='all' || state.txnFilterCategoryIds.size>0 || state.txnFilterPaymentIds.size>0 || !!state.txnFilterStartISO || !!state.txnFilterEndISO || state.txnFilterMinAmount!=null || state.txnFilterMaxAmount!=null || state.txnFilterSplitOnly || state.txnFilterGroupIds.size>0 || state.txnFilterAccountIds.size>0;
 }
 function updateTxnFilterBtnState(){
-  const count = (state.txnFilterType!=='all'?1:0) + (state.txnFilterCategoryIds.size>0?1:0) + (state.txnFilterPaymentIds.size>0?1:0) + ((state.txnFilterStartISO||state.txnFilterEndISO)?1:0) + ((state.txnFilterMinAmount!=null||state.txnFilterMaxAmount!=null)?1:0) + (state.txnFilterSplitOnly?1:0) + (state.txnFilterGroupIds.size>0?1:0);
+  const count = (state.txnFilterType!=='all'?1:0) + (state.txnFilterCategoryIds.size>0?1:0) + (state.txnFilterPaymentIds.size>0?1:0) + ((state.txnFilterStartISO||state.txnFilterEndISO)?1:0) + ((state.txnFilterMinAmount!=null||state.txnFilterMaxAmount!=null)?1:0) + (state.txnFilterSplitOnly?1:0) + (state.txnFilterGroupIds.size>0?1:0) + (state.txnFilterAccountIds.size>0?1:0);
   const btn=document.getElementById('txn-filter-btn');
   btn.textContent = count>0 ? `Filter • ${count}` : 'Filter';
   btn.classList.toggle('active', count>0);
@@ -3415,6 +3430,25 @@ function renderTxnFilterGroupRow(){
       </button>`);
   });
 }
+function renderTxnFilterAccountRow(){
+  const row=document.getElementById('txn-filter-account-row'); row.innerHTML='';
+  // "No account" sentinel chip first — catches entries with no accountId
+  // (expense/income) or no from/to account (transfer), e.g. expenses logged
+  // before the Accounts feature existed.
+  const noAcctSel=state.txnFilterAccountIds.has('NOACCOUNT');
+  row.insertAdjacentHTML('beforeend', `
+    <button type="button" class="pay-chip" data-account="NOACCOUNT" style="background:${noAcctSel?'var(--grape)':'var(--surface)'};color:${noAcctSel?'white':'var(--ink)'}">
+      No account
+    </button>`);
+  state.accounts.forEach(a=>{
+    const sel=state.txnFilterAccountIds.has(a.id);
+    const icon = a.type==='cc' ? '💳' : '🏦';
+    row.insertAdjacentHTML('beforeend', `
+      <button type="button" class="pay-chip" data-account="${a.id}" style="background:${sel?'var(--grape)':'var(--surface)'};color:${sel?'white':'var(--ink)'}">
+        <span>${icon}</span>${esc(a.name)}
+      </button>`);
+  });
+}
 // Every toggle inside the sheet takes effect immediately (consistent with
 // search-as-you-type and Insights' instant period switching elsewhere in
 // the app) — there's no separate "Apply" step, so closing the sheet by any
@@ -3429,12 +3463,17 @@ async function openTxnFilterSheet(){
   renderTxnFilterCatGrid();
   renderTxnFilterPayRow();
   renderTxnFilterGroupRow();
+  renderTxnFilterAccountRow();
   document.getElementById('txn-filter-start').value = state.txnFilterStartISO || '';
   document.getElementById('txn-filter-end').value = state.txnFilterEndISO || '';
   document.getElementById('txn-filter-min-amount').value = state.txnFilterMinAmount!=null ? state.txnFilterMinAmount : '';
   document.getElementById('txn-filter-max-amount').value = state.txnFilterMaxAmount!=null ? state.txnFilterMaxAmount : '';
   // Hide Transfer tab when accounts not enabled
   document.querySelector('#txn-filter-type-tabs [data-filtertype="transfer"]').classList.toggle('hidden', !state.accountsEnabled);
+  // Hide Account filter row entirely when accounts feature is off or no accounts exist yet
+  const showAccountFilter = state.accountsEnabled && state.accounts.length>0;
+  document.getElementById('txn-filter-account-label').classList.toggle('hidden', !showAccountFilter);
+  document.getElementById('txn-filter-account-row').classList.toggle('hidden', !showAccountFilter);
   // Sync the Type toggle buttons to current state
   document.querySelectorAll('#txn-filter-type-tabs .segmented-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.filtertype === state.txnFilterType);
@@ -3479,6 +3518,7 @@ async function clearTxnFilters(){
   state.txnFilterSplitOnly=false;
   state.txnFilterSplitStatus='unsettled';
   state.txnFilterGroupIds=new Set();
+  state.txnFilterAccountIds=new Set();
   document.getElementById('txn-filter-start').value='';
   document.getElementById('txn-filter-end').value='';
   document.getElementById('txn-filter-min-amount').value='';
@@ -3491,6 +3531,7 @@ async function clearTxnFilters(){
   renderTxnFilterCatGrid();
   renderTxnFilterPayRow();
   renderTxnFilterGroupRow();
+  renderTxnFilterAccountRow();
   syncSplitFilterUI();
   await onTxnFilterChange();
 }
@@ -8085,6 +8126,14 @@ document.getElementById('txn-filter-group-row').addEventListener('click', (e) =>
   if(state.txnFilterGroupIds.has(id)) state.txnFilterGroupIds.delete(id);
   else state.txnFilterGroupIds.add(id);
   renderTxnFilterGroupRow();
+  onTxnFilterChange();
+});
+document.getElementById('txn-filter-account-row').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-account]'); if(!btn) return;
+  const id=btn.dataset.account;
+  if(state.txnFilterAccountIds.has(id)) state.txnFilterAccountIds.delete(id);
+  else state.txnFilterAccountIds.add(id);
+  renderTxnFilterAccountRow();
   onTxnFilterChange();
 });
 document.getElementById('txn-filter-start').addEventListener('change', (e) => {
