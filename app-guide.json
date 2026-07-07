@@ -1,6 +1,14 @@
 {
-  "version": "3.25",
+  "version": "3.26",
   "releaseNotes": [
+    {
+      "version": "3.26",
+      "date": "2026-07-06",
+      "highlights": [
+        "Smoother scrolling on Home and Transactions — scrolling that starts on a transaction row no longer competes with the swipe-to-delete gesture",
+        "Lower memory use — the 13 screens you're not looking at no longer occupy graphics memory"
+      ]
+    },
     {
       "version": "3.25",
       "date": "2026-07-06",

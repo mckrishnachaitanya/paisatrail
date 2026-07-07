@@ -49,16 +49,22 @@ input{outline:none;}
 /* ============================== SCREEN SYSTEM ============================== */
 .screen{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;overflow:hidden;
   opacity:1;transition:opacity .2s;z-index:10;
-  /* transform:translateZ(0) forces each .screen onto its own compositor layer
+  /* transform:translateZ(0) forces the screen onto its own compositor layer
      with stable rasterization. On this Android tablet Chrome spontaneously
      snaps devicePixelRatio between 1.874 and a fractional 2.00142, and at the
      fractional value the full-viewport position:fixed fill was mis-rounding and
      leaving large blank/white areas (the "flickering"/blank-background bug —
      see handover doc tablet investigation). Promoting the layer makes the
      browser rasterize the fill consistently regardless of fractional DPR.
-     Android-safe; no effect on the phone. */
+     Android-safe; no effect on the phone.
+     Scoped to the VISIBLE screen only as of v3.26 (2026-07-06): the original
+     blanket rule also promoted the 4-5 hidden screens, pinning permanent
+     full-viewport GPU layers for content nobody can see — the same tile-memory
+     class of cost as the pre-v3.24 hidden overlays. Hidden screens are
+     opacity:0 and unpromoted, so they cost ~nothing; the rasterization
+     stability benefit only ever mattered for the screen being painted. */
   transform:translateZ(0);}
-.screen.is-hidden{opacity:0;pointer-events:none;z-index:0;}
+.screen.is-hidden{opacity:0;pointer-events:none;z-index:0;transform:none;}
 /* Pin screen must sit above all overlays (edit-sheet-overlay z-index:900,
    confirm-overlay z-index:800) so locking while a sheet is open doesn't
    let the sheet bleed through the lock screen. Data in open sheets is
@@ -3075,7 +3081,16 @@ function addSwipeToDelete(container, onDelete){
       if(Math.abs(dx)<5 && Math.abs(dy)<5) return;
       isHoriz=Math.abs(dx)>Math.abs(dy)*1.3;
       dirLocked=true;
-      if(!isHoriz){ activeRow=null; return; } // vertical drag — let the page scroll, listeners are removed on touchend below
+      if(!isHoriz){
+        // Vertical drag — this is a normal page scroll that happened to start
+        // on a row. Detach the non-passive touchmove listener IMMEDIATELY, not
+        // on touchend: while attached, Chrome must block compositor scrolling
+        // and wait on the main thread every frame of the gesture. touchend
+        // stays attached to reset state (its removeEventListener calls are
+        // no-ops for an already-removed touchmove).
+        document.removeEventListener('touchmove', onMove);
+        activeRow=null; return;
+      }
     }
     e.preventDefault();
     dragging=true;
