@@ -6460,7 +6460,11 @@ function closeAccountsViewSheet(){
 // Savings: opening + income credited - expenses debited + transfers in - transfers out
 // CC: opening (outstanding) + expenses debited - payments (transfers in from savings) + transfers out
 async function computeAccountBalance(account){
-  const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31'))
+  // Future-dated entries (date > today) are excluded so the balance only
+  // reflects money that has actually moved. Since this is recomputed live on
+  // every render (not cached), a future entry naturally rolls into the
+  // balance on its own once its date arrives — no migration/cron needed.
+  const all=(await DB.getExpensesByDateRange('0000-01-01', todayISO()))
     .filter(e=>!pendingDeletes[e.id]);
   const isCc=account.type==='cc';
   let balance=account.openingBalance||0;

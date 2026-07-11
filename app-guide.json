@@ -1,6 +1,13 @@
 {
-  "version": "3.30",
+  "version": "3.31",
   "releaseNotes": [
+    {
+      "version": "3.31",
+      "date": "2026-07-11",
+      "highlights": [
+        "Fix: expenses/income/transfers dated in the future no longer affect account balance or net worth immediately — they only count once their date actually arrives. (List tab and Insights still show them right away, as before.)"
+      ]
+    },
     {
       "version": "3.30",
       "date": "2026-07-07",
