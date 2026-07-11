@@ -1,6 +1,14 @@
 {
-  "version": "3.31",
+  "version": "3.32",
   "releaseNotes": [
+    {
+      "version": "3.32",
+      "date": "2026-07-11",
+      "highlights": [
+        "Adding an expense is faster: category and payment method now default to whatever you used last time, same as account already did — so routine expenses are often just amount + save.",
+        "The \"One-time expense\" (skip in Forecast average) toggle moved into More Options, alongside Warranty/Group/Split/Recurring/Attachments, so it’s tucked away unless you need it."
+      ]
+    },
     {
       "version": "3.31",
       "date": "2026-07-11",

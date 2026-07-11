@@ -804,14 +804,6 @@ body.inc-revealed .minc-mask{display:none;}
 
       <!-- Fields only relevant to expenses; hidden automatically when income mode is active -->
       <div id="add-expense-only-fields">
-        <div class="exclude-forecast-row" id="add-exclude-forecast-row">
-          <div class="exclude-forecast-info">
-            <p class="exclude-forecast-label">One-time expense</p>
-            <span class="exclude-forecast-sub">Skip this in Forecast's spending average</span>
-          </div>
-          <div class="switch" id="exclude-forecast-switch"><div class="switch-thumb"></div></div>
-        </div>
-
         <p class="field-label">MORE OPTIONS</p>
         <div class="opt-row" id="add-opt-row"></div>
 
@@ -820,6 +812,18 @@ body.inc-revealed .minc-mask{display:none;}
              target these same ids and are unchanged) — only the wrapper
              around it is new, toggled open/closed by the chip row above.
              Only one wrapper is open at a time. -->
+        <div class="opt-expand hidden" id="add-onetime-wrap">
+          <div class="opt-expand-head">
+            <span class="opt-expand-icon">📌</span><span class="opt-expand-title">One-time expense</span>
+            <button type="button" class="opt-expand-close" data-closeopt="onetime">✕</button>
+          </div>
+          <div class="exclude-forecast-row" id="add-exclude-forecast-row">
+            <div class="exclude-forecast-info">
+              <span class="exclude-forecast-sub">Skip this in Forecast's spending average</span>
+            </div>
+            <div class="switch" id="exclude-forecast-switch"><div class="switch-thumb"></div></div>
+          </div>
+        </div>
         <div class="opt-expand hidden" id="add-warranty-wrap">
           <div class="opt-expand-head">
             <span class="opt-expand-icon">🛡️</span><span class="opt-expand-title">Warranty</span>
@@ -7447,6 +7451,7 @@ function renderGroupArea(){
   });
 }
 const ADD_OPT_DEFS=[
+  {key:'onetime',  icon:'📌', label:'One-time', wrapId:'add-onetime-wrap', hasData:()=>state.excludeFromForecast},
   {key:'warranty', icon:'🛡️', label:'Warranty', wrapId:'add-warranty-wrap', hasData:()=>state.warrantyEnabled},
   {key:'group',    icon:'🏷️', label:'Group',    wrapId:'add-group-wrap',    hasData:()=>state.groupEnabled},
   {key:'split',    icon:'✂️', label:'Split',    wrapId:'add-split-wrap',    hasData:()=>state.splitEnabled},
@@ -7750,11 +7755,21 @@ async function openAddScreen(existing){
   // Transfer state
   state.selectedTransferFromId = existing ? (existing.fromAccountId||null) : (state.accounts[0]?state.accounts[0].id:null);
   state.selectedTransferToId = existing ? (existing.toAccountId||null) : (state.accounts[1]?state.accounts[1].id:null);
-  state.selectedCategoryId = existing ? existing.categoryId : (state.categories[0] ? state.categories[0].id : null);
+  // Category — default to last used (pt_last_category), or first category if no prior/invalid selection
+  {
+    const lastCat=Store.get('pt_last_category');
+    const validLastCat=lastCat && state.categories.find(c=>c.id===lastCat);
+    state.selectedCategoryId = existing ? existing.categoryId : (validLastCat ? lastCat : (state.categories[0] ? state.categories[0].id : null));
+  }
   state.selectedIncomeCategoryId = existing ? (existing.incomeCategoryId || state.incomeCategories[0].id) : state.incomeCategories[0].id;
   state.catGridExpanded = false; // always start collapsed — same pattern as MORE OPTIONS below
   state.catUsageCounts = await getCategoryUsageCounts();
-  state.selectedPaymentId = existing ? existing.paymentMethod : (state.paymentMethods[0] ? state.paymentMethods[0].id : null);
+  // Payment method — default to last used (pt_last_payment), or first method if no prior/invalid selection
+  {
+    const lastPay=Store.get('pt_last_payment');
+    const validLastPay=lastPay && state.paymentMethods.find(p=>p.id===lastPay);
+    state.selectedPaymentId = existing ? existing.paymentMethod : (validLastPay ? lastPay : (state.paymentMethods[0] ? state.paymentMethods[0].id : null));
+  }
   // Account — default to last used (pt_last_account), or first account if no prior selection
   if(state.accountsEnabled && state.accounts.length>0){
     const lastAcct=Store.get('pt_last_account');
@@ -7952,10 +7967,12 @@ async function saveExpense(){
   await DB.addExpense(expense);
   await finalizeMarkPaidIfNeeded();
 
-  // Persist last used account for next Add screen open
+  // Persist last used account/category/payment method for next Add screen open
   if(state.accountsEnabled && state.selectedAccountId){
     Store.set('pt_last_account', state.selectedAccountId);
   }
+  Store.set('pt_last_category', state.selectedCategoryId);
+  Store.set('pt_last_payment', state.selectedPaymentId);
 
   // If the selected payment method is not in the selected account's methods,
   // prompt to add it — non-blocking, save already happened above.
