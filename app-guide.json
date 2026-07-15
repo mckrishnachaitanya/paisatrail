@@ -1,6 +1,24 @@
 {
-  "version": "3.32",
+  "version": "3.34",
   "releaseNotes": [
+    {
+      "version": "3.34",
+      "date": "2026-07-15",
+      "highlights": [
+        "Fixed: filtering the Transactions list by category no longer shows income entries alongside the filtered expenses — picking a category now shows only that category.",
+        "Switching the filter type to Income or Transfer now also clears any selected categories (same as it already did for payment method, group, and split filters)."
+      ]
+    },
+    {
+      "version": "3.33",
+      "date": "2026-07-15",
+      "highlights": [
+        "Fixed: a negative Net on the Home overview now shows a minus sign (e.g. -₹5,000) instead of relying on the red colour alone.",
+        "Faster Home screen: opening Home (and every save) now reads your data once instead of up to 7 times behind the scenes — most noticeable as your history grows.",
+        "Snappier long transaction lists — amount and date formatting under the hood is now much cheaper per row.",
+        "One last hidden pop-up (the attachment viewer) brought in line with the tablet rendering fix from v3.24."
+      ]
+    },
     {
       "version": "3.32",
       "date": "2026-07-11",

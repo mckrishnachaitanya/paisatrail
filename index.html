@@ -413,9 +413,16 @@ body.inc-revealed .minc-mask{display:none;}
   display:flex;align-items:center;justify-content:center;}
 
 /* ============================== ATTACHMENT VIEWER ============================== */
+/* Hidden state = display:none — same tablet rendering fix and rationale as
+   .confirm-overlay (this was the one overlay the 2026-07-06 migration missed:
+   no backdrop-filter so lower risk, but still an always-mounted full-viewport
+   position:fixed layer while hidden). @starting-style + allow-discrete keeps
+   the fade, same as the other overlays. */
 #attach-viewer-overlay{position:fixed;inset:0;background:var(--canvas);z-index:2000;
-  display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .2s;}
-#attach-viewer-overlay.show{opacity:1;pointer-events:auto;}
+  display:none;flex-direction:column;opacity:0;pointer-events:none;
+  transition:opacity .2s,display .2s allow-discrete;}
+#attach-viewer-overlay.show{display:flex;opacity:1;pointer-events:auto;}
+@starting-style{#attach-viewer-overlay.show{opacity:0;}}
 .viewer-bar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
   padding:calc(14px + env(safe-area-inset-top,0px)) 16px 12px;}
 .viewer-bar p{color:#fff;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;
@@ -1945,7 +1952,11 @@ DebugLog.install();
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function genId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function todayISO(){ const d=new Date(); const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); }
-function formatINR(n){ const num=Number(n)||0; return '₹' + num.toLocaleString('en-IN',{maximumFractionDigits:2}); }
+// Cached formatter — toLocaleString() builds a fresh formatter internally on
+// every call, which is measurable when renderTransactions formats 1-2 amounts
+// per row over a long history. Same output, ~an order of magnitude cheaper.
+const INR_FORMATTER=new Intl.NumberFormat('en-IN',{maximumFractionDigits:2});
+function formatINR(n){ return '₹' + INR_FORMATTER.format(Number(n)||0); }
 // Compact form for tight spaces like Trend bar-chart labels (₹12.3k, ₹4.5L,
 // ₹1.2Cr) — formatINR's full digit-grouped form is too wide for a 34px column.
 function formatCompactINR(n){
@@ -2868,13 +2879,31 @@ function buildDonutGradient(catTotals, total){
   catTotals.forEach(c=>{ const pct=(c.amount/total)*100; parts.push(`${c.color} ${acc}% ${acc+pct}%`); acc+=pct; });
   return `conic-gradient(${parts.join(', ')})`;
 }
-async function getWarrantyExpenses(){
-  const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
+// Single full-table read shared across one renderHome() pass. Before this,
+// each Home render did the same IndexedDB work up to 6-7 times over: two full
+// scans (Actions pill's warranty check + Warranties panel) and three separate
+// reads of the same cycle range (Overview, Forecast, Budgets). Every function
+// below takes an OPTIONAL prefetched array and falls back to its own read when
+// called standalone (forecast tab toggles, other screens' Actions pills, etc.)
+// — so behaviour outside renderHome is unchanged. The full-range cursor read
+// returns entries in ascending date order, and Array.filter preserves that
+// order, so in-memory slices are ordering-identical to the range queries they
+// replace. pendingDeletes is excluded here; downstream !pendingDeletes checks
+// are kept as harmless idempotent guards for the standalone paths.
+async function fetchAllEntries(){
+  return (await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
+}
+function sliceByDateRange(entries, startISO, endISO){
+  return entries.filter(e => e.date>=startISO && e.date<=endISO);
+}
+async function getWarrantyExpenses(prefetched){
+  const source = prefetched || await fetchAllEntries();
+  const all=source.filter(e => !pendingDeletes[e.id] && isExpenseEntry(e));
   return all.filter(e => e.warrantyExpiry);
 }
 const WARRANTY_SOON_DAYS=30; // window for the Home banner — only nudges about what's not expired yet
-async function getWarrantiesExpiringSoon(){
-  const items=await getWarrantyExpenses();
+async function getWarrantiesExpiringSoon(prefetched){
+  const items=await getWarrantyExpenses(prefetched);
   const today=todayISO();
   const cutoff=dateToISO(new Date(new Date(today+'T00:00:00').getTime() + WARRANTY_SOON_DAYS*86400000));
   return items.filter(e => e.warrantyExpiry>=today && e.warrantyExpiry<=cutoff)
@@ -2888,8 +2917,8 @@ async function getWarrantiesExpiringSoon(){
 const BACKUP_NUDGE_DAYS=15; // how long since the last export before the Actions pill nags again
 // Gated on there being at least one expense ever recorded — no point nagging
 // a brand-new install with nothing to back up yet.
-async function shouldShowBackupNudge(){
-  const any=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e=>!pendingDeletes[e.id]);
+async function shouldShowBackupNudge(prefetched){
+  const any=(prefetched || await fetchAllEntries()).filter(e=>!pendingDeletes[e.id]);
   if(any.length===0) return false;
   const lastExport=parseInt(Store.get('pt_last_export')||'0');
   if(!lastExport) return true;
@@ -2958,7 +2987,7 @@ async function renderOnboardingChecklist(){
   });
 }
 
-async function renderHomeOverviewPanel(){
+async function renderHomeOverviewPanel(prefetched){
   // Banner hierarchy (2026-07-02: warranty + backup MOVED to the Actions pill,
   // which now surfaces both simultaneously — showing them here too was
   // redundant/duplicate nagging, see Krishna's screenshot report). What's New
@@ -2969,14 +2998,15 @@ async function renderHomeOverviewPanel(){
   if(await shouldShowWhatsNewBanner()){
     await renderWhatsNewBanner();
   }
-  await renderActionsPill();
+  await renderActionsPill(prefetched);
   await renderOnboardingChecklist();
   const todayISO_=todayISO();
   const bounds=cycleBounds(todayISO_);
   const startISO=bounds.startISO;
   const endISO=todayISO_;
 
-  const all=(await DB.getExpensesByDateRange(startISO, endISO)).filter(e => !pendingDeletes[e.id] && !isReconEntry(e));
+  const source = prefetched ? sliceByDateRange(prefetched, startISO, endISO) : await DB.getExpensesByDateRange(startISO, endISO);
+  const all=source.filter(e => !pendingDeletes[e.id] && !isReconEntry(e));
   const expenses=all.filter(isExpenseEntry);
   const incomes=all.filter(isIncomeEntry);
   const expenseTotal=expenses.reduce((s,e)=>s+Number(e.amount),0);
@@ -2988,7 +3018,7 @@ async function renderHomeOverviewPanel(){
   const netEl=document.getElementById('home-net-total');
   // Net is income-derived, so it masks too; the sign is only part of the
   // revealed representation (masked shows a plain ₹••••••, as before).
-  netEl.innerHTML = maskIncomeHTML((net>=0?'+':'')+formatINR(Math.abs(net)));
+  netEl.innerHTML = maskIncomeHTML((net>=0?'+':'-')+formatINR(Math.abs(net)));
   netEl.style.color = net>=0 ? '#7FFFEC' : '#FFB4B4';
   // Label: if cycle day is 1, show familiar "June 2026"; otherwise show the cycle range
   const cycleDay=getCycleDay();
@@ -3079,8 +3109,8 @@ async function renderHomeOverviewPanel(){
 }
 
 /* ============================== HOME TABS (Overview / Warranties) ============================== */
-async function renderHomeWarrantiesPanel(){
-  const items=await getWarrantyExpenses();
+async function renderHomeWarrantiesPanel(prefetched){
+  const items=await getWarrantyExpenses(prefetched);
   const container=document.getElementById('home-warranties-list'); container.innerHTML='';
   if(items.length===0){
     container.innerHTML='<p class="empty-hint">Mark a purchase as under warranty from the Add/Edit screen to see it here.</p>';
@@ -3133,10 +3163,13 @@ function setHomeTab(tab){
 // from Add/Edit "just works" since state.homeTab persists on its own —
 // nothing else needs to remember or restore it separately.
 async function renderHome(){
-  await renderHomeOverviewPanel();
-  await renderHomeWarrantiesPanel();
-  await renderHomeForecastPanel();
-  await renderHomeBudgetsPanel();
+  // One shared read for the whole pass (see fetchAllEntries) — previously
+  // each panel + the Actions pill did its own overlapping IndexedDB reads.
+  const allEntries=await fetchAllEntries();
+  await renderHomeOverviewPanel(allEntries);
+  await renderHomeWarrantiesPanel(allEntries);
+  await renderHomeForecastPanel(allEntries);
+  await renderHomeBudgetsPanel(allEntries);
   applyHomeTabUI();
 }
 
@@ -3220,12 +3253,29 @@ async function handleHomeSwipeDelete(id){
 }
 
 /* ============================== TRANSACTIONS RENDER ============================== */
+// Called once per row in the transactions loop — the yesterday computation
+// (Date construction + toISOString) and toLocaleDateString are both hoisted
+// into a per-day cache so a long list doesn't redo them thousands of times.
+// The cache self-invalidates when the calendar day changes (todayISO() moves),
+// which also keeps 'Today'/'Yesterday' labels correct across midnight.
+let groupLabelDay=null, groupLabelYest=null;
+const groupLabelCache=new Map();
 function formatGroupLabel(dateISO){
   const today=todayISO();
-  const yest=(()=>{ const d=new Date(); d.setDate(d.getDate()-1); const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10); })();
+  if(groupLabelDay!==today){
+    groupLabelDay=today;
+    const d=new Date(); d.setDate(d.getDate()-1); const tz=d.getTimezoneOffset()*60000;
+    groupLabelYest=new Date(d-tz).toISOString().slice(0,10);
+    groupLabelCache.clear();
+  }
   if(dateISO===today) return 'Today';
-  if(dateISO===yest) return 'Yesterday';
-  return new Date(dateISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  if(dateISO===groupLabelYest) return 'Yesterday';
+  let label=groupLabelCache.get(dateISO);
+  if(!label){
+    label=new Date(dateISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    groupLabelCache.set(dateISO, label);
+  }
+  return label;
 }
 // Shared by the visible list and the filter sheet's live "Show N expenses"
 // preview, so both always agree without querying IndexedDB twice.
@@ -3237,9 +3287,15 @@ async function getFilteredTransactions(){
   else if(state.txnFilterType==='income') list=list.filter(isIncomeEntry);
   else if(state.txnFilterType==='transfer') list=list.filter(isTransferEntry);
   else list=list.filter(e=>!isTransferEntry(e)); // 'all' — hide transfers by default
-  // Category filter only applies to expense entries — income entries use a
-  // separate INCOME_CATEGORIES list so txnFilterCategoryIds never match them
-  if(state.txnFilterCategoryIds.size>0) list=list.filter(e => isIncomeEntry(e) || state.txnFilterCategoryIds.has(e.categoryId));
+  // Category filter is an expense-only concept (income uses incomeCategoryId;
+  // its categoryId is null). Income used to be EXEMPTED here ("can never
+  // match, so pass it through") — which meant filtering to a category showed
+  // that category's expenses PLUS all income. Fixed 2026-07-15: income now
+  // simply fails the check like any non-matching entry. The type-switch
+  // handler clears txnFilterCategoryIds when switching to Income/Transfer,
+  // same as the other expense-only filters, so a stale hidden selection can
+  // never blank out income results.
+  if(state.txnFilterCategoryIds.size>0) list=list.filter(e => state.txnFilterCategoryIds.has(e.categoryId));
   if(state.txnFilterPaymentIds.size>0) list=list.filter(e => state.txnFilterPaymentIds.has(e.paymentMethod));
   if(state.txnFilterStartISO) list=list.filter(e => e.date >= state.txnFilterStartISO);
   if(state.txnFilterEndISO) list=list.filter(e => e.date <= state.txnFilterEndISO);
@@ -4270,30 +4326,16 @@ function base64ToArrayBuffer(base64){
 
 async function exportData(){
   try{
-    const [categories, incomeCategories, paymentMethods, groups, expensesRaw, attachmentsRaw, recurring, budgets, accounts] = await Promise.all([
-      DB.getAllCategories(), DB.getAllIncomeCategories(), DB.getAllPaymentMethods(), DB.getAllGroups(),
-      DB.getExpensesByDateRange('0000-01-01','9999-12-31'), DB.getAllAttachments(), DB.getAllRecurring(), DB.getAllBudgets(), DB.getAllAccounts(),
-    ]);
-    const expenses=expensesRaw.filter(e => !pendingDeletes[e.id]); // includes expenses, income, and transfers
-    // Attachments carry raw ArrayBuffer data, which JSON can't hold
-    // directly — base64-encoded here, decoded back on import.
-    const attachments=attachmentsRaw.map(a => ({
-      id:a.id, expenseId:a.expenseId, type:a.type, fileName:a.fileName, mimeType:a.mimeType,
-      dataBase64: arrayBufferToBase64(a.data),
-    }));
+    // Payload construction is delegated to CloudBackup.buildPayload — it was a
+    // byte-for-byte duplicate of this code, and the schemaVersion:6 bump
+    // already had to be made in two places once. buildPayload(true) = include
+    // ALL attachments, matching the manual export's original behaviour (the
+    // auto-backup path passes false to keep only warranty attachments).
     // PIN/lockout state lives in Store (localStorage), not IndexedDB, and is
     // deliberately left out of the export — a backup is about expense data,
     // not device security, and restoring an old PIN hash onto a different
     // session would be confusing at best.
-    const payload={
-      app:'PaisaTrail', schemaVersion:6, exportedAt:new Date().toISOString(),
-      categories, incomeCategories, paymentMethods, groups, expenses, attachments, recurring, budgets, accounts,
-      preferences:{
-        cycleDay: parseInt(Store.get('pt_cycle_day')||'1',10),
-        accountsEnabled: Store.get('pt_accounts_enabled')==='1',
-        accountsHadData: Store.get('pt_accounts_had_data')==='1',
-      },
-    };
+    const payload=await CloudBackup.buildPayload(true);
     const blob=new Blob([JSON.stringify(payload)], {type:'application/json'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
@@ -4768,9 +4810,9 @@ function getHighExpenseAlerts(){
     return r.nextDueISO<=windowEndISO;
   });
 }
-async function getPendingActions(){
+async function getPendingActions(prefetched){
   const actions=[];
-  const warrantiesSoon=await getWarrantiesExpiringSoon();
+  const warrantiesSoon=await getWarrantiesExpiringSoon(prefetched);
   if(warrantiesSoon.length>0){
     const label = warrantiesSoon.length===1
       ? `${(state.categories.find(c=>c.id===warrantiesSoon[0].categoryId)||{}).name || warrantiesSoon[0].note || 'Item'} warranty — ${formatWarrantyRemaining(warrantiesSoon[0].warrantyExpiry).label}`
@@ -4784,7 +4826,7 @@ async function getPendingActions(){
     const amountLabel = rule.type==='income' ? maskIncome(rule.amount) : formatINR(rule.amount);
     actions.push({ id:'highexp-'+rule.id, icon:'🔔', label:`${rule.name} due ${dueLabel} · ${amountLabel}`, action:'highexpense', ruleId:rule.id });
   });
-  if(await shouldShowBackupNudge()){
+  if(await shouldShowBackupNudge(prefetched)){
     const lastExport=parseInt(Store.get('pt_last_export')||'0');
     const label = lastExport
       ? `Back up your data — last backed up ${fmtDuration(Math.floor((Date.now()-lastExport)/86400000))} ago`
@@ -4807,8 +4849,8 @@ async function getPendingActions(){
   }
   return actions;
 }
-async function renderActionsPill(){
-  const actions=await getPendingActions();
+async function renderActionsPill(prefetched){
+  const actions=await getPendingActions(prefetched);
   const count=actions.length;
   ACTIONS_PILL_IDS.forEach(id=>{
     const btn=document.getElementById(id);
@@ -5752,10 +5794,11 @@ const FORECAST_LOOKBACK_OPTIONS=[30,90,180]; // user-configurable: how far back 
 // per-expense — this stays as a backstop for anyone who doesn't use it.)
 const FORECAST_MIN_EXPENSE_COUNT=5;
 const FORECAST_MIN_DISTINCT_DAYS=7;
-async function estimateDailyOtherSpend(lookbackDays){
+async function estimateDailyOtherSpend(lookbackDays, prefetched){
   const today=todayISO();
   const lookbackStartISO=dateToISO(addDays(new Date(today+'T00:00:00'), -lookbackDays));
-  const all=(await DB.getExpensesByDateRange(lookbackStartISO, today)).filter(e => !pendingDeletes[e.id] && !e.recurringId && isExpenseEntry(e));
+  const source = prefetched ? sliceByDateRange(prefetched, lookbackStartISO, today) : await DB.getExpensesByDateRange(lookbackStartISO, today);
+  const all=source.filter(e => !pendingDeletes[e.id] && !e.recurringId && isExpenseEntry(e));
   const excluded=all.filter(e => e.excludeFromForecast);
   const expenses=all.filter(e => !e.excludeFromForecast);
   const excludedTotal=excluded.reduce((s,e)=>s+Number(e.amount),0);
@@ -5774,7 +5817,7 @@ function setForecastLookback(days){
   state.forecastLookbackDays=days;
   renderHomeForecastPanel();
 }
-async function renderHomeForecastPanel(){
+async function renderHomeForecastPanel(prefetched){
   document.querySelectorAll('#forecast-window-tabs .segmented-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.forecastwindow===state.forecastWindow);
   });
@@ -5792,14 +5835,14 @@ async function renderHomeForecastPanel(){
     const bounds=cycleBounds(today);
     windowEndISO=bounds.endISO;
     remainingDays=Math.max(0, Math.round((new Date(windowEndISO+'T00:00:00') - new Date(today+'T00:00:00'))/86400000));
-    spentSoFar=(await DB.getExpensesByDateRange(bounds.startISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
+    spentSoFar=(prefetched ? sliceByDateRange(prefetched, bounds.startISO, today) : await DB.getExpensesByDateRange(bounds.startISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
   } else {
     windowEndISO=dateToISO(addDays(new Date(today+'T00:00:00'), FORECAST_ROLLING_WINDOW_DAYS));
     remainingDays=FORECAST_ROLLING_WINDOW_DAYS;
   }
 
   const { total:recurringTotal, items:upcoming } = projectRecurringTotal(windowEndISO);
-  const { rate:dailyOtherRate, excludedTotal, excludedCount } = await estimateDailyOtherSpend(state.forecastLookbackDays);
+  const { rate:dailyOtherRate, excludedTotal, excludedCount } = await estimateDailyOtherSpend(state.forecastLookbackDays, prefetched);
   const estimatedOther = dailyOtherRate!=null ? dailyOtherRate*remainingDays : null;
   const projectedTotal = spentSoFar + recurringTotal + (estimatedOther || 0);
 
@@ -5914,10 +5957,11 @@ async function renderHomeForecastPanel(){
 }
 
 /* ============================== BUDGETS ============================== */
-async function getMonthToDateExpenses(){
+async function getMonthToDateExpenses(prefetched){
   const today=todayISO();
   const cycleStartISO=cycleBounds(today).startISO;
-  return (await DB.getExpensesByDateRange(cycleStartISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e));
+  const source = prefetched ? sliceByDateRange(prefetched, cycleStartISO, today) : await DB.getExpensesByDateRange(cycleStartISO, today);
+  return source.filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e));
 }
 // Unlike Forecast's "estimated other spending," budgets intentionally
 // include recurring-generated expenses in the spent total — a recurring
@@ -5996,14 +6040,14 @@ async function getBudgetHistoryData(targetCategoryId){
 function updateBudgetsAddBtn(){
   document.getElementById('budgets-add-btn').classList.toggle('hidden', getAvailableBudgetTargets().length===0);
 }
-async function renderHomeBudgetsPanel(){
+async function renderHomeBudgetsPanel(prefetched){
   const list=document.getElementById('budgets-list'); list.innerHTML='';
   updateBudgetsAddBtn();
   if(state.budgets.length===0){
     list.innerHTML='<p class="empty-hint">No budgets set yet — tap below to set a monthly limit for a category, or an overall total.</p>';
     return;
   }
-  const monthExpenses=await getMonthToDateExpenses();
+  const monthExpenses=await getMonthToDateExpenses(prefetched);
   const rows=state.budgets.map(b=>{
     const spent=budgetSpentAmount(b, monthExpenses);
     const pct=b.monthlyLimit>0 ? spent/b.monthlyLimit : 0;
@@ -8120,6 +8164,8 @@ document.getElementById('txn-filter-type-tabs').addEventListener('click', (e) =>
   if(newType==='income' || newType==='transfer'){
     state.txnFilterPaymentIds.clear();
     state.txnFilterGroupIds.clear();
+    state.txnFilterCategoryIds.clear();
+    renderTxnFilterCatGrid(); // deselect the chips too, so nothing looks selected when switching back
     if(state.txnFilterSplitOnly){ state.txnFilterSplitOnly=false; syncSplitFilterUI(); }
   }
   syncIncomeFilterSections();
