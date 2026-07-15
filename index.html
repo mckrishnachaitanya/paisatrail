@@ -1984,11 +1984,26 @@ function maskIncomeHTML(realText, maskText){
 }
 // Single entry point for changing reveal state — keeps state, the <body>
 // class that drives CSS masking, and the eye-button icons in sync.
+// v3.38: reveal is a PEEK, not a persistent state — auto re-masks after 30s.
+// This bounds the recents-thumbnail exposure (a hidden page stops painting
+// before visibilitychange fires, so masking on hide never lands in the
+// snapshot — the thumbnail can now only leak if the switch happens within
+// the peek window, and the blur listener below covers most of that too).
+const INCOME_PEEK_MS = 30*1000;
+let incomePeekTimer=null;
 function setIncomeRevealed(v){
   state.incomeRevealed=v;
   document.body.classList.toggle('inc-revealed', v);
   updateEyeButtons();
+  clearTimeout(incomePeekTimer);
+  if(v) incomePeekTimer=setTimeout(()=>setIncomeRevealed(false), INCOME_PEEK_MS);
 }
+// window blur fires slightly BEFORE the app-switch shrink animation, while
+// the page is often still painting — so a mask applied here has a real shot
+// at making it into the recents snapshot (unlike visibilitychange, which is
+// too late by definition). Not guaranteed on every Android version/launcher;
+// best-effort, harmless when it doesn't land (user just taps 👁️ again).
+window.addEventListener('blur', ()=>{ if(state.incomeRevealed) setIncomeRevealed(false); });
 function splitTitlePrefix(e){ return (e.splitTotal!=null) ? '✂️ ' : ''; }
 function addMonthsISO(dateISO, months){
   const d=new Date((dateISO||todayISO())+'T00:00:00');
@@ -2886,10 +2901,12 @@ function endPickerSuppression(){
 // stays alive, and the AUTHORITATIVE elapsed-time check on return catches the
 // frozen-page case where that timer never fired — so an over-grace absence
 // always locks, at latest the instant the app becomes visible again.
-// Income is re-masked on EVERY hide (even picker-suppressed ones) so the
-// recents-screen thumbnail never shows revealed income during the grace
-// window — the thumbnail is captured at hide time, so this must happen
-// synchronously here, not when the grace expires.
+// Income is re-masked on EVERY hide (even picker-suppressed ones) — note
+// this alone does NOT protect the recents thumbnail (the page stops painting
+// before this event fires, so the mask never reaches the snapshot; learned
+// on-device v3.37). Thumbnail protection comes from the blur listener +
+// 30s peek timer in setIncomeRevealed (v3.38); this hide-time mask remains
+// as the guarantee that the app RESUMES masked.
 const HIDE_LOCK_GRACE_MS = 60*1000;
 let hideLockTimer=null;
 let hiddenAtMs=null;

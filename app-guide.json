@@ -2,6 +2,14 @@
   "version": "3.36",
   "releaseNotes": [
     {
+      "version": "3.38",
+      "date": "2026-07-15",
+      "highlights": [
+        "The 👁️ income reveal now works as a peek — revealed amounts automatically mask themselves again after 30 seconds, so income is never left visible by accident.",
+        "Income also re-masks the instant the app starts losing focus (e.g. tapping the recents button), so the app preview in your recents screen is far less likely to show real values — this closes the gap where v3.37's masking only took effect after returning to the app."
+      ]
+    },
+    {
       "version": "3.37",
       "date": "2026-07-15",
       "highlights": [
