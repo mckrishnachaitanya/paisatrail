@@ -309,6 +309,10 @@ body.inc-revealed .minc-mask{display:none;}
 .txn-filter-btn.active{background:var(--grape);color:#fff;}
 .search-bar input{flex:1;border:none;background:transparent;font-size:14px;color:var(--ink);}
 .txn-group-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.03em;margin:14px 0 8px;}
+.txn-filter-show-more{display:block;width:100%;margin:14px 0 4px;padding:13px;border-radius:16px;
+  border:1.5px dashed var(--border);background:var(--surface);color:var(--muted);
+  font-size:13px;font-weight:700;cursor:pointer;}
+.txn-filter-show-more:active{transform:scale(.98);}
 .txn-delete{font-size:15px;color:var(--muted);width:26px;height:26px;flex-shrink:0;display:flex;
   align-items:center;justify-content:center;}
 
@@ -335,7 +339,6 @@ body.inc-revealed .minc-mask{display:none;}
 .exclude-forecast-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
   border-radius:18px;background:var(--surface);margin-top:18px;}
 .exclude-forecast-info{flex:1;min-width:0;}
-.exclude-forecast-label{font-size:13px;font-weight:700;}
 .exclude-forecast-sub{font-size:11px;color:var(--muted);margin-top:2px;display:block;}
 
 .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
@@ -598,7 +601,7 @@ body.inc-revealed .minc-mask{display:none;}
     <div class="pin-brand-sub" id="pin-subtitle">Your personal expense tracker</div>
   </div>
   <div class="pin-label" id="pin-label">Enter your 6-digit PIN</div>
-  <div class="pin-dots" id="pin-dots">
+  <div class="pin-dots">
     <div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div>
     <div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div>
     <div class="pin-dot" id="d4"></div><div class="pin-dot" id="d5"></div>
@@ -656,7 +659,7 @@ body.inc-revealed .minc-mask{display:none;}
       <div class="spend-card">
         <div class="cashflow-row">
           <span class="cashflow-label">Income</span>
-          <span class="cashflow-amount cashflow-in" id="home-income-total">+₹0</span>
+          <span class="cashflow-amount cashflow-in" id="home-income-total">+₹••••••</span>
         </div>
         <div class="cashflow-row">
           <span class="cashflow-label">Expenses</span>
@@ -877,7 +880,7 @@ body.inc-revealed .minc-mask{display:none;}
 
 <!-- ============================== TRANSACTIONS SCREEN ============================== -->
 <div class="screen is-hidden" id="transactions-screen">
-  <div id="txn-sticky-top" style="flex-shrink:0;background:var(--paper);padding:0 20px;">
+  <div style="flex-shrink:0;background:var(--paper);padding:0 20px;">
     <div class="screen-topbar">
       <p class="topbar-title">Transactions</p>
       <div class="topbar-icons">
@@ -963,7 +966,7 @@ body.inc-revealed .minc-mask{display:none;}
 
 <!-- ============================== INSIGHTS ============================== -->
 <div class="screen is-hidden" id="stats-screen">
-  <div id="stats-sticky-top" style="flex-shrink:0;background:var(--paper);padding:0 20px;">
+  <div style="flex-shrink:0;background:var(--paper);padding:0 20px;">
     <div class="screen-topbar">
       <p class="topbar-title">Insights</p>
       <div class="topbar-icons">
@@ -1060,7 +1063,7 @@ body.inc-revealed .minc-mask{display:none;}
         <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">🏦</span>
         <div class="settings-row-info">
           <p class="settings-row-title">Accounts &amp; Wallets</p>
-          <span class="settings-row-sub" id="settings-accounts-sub">Track bank balances and credit card outstanding</span>
+          <span class="settings-row-sub">Track bank balances and credit card outstanding</span>
         </div>
         <div class="switch" id="settings-accounts-switch"><div class="switch-thumb"></div></div>
       </button>
@@ -1467,7 +1470,7 @@ body.inc-revealed .minc-mask{display:none;}
       <button type="button" class="topbar-close" id="recurring-edit-close-btn">✕</button>
     </div>
     <!-- Type toggle — expense vs income; locked to read-only when editing existing rule -->
-    <div id="recurring-type-toggle-wrap" style="margin-top:14px;">
+    <div style="margin-top:14px;">
       <div class="segmented-tabs" id="recurring-type-tabs" style="margin-bottom:0;">
         <button type="button" class="segmented-tab active" data-rtype="expense">Expense</button>
         <button type="button" class="segmented-tab" data-rtype="income">Income</button>
@@ -2262,6 +2265,18 @@ const DB = {
       req.onerror=()=>reject(req.error);
     });
   },
+  // Store-level count without loading a single row — used by the Drive
+  // connect/open checks that only need "is this DB empty?". Counts raw store
+  // contents (including any entry inside its undo-delete window), exactly
+  // matching the full-fetch .length it replaced.
+  async countEntries(){
+    const db=await openDB();
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction('expenses','readonly').objectStore('expenses').count();
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  },
   async getAllGroups(){
     const db=await openDB();
     return new Promise((resolve,reject)=>{
@@ -3013,7 +3028,9 @@ async function renderHomeOverviewPanel(prefetched){
   const incomeTotal=incomes.reduce((s,e)=>s+Number(e.amount),0);
   const net=incomeTotal - expenseTotal;
 
-  document.getElementById('home-income-total').innerHTML = incomeTotal>0 ? `+${maskIncomeHTML(formatINR(incomeTotal))}` : '+₹0';
+  // Zero goes through the mask too — the old '+₹0' shortcut leaked the
+  // "no income logged yet" state even while income was hidden.
+  document.getElementById('home-income-total').innerHTML = `+${maskIncomeHTML(formatINR(incomeTotal))}`;
   document.getElementById('home-expense-total').textContent = formatINR(expenseTotal);
   const netEl=document.getElementById('home-net-total');
   // Net is income-derived, so it masks too; the sign is only part of the
@@ -3353,6 +3370,14 @@ let txnRenderSeq=0; // bumped on every render so an in-flight, now-superseded
                      // skip its DOM write instead of overwriting the fresher
                      // result — fixes the filter button occasionally lagging
                      // a beat behind rapid filter changes.
+// Chunked list rendering: only TXN_CHUNK rows hit the DOM initially, with a
+// "Show more" row to extend. The limit lives in module scope and resets
+// whenever the filter/search signature changes, so "show more" survives a
+// save-triggered refresh but a new search starts fresh. The footer count and
+// split summary always use the FULL filtered list — only DOM rows are capped.
+const TXN_CHUNK=200;
+let txnVisibleLimit=TXN_CHUNK;
+let txnLastSignature='';
 async function renderTransactions(){
   const mySeq=++txnRenderSeq;
   const search=(document.getElementById('txn-search').value||'').toLowerCase().trim();
@@ -3360,7 +3385,11 @@ async function renderTransactions(){
   if(mySeq!==txnRenderSeq) return;
   updateTxnFilterBtnState();
 
-  const container=document.getElementById('txn-list'); container.innerHTML='';
+  const signature=JSON.stringify([search, state.txnFilterType, [...state.txnFilterCategoryIds], [...state.txnFilterPaymentIds], state.txnFilterStartISO, state.txnFilterEndISO, state.txnFilterMinAmount, state.txnFilterMaxAmount, state.txnFilterSplitOnly, state.txnFilterSplitStatus, [...state.txnFilterGroupIds], [...state.txnFilterAccountIds]]);
+  if(signature!==txnLastSignature){ txnLastSignature=signature; txnVisibleLimit=TXN_CHUNK; }
+
+  const container=document.getElementById('txn-list');
+  const parts=[];
   if(state.txnFilterSplitOnly){
     const unsettled=list.filter(e=>!e.splitSettled);
     const pendingAmt=unsettled.reduce((s,e)=>s+Math.max(0,(e.splitTotal||0)-Number(e.amount)),0);
@@ -3368,17 +3397,18 @@ async function renderTransactions(){
       ? `${unsettled.length} unsettled · ${formatINR(pendingAmt)} pending from others`
       : (list.length>0 ? 'All splits settled ✓' : '');
     if(summaryText){
-      container.insertAdjacentHTML('beforeend', `<p class="spend-count" style="margin:0 0 12px;color:var(--muted);">${summaryText}</p>`);
+      parts.push(`<p class="spend-count" style="margin:0 0 12px;color:var(--muted);">${summaryText}</p>`);
     }
   }
   if(list.length===0){
-    container.insertAdjacentHTML('beforeend', `<p class="empty-hint">${(search||hasActiveTxnFilters()) ? 'No entries match your search or filters.' : 'No entries yet — tap + to add your first one.'}</p>`);
+    parts.push(`<p class="empty-hint">${(search||hasActiveTxnFilters()) ? 'No entries match your search or filters.' : 'No entries yet — tap + to add your first one.'}</p>`);
   } else {
+    const visible=list.slice(0, txnVisibleLimit);
     let lastGroup=null;
-    list.forEach(e=>{
+    visible.forEach(e=>{
       const groupLabel=formatGroupLabel(e.date);
       if(groupLabel!==lastGroup){
-        container.insertAdjacentHTML('beforeend', `<p class="txn-group-label">${esc(groupLabel.toUpperCase())}</p>`);
+        parts.push(`<p class="txn-group-label">${esc(groupLabel.toUpperCase())}</p>`);
         lastGroup=groupLabel;
       }
       const isInc=isIncomeEntry(e);
@@ -3391,7 +3421,7 @@ async function renderTransactions(){
         // the signed effect the user will recognise.
         const reconIsInc=isIncomeEntry(e);
         const reconAmtText = reconIsInc ? `+${formatINR(e.amount)}` : `-${formatINR(e.amount)}`;
-        container.insertAdjacentHTML('beforeend', `
+        parts.push(`
           <div class="recent-row" data-id="${e.id}">
             <div class="recent-icon" style="background:rgba(134,87,224,0.14);">⚖️</div>
             <div class="recent-info">
@@ -3406,7 +3436,7 @@ async function renderTransactions(){
       if(isTxfr){
         const fromAcct=state.accounts.find(a=>a.id===e.fromAccountId);
         const toAcct=state.accounts.find(a=>a.id===e.toAccountId);
-        container.insertAdjacentHTML('beforeend', `
+        parts.push(`
           <div class="recent-row" data-id="${e.id}">
             <div class="recent-icon" style="background:rgba(134,87,224,0.14);">⇄</div>
             <div class="recent-info">
@@ -3433,7 +3463,7 @@ async function renderTransactions(){
         const withText = e.splitWith ? ` with ${esc(e.splitWith)}` : '';
         subtitle = `${formatINR(e.splitTotal)} total${withText}${e.splitSettled?' · Settled':''}`;
       }
-      container.insertAdjacentHTML('beforeend', `
+      parts.push(`
         <div class="recent-row" data-id="${e.id}">
           <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:fallbackIcon}</div>
           <div class="recent-info">
@@ -3444,7 +3474,16 @@ async function renderTransactions(){
           <button class="txn-delete" data-del="${e.id}">🗑️</button>
         </div>`);
     });
+    if(list.length>txnVisibleLimit){
+      const remaining=list.length-txnVisibleLimit;
+      parts.push(`<button type="button" class="txn-filter-show-more" id="txn-show-more">Show ${Math.min(TXN_CHUNK, remaining)} more (${remaining} remaining)</button>`);
+    }
   }
+  // One innerHTML assignment instead of one insertAdjacentHTML per row —
+  // a single parse pass on a detached string, no incremental DOM churn.
+  container.innerHTML=parts.join('');
+  const moreBtn=document.getElementById('txn-show-more');
+  if(moreBtn) moreBtn.onclick=()=>{ txnVisibleLimit+=TXN_CHUNK; renderTransactions(); };
   const typeLabel = state.txnFilterType==='income' ? 'income entries' : state.txnFilterType==='expense' ? 'expenses' : state.txnFilterType==='transfer' ? 'transfers' : 'entries';
   document.getElementById('txn-filter-show-btn').textContent = `Show ${list.length} ${typeLabel}`;
 }
@@ -5002,7 +5041,7 @@ async function handleDriveConnectClick(){
     //     restore, which is the whole reason someone connects on a 2nd device.
     //   - Has data: kick off a silent backup so there's something on Drive
     //     immediately (original behaviour).
-    const expenseCount=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).length;
+    const expenseCount=await DB.countEntries();
     if(expenseCount===0){
       await offerDriveRestoreIfBackupExists();
     } else {
@@ -5089,7 +5128,7 @@ function confirmDriveDisconnect(){
 // of scope.
 async function checkDriveOnOpen(){
   if(!CloudBackup.isConnected()) return;
-  const expenseCount=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).length;
+  const expenseCount=await DB.countEntries();
   if(expenseCount===0){
     await offerDriveRestoreIfBackupExists();
     return;
@@ -8734,6 +8773,10 @@ document.getElementById('ins-custom-end').addEventListener('change', (e) => {
 document.querySelectorAll('[data-nav]').forEach(item => {
   item.addEventListener('click', () => {
     const nav=item.dataset.nav;
+    // Already on this tab? Nothing can have changed underneath us (all data
+    // mutations go through flows that refresh their views), so skip the full
+    // re-render — Home alone was re-running four panels on a redundant tap.
+    if(getCurrentScreen()===nav+'-screen') return;
     showScreen(nav+'-screen');
     if(nav==='home') renderHome();
     if(nav==='transactions') renderTransactions();

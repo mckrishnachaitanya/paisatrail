@@ -1,6 +1,23 @@
 {
-  "version": "3.34",
+  "version": "3.36",
   "releaseNotes": [
+    {
+      "version": "3.36",
+      "date": "2026-07-15",
+      "highlights": [
+        "When income is hidden, a zero income now shows the same ₹•••••• dots as any other amount — previously it displayed +₹0, revealing that no income had been logged. Tap the eye to reveal the real value as before."
+      ]
+    },
+    {
+      "version": "3.35",
+      "date": "2026-07-15",
+      "highlights": [
+        "Long transaction lists now load in pages of 200 with a \"Show more\" button — the list opens instantly no matter how much history you have. Search and filters still cover everything; only what's drawn on screen is paged.",
+        "The list is also built in one pass instead of row by row, and connecting Google Drive no longer loads your whole history just to check whether the app is empty.",
+        "Tapping the tab you're already on no longer silently redraws the whole screen.",
+        "Housekeeping: removed a leftover style rule and a few unused element ids."
+      ]
+    },
     {
       "version": "3.34",
       "date": "2026-07-15",
