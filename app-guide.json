@@ -2,6 +2,15 @@
   "version": "3.36",
   "releaseNotes": [
     {
+      "version": "3.37",
+      "date": "2026-07-15",
+      "highlights": [
+        "Switching to another app no longer locks PaisaTrail instantly — you now have a 60-second grace window, so flipping to your bank app mid-entry and back doesn't force a re-unlock. Stay away longer and it locks as before.",
+        "For privacy, income amounts are automatically re-masked the moment the app goes to the background — the app preview in your recents screen never shows revealed income.",
+        "The 2-minute idle lock and the manual 🔒 button are unchanged."
+      ]
+    },
+    {
       "version": "3.36",
       "date": "2026-07-15",
       "highlights": [

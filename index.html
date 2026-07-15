@@ -2841,6 +2841,7 @@ function lockVault(){
   state.unlocked=false;
   setIncomeRevealed(false);
   clearTimeout(autoLockTimer);
+  clearTimeout(hideLockTimer); // grace timer (declared below) — lockVault's unlocked-guard makes a stale fire harmless, but don't leave it pending
   enterUnlockScreen();
 }
 // Single entry point for showing the unlock screen — used by lockVault()
@@ -2878,10 +2879,36 @@ function endPickerSuppression(){
   suppressLockOnHide=false;
   clearTimeout(suppressLockTimer);
 }
+// App-switch grace period (v3.37): switching away no longer locks instantly.
+// A 60s grace window covers the flip-to-another-app-and-back flow (checking a
+// bank app mid-entry). Two mechanisms because Android throttles/freezes
+// background timers: a best-effort setTimeout locks while hidden if the page
+// stays alive, and the AUTHORITATIVE elapsed-time check on return catches the
+// frozen-page case where that timer never fired — so an over-grace absence
+// always locks, at latest the instant the app becomes visible again.
+// Income is re-masked on EVERY hide (even picker-suppressed ones) so the
+// recents-screen thumbnail never shows revealed income during the grace
+// window — the thumbnail is captured at hide time, so this must happen
+// synchronously here, not when the grace expires.
+const HIDE_LOCK_GRACE_MS = 60*1000;
+let hideLockTimer=null;
+let hiddenAtMs=null;
 document.addEventListener('visibilitychange', ()=>{
   if(document.hidden){
-    if(!suppressLockOnHide && state.unlocked) lockVault();
+    setIncomeRevealed(false); // unconditional — thumbnail privacy (cheap CSS flip, no re-render)
+    if(!suppressLockOnHide && state.unlocked){
+      hiddenAtMs=Date.now();
+      clearTimeout(hideLockTimer);
+      hideLockTimer=setTimeout(lockVault, HIDE_LOCK_GRACE_MS); // best-effort while backgrounded
+    }
   } else {
+    clearTimeout(hideLockTimer);
+    const overGrace = state.unlocked && hiddenAtMs!==null && (Date.now()-hiddenAtMs) >= HIDE_LOCK_GRACE_MS;
+    hiddenAtMs=null;
+    if(overGrace){
+      lockVault(); // page visible → enterUnlockScreen fires the biometric prompt directly
+      return;
+    }
     if(pendingAutoBio){ pendingAutoBio=false; tryAutoBiometric(); }
     if(state.unlocked) resetAutoLock();
   }
