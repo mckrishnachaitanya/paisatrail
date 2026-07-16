@@ -2,6 +2,13 @@
   "version": "3.36",
   "releaseNotes": [
     {
+      "version": "3.39",
+      "date": "2026-07-17",
+      "highlights": [
+        "Fixed a Forecast bug where active recurring income (like salary) was being added into \u201cRecurring still due\u201d and the upcoming list as if it were an expense, inflating projected spend and understating projected savings. Recurring income now only counts once, correctly, on the income side."
+      ]
+    },
+    {
       "version": "3.38",
       "date": "2026-07-15",
       "highlights": [

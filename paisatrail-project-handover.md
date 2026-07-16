@@ -252,6 +252,8 @@ Type guards — apply consistently, income and transfers must never reach budget
 
 **`sw.js`:** Cache name `paisatrail-v3`. `index.html` stale-while-revalidate. Bump cache name only if `manifest.json` or icons change. `{cache:'no-store'}` on fetch calls is load-bearing.
 
+**`projectRecurringTotal()` (v3.39 fix):** Must filter `rule.type==='expense'` — it only iterates `rule.active`, not type, so any active income recurring rule (salary etc.) silently got summed into the expense-side "Recurring still due" total and listed in the Forecast upcoming list. The savings card's own `incomeRules` filter (search `type==='income'`) was already correct and unaffected — this was purely an expense-side leak. If adding any new recurring-rule consumer, always filter by `rule.type` explicitly; `state.recurringRules` is a single mixed array of both income and expense rules.
+
 ---
 
 ## 5. Testing
