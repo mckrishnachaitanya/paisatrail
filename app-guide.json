@@ -2,6 +2,13 @@
   "version": "3.36",
   "releaseNotes": [
     {
+      "version": "3.40",
+      "date": "2026-07-17",
+      "highlights": [
+        "Fixed a regression from v3.39: recurring expenses created via the quick “Make this recurring” toggle on the Add Expense screen (rather than the Recurring Manager) were being excluded from Forecast entirely, because they don't carry an explicit type field. Forecast now correctly treats any recurring rule not explicitly marked as income as an expense."
+      ]
+    },
+    {
       "version": "3.39",
       "date": "2026-07-17",
       "highlights": [

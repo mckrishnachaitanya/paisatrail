@@ -5842,7 +5842,7 @@ function projectRecurringTotal(windowEndISO){
   let total=0;
   const items=[];
   for(const rule of state.recurringRules){
-    if(!rule.active || rule.type!=='expense') continue;
+    if(!rule.active || rule.type==='income') continue;
     let cursor=rule.nextDueISO;
     let count=0;
     while(cursor<=windowEndISO && count<RECURRING_CATCHUP_CAP){
