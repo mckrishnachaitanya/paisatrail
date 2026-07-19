@@ -1,6 +1,14 @@
 {
-  "version": "3.36",
+  "version": "3.41",
   "releaseNotes": [
+    {
+      "version": "3.41",
+      "date": "2026-07-19",
+      "highlights": [
+        "Home now greets you with the time of day (\u201cGood morning\u201d/\u201cGood afternoon\u201d/\u201cGood evening\u201d) instead of a flat \u201cHey there\u201d",
+        "Add your name in Settings \u2192 Profile to have it show up in the greeting too \u2014 this is per-device, so you and anyone else sharing the app can each set your own"
+      ]
+    },
     {
       "version": "3.40",
       "date": "2026-07-17",

@@ -159,6 +159,8 @@ Bulk assign: Settings → Manage accounts → "Bulk assign past transactions" �
 
 **Transfer Phase 2 + cleanup (2026-07-03):** Investigation before building revealed transfer *editing* already worked end-to-end via the generic Add/Edit screen — the backlog note claiming "add/delete only" was stale; `openEditFromId` never excluded transfers and `saveExpense`'s transfer branch already handled `isEdit`. Verified via Playwright before touching anything. Actual work: fixed a title-display bug (editing a transfer showed "Add transfer" — 3 separate places set that text, 2 of them incomplete; consolidated into one `updateAddScreenTitleAndSaveBtn()`), locked the Expense/Income/Transfer toggle read-only during any edit (same pattern recurring rules already used), added a new per-account transfer history view (tap an account row in the Accounts sheet → `#account-transfers-overlay`, read-only, newest-first, direction + date + signed amount), consolidated `.home-tabs`/`.home-tab` into `.segmented-tabs`/`.segmented-tab` (was a pixel-identical duplicate), and removed one dead function (`isAccountsEnabled()`, zero call sites).
 
+**Home greeting (v3.41, 2026-07-19):** The static "Hey there 👋" was replaced with a time-of-day greeting (`getTimeOfDayGreeting()`: Good morning/afternoon/evening/night by hour) plus an optional name, read from `pt_user_name` (new Settings → Profile text field, per-device localStorage — not synced, same as every other Store-backed preference). `renderHomeGreeting()` sets `#home-greeting`'s text and is called from `renderHome()` (so it's always current on nav/unlock) and directly from the Profile input's `input` listener (so switching back to Home shows the new name immediately without waiting on a full `renderHome()`). No name set → falls back to a plain time-of-day greeting with no comma, so neither Krishna nor Pavankumar sees anything broken until they opt in on their own device.
+
 **Dropped:** Dark mode.
 
 ---
@@ -219,6 +221,7 @@ Type guards — apply consistently, income and transfers must never reach budget
 | `pt_drive_last_error` | '1' when the last backup attempt failed (drives the cloud icon's error dot); cleared on next successful backup |
 | `pt_drive_last_backup_mode` | `'auto'` or `'manual'` — mode of the last successful Drive backup, shown in the Settings row |
 | `pt_drive_last_error_at` | timestamp (ms) of the last failed backup attempt, shown in the Settings row when a failure is active |
+| `pt_user_name` | optional display name shown in the Home greeting (Settings → Profile); per-device, not synced |
 
 ---
 

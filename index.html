@@ -623,7 +623,7 @@ body.inc-revealed .minc-mask{display:none;}
   <div id="home-sticky-top">
     <div class="home-header">
       <div>
-        <p class="greeting">Hey there 👋</p>
+        <p class="greeting" id="home-greeting">Hey there 👋</p>
         <p class="month-label" id="home-month-label">—</p>
       </div>
       <div class="topbar-icons">
@@ -1044,7 +1044,18 @@ body.inc-revealed .minc-mask{display:none;}
           <button type="button" class="topbar-lock-btn" id="settings-lock-btn" title="Lock app">🔒</button>
         </div>
       </div>
-      <p class="field-label" style="margin-top:0;">FINANCE</p>
+      <p class="field-label" style="margin-top:0;">PROFILE</p>
+      <div class="settings-row" style="cursor:default;">
+        <span class="settings-row-icon" style="background:rgba(255,143,179,.14);">🙂</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Your name</p>
+          <span class="settings-row-sub">Shown in the Home greeting</span>
+        </div>
+        <input type="text" id="settings-user-name" maxlength="24" placeholder="Name"
+          style="width:110px;padding:6px 10px;border:1.5px solid var(--border);border-radius:10px;
+                 font-size:14px;font-weight:700;color:var(--ink);background:var(--surface);text-align:right;">
+      </div>
+      <p class="field-label">FINANCE</p>
       <div class="settings-row" style="cursor:default;">
         <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">📅</span>
         <div class="settings-row-info">
@@ -2931,6 +2942,28 @@ document.addEventListener('visibilitychange', ()=>{
   }
 });
 
+/* ============================== HOME GREETING ============================== */
+// Replaces the static "Hey there 👋" with a time-of-day greeting plus the
+// user's name (Store key pt_user_name, set from Settings → Profile). Falls
+// back to a plain time-of-day greeting with no name if it's never been set —
+// so neither Krishna nor Pavankumar sees a blank/broken greeting until they
+// fill it in on their own device (the name is per-device localStorage, not
+// synced — same as every other Store-backed preference in the app).
+function getTimeOfDayGreeting(){
+  const hour=new Date().getHours();
+  if(hour<5) return 'Good night';
+  if(hour<12) return 'Good morning';
+  if(hour<17) return 'Good afternoon';
+  if(hour<21) return 'Good evening';
+  return 'Good night';
+}
+function renderHomeGreeting(){
+  const el=document.getElementById('home-greeting');
+  if(!el) return;
+  const name=(Store.get('pt_user_name')||'').trim();
+  el.textContent = `${getTimeOfDayGreeting()}${name?', '+name:''} 👋`;
+}
+
 /* ============================== HOME RENDER ============================== */
 function buildDonutGradient(catTotals, total){
   if(total<=0) return 'conic-gradient(var(--border) 0% 100%)';
@@ -3224,6 +3257,7 @@ function setHomeTab(tab){
 // from Add/Edit "just works" since state.homeTab persists on its own —
 // nothing else needs to remember or restore it separately.
 async function renderHome(){
+  renderHomeGreeting();
   // One shared read for the whole pass (see fetchAllEntries) — previously
   // each panel + the Actions pill did its own overlapping IndexedDB reads.
   const allEntries=await fetchAllEntries();
@@ -8476,6 +8510,10 @@ document.getElementById('settings-cycle-day').addEventListener('change', () => {
   renderHomeBudgetsPanel();
   toast('Cycle start day updated');
 });
+document.getElementById('settings-user-name').addEventListener('input', (e) => {
+  Store.set('pt_user_name', e.target.value.trim());
+  renderHomeGreeting(); // harmless no-op visually while Settings is on screen; keeps Home correct the instant the user navigates back without needing a full renderHome()
+});
 document.getElementById('guide-close-btn').addEventListener('click', closeGuideScreen);
 document.getElementById('settings-notif-row').addEventListener('click', async () => {
   if(isNotifEnabled()){
@@ -8972,6 +9010,7 @@ function init(){
   renderBiometricRow();
   renderNotifRow();
   document.getElementById('settings-cycle-day').value=getCycleDay();
+  document.getElementById('settings-user-name').value=Store.get('pt_user_name')||'';
   // Accounts UI state — read from localStorage directly since unlockSuccess
   // hasn't run yet at init time; unlockSuccess will set state.accountsEnabled.
   const acctEnabled = Store.get('pt_accounts_enabled')==='1';
