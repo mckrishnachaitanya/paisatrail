@@ -1,6 +1,16 @@
 {
-  "version": "3.41",
+  "version": "3.42",
   "releaseNotes": [
+    {
+      "version": "3.42",
+      "date": "2026-07-20",
+      "highlights": [
+        "New: Refund — for cancelled bookings or returned items, open the original expense and tap Refund (in More Options) to log the amount that came back. Partial refunds are expected — you're not forced to refund the full amount.",
+        "Refunds are correctly attributed to the cycle the original purchase happened in, not the cycle the refund lands in — so a refund for last month's cancelled ticket correctly reduces last month's numbers in Budgets and Insights, not this month's.",
+        "The refund still shows up today in your Home and List views the moment it lands, so you always have visible confirmation it happened — tap it to jump back to the original expense.",
+        "Deleting an expense that has linked refunds now warns you and deletes them together, so nothing is left dangling."
+      ]
+    },
     {
       "version": "3.41",
       "date": "2026-07-19",
@@ -435,6 +445,12 @@
       "icon": "✂️",
       "title": "Split expenses",
       "body": "When you split a bill with someone, log the full amount and how many ways it's split — the app works out your share automatically, and that share is what counts toward your budgets and totals. Mark it as settled once everyone's paid up."
+    },
+    {
+      "id": "refund",
+      "icon": "↩️",
+      "title": "Refund",
+      "body": "Cancelled a booking or returned something? Open the original expense, tap Refund in More Options, and log the amount that actually came back — partial refunds are expected, you don't need to refund the full amount. The refund shows up right away in Home and List so you know it landed, but it's counted against the cycle the original purchase happened in, not the cycle the refund arrives in — so Budgets and Insights for that earlier cycle correct themselves automatically. Tap a refund entry to jump back to the original expense. Refunds aren't editable once added — delete and re-add if you need to fix one. Deleting the original expense deletes its linked refunds too."
     },
     {
       "id": "recurring",
