@@ -1,6 +1,13 @@
 {
-  "version": "3.42",
+  "version": "3.43",
   "releaseNotes": [
+    {
+      "version": "3.43",
+      "date": "2026-07-24",
+      "highlights": [
+        "The duplicate-expense hint on the Add screen is now much easier to notice — it's shown as a tinted banner instead of faint gray caption text that was easy to miss while entering an amount"
+      ]
+    },
     {
       "version": "3.42",
       "date": "2026-07-20",

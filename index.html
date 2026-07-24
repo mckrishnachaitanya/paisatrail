@@ -292,6 +292,17 @@ body.inc-revealed .minc-mask{display:none;}
 .recent-amt{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--coral);
   flex-shrink:0;}
 .empty-hint{font-size:13px;color:var(--muted);text-align:center;padding:24px 0;}
+/* Duplicate-expense soft hint (v3.28, restyled v3.43): deliberately NOT styled
+   like .empty-hint's muted placeholder text — Krishna reported the original
+   plain-caption styling was easy to miss entirely while entering an expense.
+   A tinted sunshine background + bold ink text makes it read as a notice
+   worth a glance, without looking like an error/warning — duplicates are
+   often legitimate (e.g. two coffees in one day), so the tone stays
+   informational, never alarming (no red/coral). */
+.dup-hint-banner{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:14px;
+  background:rgba(255,194,60,.18);margin:8px 0 0;}
+.dup-hint-banner-icon{font-size:15px;flex-shrink:0;}
+.dup-hint-banner-text{font-size:12px;font-weight:700;color:var(--ink);line-height:1.4;}
 
 /* swipe-to-delete (Home recent list) */
 .swipe-wrap{position:relative;overflow:hidden;border-radius:18px;margin-bottom:8px;}
@@ -774,9 +785,12 @@ body.inc-revealed .minc-mask{display:none;}
           <input id="add-amount" type="number" inputmode="decimal" placeholder="0" min="0" step="0.01">
         </div>
       </div>
-      <!-- Soft duplicate-expense hint (v3.28) — informational only, never
-           blocks Save. See checkDuplicateExpense() for matching logic. -->
-      <p class="empty-hint hidden" id="add-dup-hint" style="text-align:left;padding:6px 2px 0;"></p>
+      <!-- Soft duplicate-expense hint (v3.28, restyled v3.43) — informational
+           only, never blocks Save. See checkDuplicateExpense() for matching logic. -->
+      <div class="dup-hint-banner hidden" id="add-dup-hint">
+        <span class="dup-hint-banner-icon">🔁</span>
+        <span class="dup-hint-banner-text" id="add-dup-hint-text"></span>
+      </div>
       <div class="perforation">
         <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
         <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
@@ -8147,6 +8161,7 @@ function scheduleDuplicateCheck(){
 }
 async function checkDuplicateExpense(){
   const hintEl=document.getElementById('add-dup-hint');
+  const hintTextEl=document.getElementById('add-dup-hint-text');
   if(state.addMode!=='expense'){ hintEl.classList.add('hidden'); return; }
   const amount=parseFloat(document.getElementById('add-amount').value);
   const categoryId=state.selectedCategoryId;
@@ -8160,7 +8175,9 @@ async function checkDuplicateExpense(){
   // Prefer showing the same-day match if there is one, else whichever's closest.
   const best=matches.find(e=>e.date===dateISO) || matches[0];
   const cat=state.categories.find(c=>c.id===categoryId);
-  hintEl.textContent = `🔁 A similar ${formatINR(amount)} ${cat?cat.name:'expense'} exists — ${formatGroupLabel(best.date)}`;
+  // textContent (not innerHTML) — cat.name is user-editable, so this must
+  // stay auto-escaped rather than needing a manual esc() call.
+  hintTextEl.textContent = `A similar ${formatINR(amount)} ${cat?cat.name:'expense'} expense exists — ${formatGroupLabel(best.date)}`;
   hintEl.classList.remove('hidden');
 }
 async function openAddScreen(existing){
