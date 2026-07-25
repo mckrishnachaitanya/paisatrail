@@ -37,6 +37,48 @@
   --font-mono:'Space Mono',monospace;
 }
 
+/* ============================== THEMES ==============================
+   Each theme overrides only the root tokens above via [data-theme="x"] on
+   <html> — everything in this stylesheet built from var(--...) follows
+   automatically. Applied by applyTheme() / read from localStorage key
+   pt_theme. "Original" is the default (no attribute set, falls through to
+   :root above) rather than its own [data-theme] block, so existing users
+   see zero change until they opt in.
+   KNOWN LIMITATION: category/payment-method colors are user-set DATA, not
+   theme-driven, and correctly stay put regardless of theme. A handful of
+   purely decorative inline rgba(...) tints in the JS (settings-row icon
+   backgrounds, some badge chips) are NOT var()-based and will not shift
+   with the theme — flagged deliberately rather than silently patched, see
+   handover doc for the full list. */
+[data-theme="coastal"]{
+  --paper:#F7FBFC; --ink:#123A4D; --sunshine:#4FC3E0; --coral:#FF7A66; --mint:#2AA8A0;
+  --grape:#1F6F8B; --canvas:#0E3A4D; --surface:#EFF8FA; --chip:#DCF0F3; --muted:#7FA0AC; --border:#CFE6EB;
+}
+[data-theme="forest"]{
+  --paper:#F5F7F2; --ink:#1F2E1A; --sunshine:#C9A227; --coral:#B5543A; --mint:#3E7A4F;
+  --grape:#2F5233; --canvas:#1A2E1D; --surface:#EAF0E5; --chip:#DCE7D3; --muted:#8A9A80; --border:#D2E0C8;
+}
+[data-theme="midnight"]{
+  --paper:#F4F3F9; --ink:#221E33; --sunshine:#E6B84C; --coral:#E0615A; --mint:#4FB89E;
+  --grape:#5B4B9E; --canvas:#161327; --surface:#ECEAF5; --chip:#DEDAF0; --muted:#948FB8; --border:#D6D0EA;
+}
+[data-theme="sunset"]{
+  --paper:#FFF9F4; --ink:#3D231A; --sunshine:#F2A65A; --coral:#E85D4A; --mint:#7A9E6E;
+  --grape:#B5544A; --canvas:#4A241C; --surface:#FCEEE4; --chip:#F6DCC8; --muted:#B08A72; --border:#EFD9C4;
+}
+[data-theme="blush"]{
+  --paper:#FFF7F9; --ink:#3D1F2C; --sunshine:#F0B85A; --coral:#E8637E; --mint:#4FA898;
+  --grape:#C4568A; --canvas:#3D1F2C; --surface:#FCE9EF; --chip:#F8D7E3; --muted:#B98AA0; --border:#F0D3DE;
+}
+[data-theme="slate"]{
+  --paper:#F6F7F8; --ink:#20262E; --sunshine:#C9A45C; --coral:#C0574F; --mint:#4C8C82;
+  --grape:#4A5B70; --canvas:#1B2128; --surface:#EBEDEF; --chip:#DDE1E4; --muted:#8C97A1; --border:#D6DBDF;
+}
+[data-theme="citrus"]{
+  --paper:#FFFDF5; --ink:#2E2A12; --sunshine:#F2B807; --coral:#E8622A; --mint:#7FA832;
+  --grape:#C77D12; --canvas:#332C0E; --surface:#FBF6DE; --chip:#F5EBB8; --muted:#A69B6A; --border:#EDE3A8;
+}
+
 /* ============================== RESET ============================== */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;overflow:hidden;background:var(--canvas);}
@@ -571,6 +613,17 @@ body.inc-revealed .minc-mask{display:none;}
 .text-danger-btn{width:100%;text-align:center;padding:12px;font-size:13px;font-weight:700;
   color:var(--coral);margin-top:6px;}
 
+/* ============================== THEME PICKER ============================== */
+.theme-swatch-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.theme-swatch-btn{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;
+  border-radius:18px;background:var(--surface);border:2px solid transparent;}
+.theme-swatch-btn.selected{border-color:var(--grape);background:var(--chip);}
+.theme-swatch-dots{display:flex;}
+.theme-swatch-dots span{width:20px;height:20px;border-radius:50%;margin-left:-6px;border:2px solid var(--paper);}
+.theme-swatch-dots span:first-child{margin-left:0;}
+.theme-swatch-label{font-size:12px;font-weight:700;color:var(--ink);}
+.theme-swatch-check{font-size:10px;font-weight:700;color:var(--grape);height:12px;}
+
 /* ============================== INSIGHTS ============================== */
 .ins-period-stepper{display:flex;align-items:center;justify-content:space-between;margin-top:14px;}
 .ins-step-btn{width:34px;height:34px;border-radius:50%;background:var(--surface);font-size:16px;
@@ -1079,6 +1132,15 @@ body.inc-revealed .minc-mask{display:none;}
           style="width:110px;padding:6px 10px;border:1.5px solid var(--border);border-radius:10px;
                  font-size:14px;font-weight:700;color:var(--ink);background:var(--surface);text-align:right;">
       </div>
+      <p class="field-label">APPEARANCE</p>
+      <button type="button" class="settings-row" id="settings-appearance-btn" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:rgba(134,87,224,.14);">🎨</span>
+        <div class="settings-row-info">
+          <p class="settings-row-title">Theme</p>
+          <span class="settings-row-sub" id="settings-theme-sub">Original</span>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>
       <p class="field-label">FINANCE</p>
       <div class="settings-row" style="cursor:default;">
         <span class="settings-row-icon" style="background:rgba(46,196,182,.14);">📅</span>
@@ -1452,6 +1514,19 @@ body.inc-revealed .minc-mask{display:none;}
     <div class="color-row" id="category-edit-color-row"></div>
     <button type="button" class="save-btn" id="category-edit-save-btn" style="margin-top:18px;">Save category</button>
     <button type="button" class="text-danger-btn hidden" id="category-edit-delete-btn">Delete category</button>
+  </div>
+</div>
+
+<!-- ============================== THEME PICKER SHEET ============================== -->
+<div id="theme-picker-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title">Choose a theme</p>
+      <button type="button" class="topbar-close" id="theme-picker-close-btn">✕</button>
+    </div>
+    <p class="empty-hint" style="text-align:left;padding:8px 0 14px;">Changes accent colors throughout the app — your category and payment method colors stay exactly as you set them.</p>
+    <div class="theme-swatch-grid" id="theme-picker-grid"></div>
   </div>
 </div>
 
@@ -2133,6 +2208,62 @@ async function attemptBiometric(){
     });
     return !!cred;
   } catch(e){ return false; } // includes the user cancelling the OS prompt — silent, falls back to PIN
+}
+/* ============================== THEMES ==============================
+   User-triggered only — nothing here changes the theme automatically on any
+   schedule. THEME_LIST is the single source of truth for both the CSS
+   [data-theme="x"] blocks (which must exist for every non-'original' id
+   here) and the picker sheet's swatch dots. 'original' is intentionally
+   absent from the CSS as its own block — applyTheme('original') just
+   removes the attribute, falling through to the base :root tokens. */
+const THEME_LIST=[
+  {id:'original', label:'Original', dots:['#8657E0','#FFC23C','#FF6B5B']},
+  {id:'coastal',  label:'Coastal',  dots:['#1F6F8B','#4FC3E0','#FF7A66']},
+  {id:'forest',   label:'Forest',   dots:['#2F5233','#C9A227','#B5543A']},
+  {id:'midnight', label:'Midnight', dots:['#5B4B9E','#E6B84C','#E0615A']},
+  {id:'sunset',   label:'Sunset',   dots:['#B5544A','#F2A65A','#E85D4A']},
+  {id:'blush',    label:'Blush',    dots:['#C4568A','#F0B85A','#E8637E']},
+  {id:'slate',    label:'Slate',    dots:['#4A5B70','#C9A45C','#C0574F']},
+  {id:'citrus',   label:'Citrus',   dots:['#C77D12','#F2B807','#E8622A']},
+];
+function getCurrentThemeId(){
+  const id=Store.get('pt_theme');
+  return (id && THEME_LIST.some(t=>t.id===id)) ? id : 'original';
+}
+// Single entry point for changing the theme — sets the DOM attribute,
+// persists the choice, and keeps the Settings row's subtitle in sync.
+// Called at init() (before first paint) with whatever was last saved, and
+// again live whenever the user taps a swatch in the picker sheet.
+function applyTheme(id){
+  const theme=THEME_LIST.find(t=>t.id===id) ? id : 'original';
+  document.documentElement.setAttribute('data-theme', theme==='original' ? '' : theme);
+  Store.set('pt_theme', theme);
+  const sub=document.getElementById('settings-theme-sub');
+  if(sub){
+    const label=(THEME_LIST.find(t=>t.id===theme)||{}).label || 'Original';
+    sub.textContent=label;
+  }
+}
+function renderThemePickerGrid(){
+  const grid=document.getElementById('theme-picker-grid'); if(!grid) return;
+  grid.innerHTML='';
+  const current=getCurrentThemeId();
+  THEME_LIST.forEach(t=>{
+    const selected=current===t.id;
+    grid.insertAdjacentHTML('beforeend', `
+      <button type="button" class="theme-swatch-btn ${selected?'selected':''}" data-themeid="${t.id}">
+        <span class="theme-swatch-dots">${t.dots.map(c=>`<span style="background:${c}"></span>`).join('')}</span>
+        <span class="theme-swatch-label">${esc(t.label)}</span>
+        <span class="theme-swatch-check">${selected?'✓ Selected':''}</span>
+      </button>`);
+  });
+}
+function openThemePicker(){
+  renderThemePickerGrid();
+  document.getElementById('theme-picker-overlay').classList.add('show');
+}
+function closeThemePicker(){
+  document.getElementById('theme-picker-overlay').classList.remove('show');
 }
 function disableBiometric(){
   Store.set('pt_bio','0');
@@ -8769,6 +8900,16 @@ document.getElementById('drive-autorestore-btn').addEventListener('click', async
 
 document.getElementById('settings-changepin-btn').addEventListener('click', startChangePIN);
 document.getElementById('settings-guide-btn').addEventListener('click', () => openGuideScreen('settings-screen'));
+document.getElementById('settings-appearance-btn').addEventListener('click', openThemePicker);
+document.getElementById('theme-picker-close-btn').addEventListener('click', closeThemePicker);
+document.getElementById('theme-picker-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='theme-picker-overlay') closeThemePicker();
+});
+document.getElementById('theme-picker-grid').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-themeid]'); if(!btn) return;
+  applyTheme(btn.dataset.themeid);
+  renderThemePickerGrid();
+});
 document.getElementById('settings-forcerefresh-btn').addEventListener('click', forceRefreshApp);
 
 // ---- Debug log panel ----
@@ -9297,6 +9438,7 @@ let pendingShortcutAction=null;
   }
 })();
 function init(){
+  applyTheme(getCurrentThemeId()); // before anything else paints, so there's no flash of the wrong palette
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed', err));
   }

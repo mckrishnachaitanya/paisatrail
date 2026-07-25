@@ -1,6 +1,15 @@
 {
-  "version": "3.43",
+  "version": "3.44",
   "releaseNotes": [
+    {
+      "version": "3.44",
+      "date": "2026-07-25",
+      "highlights": [
+        "New: Theme — Settings → Theme lets you switch PaisaTrail's whole color scheme any time you feel like a change. 8 options: Original, Coastal, Forest, Midnight, Sunset, Blush, Slate, and Citrus.",
+        "Purely your choice — nothing changes automatically. Your category and payment method colors stay exactly as you set them, whichever theme you pick.",
+        "Per-device, like most other settings — Krishna and Pavankumar can each pick their own theme."
+      ]
+    },
     {
       "version": "3.43",
       "date": "2026-07-24",
@@ -446,6 +455,12 @@
       "icon": "⚙️",
       "title": "Settings",
       "body": "Manage categories, payment methods, and groups; set up recurring expenses; back up or restore your data (locally, or automatically via Google Drive); and control your PIN and biometric unlock."
+    },
+    {
+      "id": "theme",
+      "icon": "🎨",
+      "title": "Theme",
+      "body": "Settings → Theme lets you pick a different color scheme for the whole app — Original, Coastal, Forest, Midnight, Sunset, Blush, Slate, or Citrus. Purely for fun, whenever you feel like a change — nothing switches on its own. Your category and payment method colors always stay exactly as you set them, no matter which theme is active. This is a per-device choice, so you and anyone else sharing the app can each pick your own."
     },
     {
       "id": "split",

@@ -174,7 +174,22 @@ Bulk assign: Settings → Manage accounts → "Bulk assign past transactions" �
 
 **Home greeting (v3.41, 2026-07-19):** The static "Hey there 👋" was replaced with a time-of-day greeting (`getTimeOfDayGreeting()`: Good morning/afternoon/evening/night by hour) plus an optional name, read from `pt_user_name` (new Settings → Profile text field, per-device localStorage — not synced, same as every other Store-backed preference). `renderHomeGreeting()` sets `#home-greeting`'s text and is called from `renderHome()` (so it's always current on nav/unlock) and directly from the Profile input's `input` listener (so switching back to Home shows the new name immediately without waiting on a full `renderHome()`). No name set → falls back to a plain time-of-day greeting with no comma, so neither Krishna nor Pavankumar sees anything broken until they opt in on their own device.
 
-**Dropped:** Dark mode.
+**Theme picker (v3.44, 2026-07-25):** Settings → Theme lets Krishna/Pavankumar switch the app's whole accent-color scheme any time — purely a "want to see something different for a while" feature, explicitly NOT automatic (no schedule, no nudge, no auto-suggestion based on time-since-last-change — Krishna was clear he wants to reach for this himself, not have the app decide for him).
+
+- **Mechanism:** `[data-theme="x"]` attribute on `<html>`, overriding the same root CSS tokens `:root` already defines (`--paper`, `--ink`, `--sunshine`, `--coral`, `--mint`, `--grape`, `--canvas`, `--surface`, `--chip`, `--muted`, `--border`). 8 themes total: Original (no `[data-theme]` block — falls through to base `:root`), Coastal, Forest, Midnight, Sunset, Blush, Slate, Citrus. `THEME_LIST` (JS array: id/label/3 swatch-dot colors) is the single source of truth for the picker UI; each non-`'original'` id must have a matching `[data-theme="id"]` CSS block — verified via a script cross-check at build time, not just assumed.
+- **Storage:** `pt_theme` in localStorage, read via `getCurrentThemeId()` (falls back to `'original'` if the stored value doesn't match a known theme — defensive against a future theme removal leaving a stale id behind).
+- **`applyTheme(id)`** is the single entry point — sets the DOM attribute, persists to Store, and updates the Settings row's subtitle. Called once at the very top of `init()` (before PIN/unlock screen even shows) so the saved theme is active from the first paint, no flash of the wrong palette — and called again live from the picker sheet on every swatch tap.
+- **Picker UI:** `#settings-appearance-btn` (new "APPEARANCE" section between Profile and Finance in Settings) opens `#theme-picker-overlay` (`edit-sheet-overlay` pattern, same as every other bottom sheet) — a 2-column grid of swatch buttons (3 stacked dots + label), tapping one applies immediately, no separate save step. Explicitly tells the user in-sheet that category/payment-method colors are unaffected.
+- **KNOWN LIMITATION, documented deliberately (not an oversight):** a handful of decorative colors are hardcoded hex/rgba directly in inline `style=` attributes or JS template strings rather than sourced from the CSS tokens, and do NOT shift with the theme:
+  - Settings-row icon-circle background tints (e.g. `rgba(255,143,179,.14)`, `rgba(46,196,182,.14)` scattered across Settings/Categories/etc rows)
+  - The cashflow card's bright `#7FFFEC`/`#FFB4B4` income/expense accent colors (chosen specifically for contrast against the grape card background, not `var(--mint)`/`var(--coral)`)
+  - The PIN screen's `#4B3E7A` dot-border and `#D8D0F0`/`#B0A7CC` subtitle/muted text colors
+  - Various category-chip/legend-dot backgrounds computed per-category as `cat.color+'22'` — these correctly do NOT change with theme, since category colors are user-set DATA, not theme-driven; switching themes should never silently recolor something the user explicitly picked, so this is correct behavior, not a gap.
+  - If this list of drift ever bothers Krishna in practice, the fix is converting the first three groups above to `var(--...)`-based inline styles — a real but bounded follow-up, not urgent.
+- **Verified via Playwright:** default theme label reads "Original"; picker opens with all 8 swatches; picking a theme sets `data-theme`, updates the selected-swatch checkmark, and updates the Settings subtitle; the choice survives a full page reload (confirmed active even before the PIN screen renders); computed `--grape` value actually changes to the new theme's hex (not just the attribute) post-reload. Zero page errors during the flow.
+- **New localStorage key:** `pt_theme` (theme id, defaults to absent → `'original'`).
+
+**Dropped:** Dark mode. (Note: the theme picker above is a distinct, narrower feature — user-chosen accent palettes, not a light/dark contrast-mode toggle; dark mode itself remains out of scope.)
 
 ---
 
@@ -237,6 +252,7 @@ Type guards — apply consistently, income and transfers must never reach budget
 | `pt_drive_last_backup_mode` | `'auto'` or `'manual'` — mode of the last successful Drive backup, shown in the Settings row |
 | `pt_drive_last_error_at` | timestamp (ms) of the last failed backup attempt, shown in the Settings row when a failure is active |
 | `pt_user_name` | optional display name shown in the Home greeting (Settings → Profile); per-device, not synced |
+| `pt_theme` | selected theme id (`'original'`\|`'coastal'`\|`'forest'`\|`'midnight'`\|`'sunset'`\|`'blush'`\|`'slate'`\|`'citrus'`); per-device, not synced |
 
 ---
 
