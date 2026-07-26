@@ -1,6 +1,13 @@
 {
-  "version": "3.44",
+  "version": "3.45",
   "releaseNotes": [
+    {
+      "version": "3.45",
+      "date": "2026-07-26",
+      "highlights": [
+        "Fixed: Forecast's savings projection could show no projected income at all for a recurring salary/income entry that had already been auto-added this cycle — it fell into a gap between \"already logged\" and \"still due\" and was counted in neither. It now shows up correctly as soon as it lands."
+      ]
+    },
     {
       "version": "3.44",
       "date": "2026-07-25",
