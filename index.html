@@ -2730,6 +2730,7 @@ const state = {
   addMode:'expense',              // 'expense' | 'income' — current mode of the Add/Edit screen
   selectedIncomeCategoryId:null,  // selected income category while in income mode
   catUsageCounts:{},              // {categoryId: count} — fetched once per Add-screen open, used to sort the category grid by frequency
+  groupUsageCounts:{},             // {groupId: count} — fetched on unlock and refreshed after any save that could change group usage; sorts every group picker most-used-first
   catGridExpanded:false,          // false = collapsed to top 6 most-used categories with a "+N more" chip; true = showing all
   recurringRules:[],              // in-memory cache of all recurring rules, mirrors state.groups
   mgrRecurringCategoryId:null,    // selected category while adding/editing a recurring rule
@@ -3035,6 +3036,7 @@ async function unlockSuccess(){
   state.incomeCategories=await DB.getAllIncomeCategories();
   state.paymentMethods=await DB.getAllPaymentMethods();
   state.groups=await DB.getAllGroups();
+  state.groupUsageCounts=await getGroupUsageCounts();
   state.recurringRules=await DB.getAllRecurring();
   state.budgets=await DB.getAllBudgets();
   state.accountsEnabled=Store.get('pt_accounts_enabled')==='1';
@@ -3870,7 +3872,7 @@ function renderTxnFilterGroupRow(){
     <button type="button" class="pay-chip" data-group="UNGROUPED" style="background:${ungroupedSel?'var(--grape)':'var(--surface)'};color:${ungroupedSel?'white':'var(--ink)'}">
       No group
     </button>`);
-  state.groups.forEach(g=>{
+  sortedGroupsByUsage().forEach(g=>{
     const sel=state.txnFilterGroupIds.has(g.id);
     row.insertAdjacentHTML('beforeend', `
       <button type="button" class="pay-chip" data-group="${g.id}" style="background:${sel?'var(--grape)':'var(--surface)'};color:${sel?'white':'var(--ink)'}">
@@ -3912,6 +3914,7 @@ async function openTxnFilterSheet(){
   renderTxnFilterPayRow();
   renderTxnFilterGroupRow();
   renderTxnFilterAccountRow();
+  getGroupUsageCounts().then(counts=>{ state.groupUsageCounts=counts; renderTxnFilterGroupRow(); }).catch(()=>{});
   document.getElementById('txn-filter-start').value = state.txnFilterStartISO || '';
   document.getElementById('txn-filter-end').value = state.txnFilterEndISO || '';
   document.getElementById('txn-filter-min-amount').value = state.txnFilterMinAmount!=null ? state.txnFilterMinAmount : '';
@@ -4530,7 +4533,7 @@ let tagManualListCache=[];
 
 function renderTagGroupArea(){
   const area=document.getElementById('tag-group-area');
-  const chipsHTML=state.groups.map(g=>{
+  const chipsHTML=sortedGroupsByUsage().map(g=>{
     const selected=state.tagGroupMode==='existing' && state.tagSelectedGroupId===g.id;
     const bg = selected ? 'var(--grape)' : 'var(--surface)';
     const color = selected ? 'white' : 'var(--ink)';
@@ -4661,6 +4664,7 @@ function openTagExpensesScreen(){
   document.getElementById('tag-range-preview').textContent='Pick a date range to see what can be tagged.';
   document.getElementById('tag-range-go-btn').classList.add('hidden');
   renderTagGroupArea();
+  getGroupUsageCounts().then(counts=>{ state.groupUsageCounts=counts; renderTagGroupArea(); }).catch(()=>{});
   setTagMode('range');
   showScreen('tagexpenses-screen');
 }
@@ -5945,7 +5949,7 @@ function renderRecurringEditGroupRow(){
   const row=document.getElementById('recurring-edit-group-row'); row.innerHTML='';
   const noneSelected = !state.mgrRecurringGroupId;
   row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-rgrp="none" style="background:${noneSelected?'var(--grape)':'var(--surface)'};color:${noneSelected?'white':'var(--ink)'}">None</button>`);
-  state.groups.forEach(g=>{
+  sortedGroupsByUsage().forEach(g=>{
     const selected = state.mgrRecurringGroupId===g.id;
     row.insertAdjacentHTML('beforeend',`<button type="button" class="pay-chip" data-rgrp="${g.id}" style="background:${selected?'var(--grape)':'var(--surface)'};color:${selected?'white':'var(--ink)'}">${esc(g.name)}</button>`);
   });
@@ -6034,6 +6038,7 @@ function openRecurringEdit(id){
   state.mgrRecurringCatGridExpanded = false;
   // Use cached usage counts if available; fetch async in background to update sort order
   getCategoryUsageCounts().then(counts=>{ state.catUsageCounts=counts; renderRecurringEditCatGrid(); }).catch(()=>{});
+  getGroupUsageCounts().then(counts=>{ state.groupUsageCounts=counts; renderRecurringEditGroupRow(); }).catch(()=>{});
   renderRecurringEditCatGrid();
   renderRecurringEditPayRow();
   renderRecurringEditGroupRow();
@@ -6083,6 +6088,18 @@ async function saveRecurringEdit(){
 
   if(existing){
     existing.name=name; existing.amount=amount;
+    // Backfill `type` on every save through this editor (v3.47) — rules
+    // created via the Add Expense screen's quick "Make this recurring"
+    // toggle never had `type` set at all (that path only writes
+    // categoryId/paymentMethod/frequency/etc, see its own rule literal).
+    // Every reader in the app already treats a missing type as "not
+    // income" (checks `=== 'income'`, never requires `=== 'expense'`), so
+    // this was never visibly broken — but it left the field permanently
+    // unpopulated even after a full edit here. `isIncome` reflects the
+    // type-toggle's locked-at-open value (see openRecurringEdit's
+    // `existing.type || 'expense'` fallback), so this always writes the
+    // correct value, never flips a rule's actual type.
+    existing.type = isIncome ? 'income' : 'expense';
     existing.categoryId=isIncome ? null : state.mgrRecurringCategoryId;
     existing.incomeCategoryId=isIncome ? state.mgrRecurringIncomeCategoryId : null;
     existing.paymentMethod=state.mgrRecurringPaymentId;
@@ -7745,6 +7762,33 @@ async function getCategoryUsageCounts(){
   all.forEach(e=>{ if(e.categoryId) counts[e.categoryId]=(counts[e.categoryId]||0)+1; });
   return counts;
 }
+// Same idea, for groups — counts every entry (expense OR income; recurring
+// rules/generated income both carry an optional groupId, see catchUpSingleRule)
+// tagged to each group, all-time. Powers "most-used first" sorting on every
+// group PICKER in the app (Add/Edit's Group section, Transactions filter,
+// Recurring rule editor, Tag Past Expenses) — deliberately NOT applied to the
+// Manage Groups screen itself (Settings), which stays alphabetical/creation
+// order since that's for renaming/deleting, not picking one to assign.
+// This counts real usage from IndexedDB, so it's correct regardless of
+// whether a group was created via Settings → Manage groups or inline via the
+// "+ New" chip on the Add screen — both just write a row to the same
+// `groups` store, and usage is counted the same way either way.
+async function getGroupUsageCounts(){
+  const all=(await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id]);
+  const counts={};
+  all.forEach(e=>{ if(e.groupId) counts[e.groupId]=(counts[e.groupId]||0)+1; });
+  return counts;
+}
+// Shared sort applied everywhere a group picker chip row is rendered. Falls
+// back gracefully to whatever order state.groups is already in (creation
+// order) if counts haven't been fetched yet for this screen — never blocks
+// rendering on the async fetch; callers kick off getGroupUsageCounts() in
+// the background and re-render once it resolves, same pattern already used
+// for state.catUsageCounts (see openAddScreen/openRecurringEdit).
+function sortedGroupsByUsage(){
+  const counts=state.groupUsageCounts || {};
+  return state.groups.slice().sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0));
+}
 
 const NOTE_PLACEHOLDERS={
   'Food': "e.g. Dinner at Truffles, Swiggy order",
@@ -7894,7 +7938,7 @@ function renderGroupArea(){
     };
     return;
   }
-  const chipsHTML=state.groups.map(g=>{
+  const chipsHTML=sortedGroupsByUsage().map(g=>{
     const selected=state.groupMode==='existing' && state.selectedGroupId===g.id;
     const bg = selected ? 'var(--grape)' : 'var(--surface)';
     const color = selected ? 'white' : 'var(--ink)';
@@ -8342,6 +8386,7 @@ async function openAddScreen(existing){
   state.selectedIncomeCategoryId = existing ? (existing.incomeCategoryId || state.incomeCategories[0].id) : state.incomeCategories[0].id;
   state.catGridExpanded = false; // always start collapsed — same pattern as MORE OPTIONS below
   state.catUsageCounts = await getCategoryUsageCounts();
+  state.groupUsageCounts = await getGroupUsageCounts();
   // Payment method — default to last used (pt_last_payment), or first method if no prior/invalid selection
   {
     const lastPay=Store.get('pt_last_payment');

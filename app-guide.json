@@ -1,6 +1,20 @@
 {
-  "version": "3.45",
+  "version": "3.47",
   "releaseNotes": [
+    {
+      "version": "3.47",
+      "date": "2026-07-28",
+      "highlights": [
+        "Fixed: recurring transactions created via the quick \"Make this recurring\" toggle on Add Expense were missing their internal type marker — invisible day-to-day, but it now gets correctly backfilled the next time you save that rule from Settings → Recurring transactions."
+      ]
+    },
+    {
+      "version": "3.46",
+      "date": "2026-07-28",
+      "highlights": [
+        "Groups now sort most-used-first everywhere you pick one — Add/Edit's Group section, the Transactions filter, the Recurring transaction editor, and Tag Past Expenses — so a group you use often no longer gets buried at the end of the row."
+      ]
+    },
     {
       "version": "3.45",
       "date": "2026-07-26",
