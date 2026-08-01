@@ -1,6 +1,13 @@
 {
-  "version": "3.47",
+  "version": "3.48",
   "releaseNotes": [
+    {
+      "version": "3.48",
+      "date": "2026-08-01",
+      "highlights": [
+        "Home and List now show the account (e.g. \"SBI Savings\", \"HDFC CC\") instead of the payment method (e.g. \"UPI\") in each expense's subtitle — falls back to the payment method name for expenses with no account set"
+      ]
+    },
     {
       "version": "3.47",
       "date": "2026-07-28",

@@ -2126,6 +2126,19 @@ function setIncomeRevealed(v){
 // best-effort, harmless when it doesn't land (user just taps 👁️ again).
 window.addEventListener('blur', ()=>{ if(state.incomeRevealed) setIncomeRevealed(false); });
 function splitTitlePrefix(e){ return (e.splitTotal!=null) ? '✂️ ' : ''; }
+// Shared subtitle label for an expense row on Home and List — prefers the
+// specific account (e.g. "SBI Savings", "HDFC CC") over the generic payment
+// method name (e.g. "UPI", "Credit Card") since Krishna finds the account
+// name more useful at a glance. Falls back to the payment method name when
+// the expense has no accountId (accounts disabled, or logged before accounts
+// existed) or the account was since deleted — same graceful-fallback pattern
+// already used everywhere else in the app (cat?cat.icon:fallback etc).
+function expensePaymentLabel(e){
+  const acct = e.accountId ? state.accounts.find(a=>a.id===e.accountId) : null;
+  if(acct) return acct.name;
+  const pm = state.paymentMethods.find(p=>p.id===e.paymentMethod);
+  return pm ? pm.name : '—';
+}
 function addMonthsISO(dateISO, months){
   const d=new Date((dateISO||todayISO())+'T00:00:00');
   d.setMonth(d.getMonth()+months);
@@ -3418,7 +3431,6 @@ async function renderHomeOverviewPanel(prefetched){
       }
       const isInc=isIncomeEntry(e);
       const cat=isInc ? state.incomeCategories.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
-      const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
       const amtText=isInc ? maskIncomeHTML(formatINR(e.amount)) : `-${formatINR(e.amount)}`;
       if(isInc){
@@ -3442,7 +3454,7 @@ async function renderHomeOverviewPanel(prefetched){
               <div class="recent-icon" style="background:${(cat?cat.color:'#9088A8')}22">${cat?cat.icon:'❔'}</div>
               <div class="recent-info">
                 <p class="recent-title">${splitTitlePrefix(e)}${esc(e.note || (cat?cat.name:'Expense'))}</p>
-                <span class="recent-pm">${pm?esc(pm.name):'—'}</span>
+                <span class="recent-pm">${esc(expensePaymentLabel(e))}</span>
               </div>
               <span class="${amtClass}">${amtText}</span>
             </div>
@@ -3800,16 +3812,17 @@ async function renderTransactions(){
         return;
       }
       const cat=isInc ? state.incomeCategories.find(c=>c.id===e.incomeCategoryId) : state.categories.find(c=>c.id===e.categoryId);
-      const pm=isInc ? null : state.paymentMethods.find(p=>p.id===e.paymentMethod);
       const amtClass=isInc ? 'recent-amt income-amt' : 'recent-amt';
       const amtText=isInc ? maskIncomeHTML(formatINR(e.amount)) : `-${formatINR(e.amount)}`;
       const defaultLabel=isInc ? 'Income' : 'Expense';
       const fallbackIcon=isInc ? '💰' : '❔';
-      // When viewing the split filter, swap the usual payment-method
+      // When viewing the split filter, swap the usual account/payment-method
       // subtitle for the split context (total + who) — that's the whole
       // reason this filter exists, so it should be visible without opening
-      // each expense.
-      let subtitle = isInc ? (cat?esc(cat.name):'Income') : (pm?esc(pm.name):'—');
+      // each expense. Otherwise, expenses show the account name (e.g. "SBI
+      // Savings") in preference to the generic payment method name (e.g.
+      // "UPI") — see expensePaymentLabel().
+      let subtitle = isInc ? (cat?esc(cat.name):'Income') : esc(expensePaymentLabel(e));
       if(!isInc && state.txnFilterSplitOnly && e.splitTotal!=null){
         const withText = e.splitWith ? ` with ${esc(e.splitWith)}` : '';
         subtitle = `${formatINR(e.splitTotal)} total${withText}${e.splitSettled?' · Settled':''}`;
