@@ -1,6 +1,13 @@
 {
-  "version": "3.48",
+  "version": "3.49",
   "releaseNotes": [
+    {
+      "version": "3.49",
+      "date": "2026-08-14",
+      "highlights": [
+        "Fixed: warranty countdowns very close to a whole number of years (e.g. 2 years) could show as \"1y 12mo left\" instead of \"2 years left\" — a rounding-carry bug in the days-remaining formatter"
+      ]
+    },
     {
       "version": "3.48",
       "date": "2026-08-01",

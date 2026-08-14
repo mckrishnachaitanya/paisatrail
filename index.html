@@ -2154,7 +2154,8 @@ function addDaysISO(dateISO, days){
 function fmtDuration(days){
   if(days<30) return `${days} day${days===1?'':'s'}`;
   if(days<365){ const m=Math.round(days/30); return `${m} month${m===1?'':'s'}`; }
-  const y=Math.floor(days/365), remM=Math.round((days%365)/30);
+  let y=Math.floor(days/365), remM=Math.round((days%365)/30);
+  if(remM>=12){ y+=1; remM=0; } // rounding remM up to 30-day "months" can itself round up to 12 (e.g. 364 days -> 12mo) — carry into a full year instead of showing "1y 12mo"
   return remM>0 ? `${y}y ${remM}mo` : `${y} year${y===1?'':'s'}`;
 }
 function formatWarrantyRemaining(expiryISO){
