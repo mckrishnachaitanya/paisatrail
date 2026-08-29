@@ -1386,6 +1386,7 @@ body.inc-revealed .minc-mask{display:none;}
       </div>
       <div id="categories-list"></div>
       <button type="button" class="warranty-toggle-btn" style="margin-top:14px;" id="categories-add-btn">+ Add category</button>
+      <button type="button" class="warranty-toggle-btn hidden" style="margin-top:10px;" id="categories-merge-btn">Merge categories</button>
     </div>
   </div>
 </div>
@@ -1578,6 +1579,36 @@ body.inc-revealed .minc-mask{display:none;}
       <p class="confirm-sheet-sub" id="group-merge-confirm-text" style="text-align:left;margin-bottom:14px;"></p>
       <button type="button" class="save-btn" id="group-merge-confirm-btn">Merge groups</button>
       <button type="button" class="confirm-sheet-cancel" id="group-merge-back-btn">Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== MERGE CATEGORIES PICKER ==============================
+     Opened from Manage Categories ("Merge categories" button), operating on
+     whichever type (expense/income) that screen's toggle currently shows.
+     Unlike group merge (entered from an existing group's edit sheet, so the
+     source is already known), this has an extra first step to pick the
+     source category, then reuses the same pick-target/confirm shape. -->
+<div id="category-merge-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title" id="category-merge-title">Merge categories</p>
+      <button type="button" class="topbar-close" id="category-merge-close-btn">✕</button>
+    </div>
+    <div id="category-merge-source-panel" style="margin-top:10px;">
+      <p class="field-label" style="margin-top:0;">MERGE FROM</p>
+      <div id="category-merge-source-list"></div>
+    </div>
+    <div id="category-merge-target-panel" class="hidden" style="margin-top:10px;">
+      <p class="field-label" style="margin-top:0;">MERGE INTO</p>
+      <div id="category-merge-target-list"></div>
+      <button type="button" class="confirm-sheet-cancel" id="category-merge-target-back-btn" style="margin-top:10px;">Back</button>
+    </div>
+    <div id="category-merge-confirm-panel" class="hidden" style="margin-top:10px;">
+      <p class="confirm-sheet-sub" id="category-merge-confirm-text" style="text-align:left;margin-bottom:14px;"></p>
+      <button type="button" class="save-btn" id="category-merge-confirm-btn">Merge categories</button>
+      <button type="button" class="confirm-sheet-cancel" id="category-merge-back-btn">Back</button>
     </div>
   </div>
 </div>
@@ -2722,6 +2753,9 @@ const state = {
   mgrPendingDelete:null, // {type, id} awaiting confirmation in manage-confirm-overlay, null when no delete is pending
   mgrMergeSourceId:null, // group being merged FROM, while the merge picker is open
   mgrMergeTargetId:null, // group chosen to merge INTO, once picked in the merge picker; null while still picking
+  catMergeType:null,     // 'category'|'incomeCategory' — which type is being merged, set when the merge picker opens from Manage Categories
+  catMergeSourceId:null, // category being merged FROM, chosen in the picker's first step
+  catMergeTargetId:null, // category chosen to merge INTO, once picked; null while still picking
   tagGroupMode:null,        // 'existing'|'new' — target-group mode on the Tag Past Expenses screen
   tagSelectedGroupId:null,  // chosen existing group's id, when tagGroupMode==='existing'
   tagNewGroupName:'',       // freeform text typed so far, when tagGroupMode==='new'
@@ -4154,6 +4188,21 @@ function openCategoriesScreen(){
   renderCategoriesScreen();
   showScreen('categories-screen');
 }
+// Categories eligible to take part in a merge, for whichever type is
+// currently active on the Manage Categories screen — the reserved
+// Balance-Adjustment category is never offered (mirrors its exclusion from
+// this screen's normal list, add-expense picker, etc). Shared by the
+// screen's merge-button visibility check and the merge picker itself.
+function categoryMergeList(){
+  return state.catMergeType==='incomeCategory'
+    ? state.incomeCategories
+    : state.categories.filter(c=>!c.isReserved);
+}
+function updateCategoriesMergeBtn(){
+  const type = state.categoriesScreenType || 'expense';
+  const count = type==='income' ? state.incomeCategories.length : state.categories.filter(c=>!c.isReserved).length;
+  document.getElementById('categories-merge-btn').classList.toggle('hidden', count<=1);
+}
 function renderCategoriesScreen(){
   const type = state.categoriesScreenType || 'expense';
   document.querySelectorAll('#categories-type-tabs .segmented-tab').forEach(b=>{
@@ -4161,6 +4210,7 @@ function renderCategoriesScreen(){
   });
   const list=document.getElementById('categories-list'); list.innerHTML='';
   const addBtn=document.getElementById('categories-add-btn');
+  updateCategoriesMergeBtn();
   if(type==='income'){
     addBtn.textContent='+ Add income category';
     if(state.incomeCategories.length===0){ list.innerHTML='<p class="empty-hint">No income categories yet.</p>'; return; }
@@ -4285,6 +4335,126 @@ function requestDeleteCategory(){
   if(source.length<=1){ toast(`You need at least one ${isIncome?'income category':'category'}`); return; }
   closeCategoryEdit();
   openManageDeleteConfirm(isIncome?'incomeCategory':'category', id, cat.name);
+}
+
+/* ============================== MERGE CATEGORIES ==============================
+   Entered from Manage Categories ("Merge categories" button, see
+   updateCategoriesMergeBtn), operating on whichever type (expense/income)
+   that screen's toggle currently shows. Unlike group merge — entered from a
+   group's own edit sheet, so the source is already known — this needs an
+   extra first step to pick the source, then reuses the same pick-target →
+   confirm shape group merge already established.
+   No index on expenses.categoryId/incomeCategoryId is used here even though
+   one exists (see countExpensesByCategory) — merging needs the full entry
+   objects to rewrite, not just a count, so this pulls the same wide cursor
+   getExpensesByGroupId already uses and filters in JS. Rare, one-off action;
+   not worth a second code path just to use the index. */
+async function getExpensesByCategoryId(id){
+  return (await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id] && e.categoryId===id);
+}
+async function getExpensesByIncomeCategoryId(id){
+  return (await DB.getExpensesByDateRange('0000-01-01','9999-12-31')).filter(e => !pendingDeletes[e.id] && e.incomeCategoryId===id);
+}
+function openCategoryMergeScreen(){
+  state.catMergeType = (state.categoriesScreenType==='income') ? 'incomeCategory' : 'category';
+  state.catMergeSourceId=null;
+  state.catMergeTargetId=null;
+  document.getElementById('category-merge-title').textContent = state.catMergeType==='incomeCategory' ? 'Merge income categories' : 'Merge categories';
+  renderCategoryMergeSourceList();
+  document.getElementById('category-merge-source-panel').classList.remove('hidden');
+  document.getElementById('category-merge-target-panel').classList.add('hidden');
+  document.getElementById('category-merge-confirm-panel').classList.add('hidden');
+  document.getElementById('category-merge-overlay').classList.add('show');
+}
+function renderCategoryMergeSourceList(){
+  const list=document.getElementById('category-merge-source-list'); list.innerHTML='';
+  categoryMergeList().forEach(cat=>{
+    list.insertAdjacentHTML('beforeend', `
+      <button type="button" class="settings-row" data-mergesrc="${cat.id}" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:${cat.color}22;">${cat.icon}</span>
+        <div class="settings-row-info"><p class="settings-row-title">${esc(cat.name)}</p></div>
+        <span class="settings-row-chevron">›</span>
+      </button>`);
+  });
+}
+function pickCategoryMergeSource(id){
+  state.catMergeSourceId=id;
+  renderCategoryMergeTargetList();
+  document.getElementById('category-merge-source-panel').classList.add('hidden');
+  document.getElementById('category-merge-target-panel').classList.remove('hidden');
+}
+function renderCategoryMergeTargetList(){
+  const list=document.getElementById('category-merge-target-list'); list.innerHTML='';
+  const others=categoryMergeList().filter(c=>c.id!==state.catMergeSourceId);
+  if(others.length===0){ list.innerHTML='<p class="empty-hint">No other categories to merge into.</p>'; return; }
+  others.forEach(cat=>{
+    list.insertAdjacentHTML('beforeend', `
+      <button type="button" class="settings-row" data-mergetgt="${cat.id}" style="margin-bottom:8px;">
+        <span class="settings-row-icon" style="background:${cat.color}22;">${cat.icon}</span>
+        <div class="settings-row-info"><p class="settings-row-title">${esc(cat.name)}</p></div>
+        <span class="settings-row-chevron">›</span>
+      </button>`);
+  });
+}
+function backFromCategoryMergeTarget(){
+  state.catMergeSourceId=null;
+  document.getElementById('category-merge-target-panel').classList.add('hidden');
+  document.getElementById('category-merge-source-panel').classList.remove('hidden');
+}
+async function pickCategoryMergeTarget(targetId){
+  state.catMergeTargetId=targetId;
+  const isIncome = state.catMergeType==='incomeCategory';
+  const list=categoryMergeList();
+  const source=list.find(c=>c.id===state.catMergeSourceId);
+  const target=list.find(c=>c.id===targetId);
+  const count = isIncome
+    ? (await getExpensesByIncomeCategoryId(state.catMergeSourceId)).length
+    : (await getExpensesByCategoryId(state.catMergeSourceId)).length;
+  const entryWord = isIncome ? (count===1?'income entry':'income entries') : (count===1?'expense':'expenses');
+  let text = `${count} ${entryWord} from "${source?source.name:''}" will move to "${target?target.name:''}", and "${source?source.name:''}" will be deleted.`;
+  if(!isIncome){
+    // Expense categories only — income categories have no budget concept.
+    // Per Krishna's call: source's budget is dropped, target's is left as-is
+    // (it just keeps working, now also covering the merged-in spending).
+    const srcBudget=state.budgets.find(b=>b.categoryId===state.catMergeSourceId);
+    if(srcBudget) text += ` Its budget will also be deleted.`;
+  }
+  document.getElementById('category-merge-confirm-text').textContent = text;
+  document.getElementById('category-merge-target-panel').classList.add('hidden');
+  document.getElementById('category-merge-confirm-panel').classList.remove('hidden');
+}
+function closeCategoryMergeScreen(){
+  document.getElementById('category-merge-overlay').classList.remove('show');
+  state.catMergeType=null; state.catMergeSourceId=null; state.catMergeTargetId=null;
+}
+function backFromCategoryMergeConfirm(){
+  state.catMergeTargetId=null;
+  document.getElementById('category-merge-confirm-panel').classList.add('hidden');
+  document.getElementById('category-merge-target-panel').classList.remove('hidden');
+}
+async function confirmCategoryMerge(){
+  const sourceId=state.catMergeSourceId, targetId=state.catMergeTargetId;
+  if(!sourceId || !targetId) return;
+  const isIncome = state.catMergeType==='incomeCategory';
+  if(isIncome){
+    const entries=await getExpensesByIncomeCategoryId(sourceId);
+    for(const e of entries){ e.incomeCategoryId=targetId; await DB.addExpense(e); }
+    await DB.deleteIncomeCategory(sourceId);
+    state.incomeCategories=state.incomeCategories.filter(c=>c.id!==sourceId);
+  } else {
+    const entries=await getExpensesByCategoryId(sourceId);
+    for(const e of entries){ e.categoryId=targetId; await DB.addExpense(e); }
+    const srcBudget=state.budgets.find(b=>b.categoryId===sourceId);
+    if(srcBudget){ await DB.deleteBudget(srcBudget.id); state.budgets=state.budgets.filter(b=>b.id!==srcBudget.id); }
+    await DB.deleteCategory(sourceId);
+    state.categories=state.categories.filter(c=>c.id!==sourceId);
+    state.txnFilterCategoryIds.delete(sourceId); // keep the Transactions filter consistent if it was filtering on the now-gone source
+  }
+  closeCategoryMergeScreen();
+  renderCategoriesScreen();
+  await refreshAllExpenseViews();
+  if(!isIncome) await renderHomeBudgetsPanel();
+  toast(isIncome ? 'Income categories merged' : 'Categories merged');
 }
 
 function openPaymentMethodEdit(id){
@@ -9174,6 +9344,22 @@ document.getElementById('categories-list').addEventListener('click', (e) => {
 document.getElementById('categories-add-btn').addEventListener('click', () => {
   openCategoryEdit(null, (state.categoriesScreenType==='income') ? 'incomeCategory' : 'category');
 });
+document.getElementById('categories-merge-btn').addEventListener('click', openCategoryMergeScreen);
+document.getElementById('category-merge-close-btn').addEventListener('click', closeCategoryMergeScreen);
+document.getElementById('category-merge-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='category-merge-overlay') closeCategoryMergeScreen();
+});
+document.getElementById('category-merge-source-list').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-mergesrc]'); if(!btn) return;
+  pickCategoryMergeSource(btn.dataset.mergesrc);
+});
+document.getElementById('category-merge-target-list').addEventListener('click', (e) => {
+  const btn=e.target.closest('[data-mergetgt]'); if(!btn) return;
+  pickCategoryMergeTarget(btn.dataset.mergetgt);
+});
+document.getElementById('category-merge-target-back-btn').addEventListener('click', backFromCategoryMergeTarget);
+document.getElementById('category-merge-back-btn').addEventListener('click', backFromCategoryMergeConfirm);
+document.getElementById('category-merge-confirm-btn').addEventListener('click', confirmCategoryMerge);
 document.getElementById('category-edit-close-btn').addEventListener('click', closeCategoryEdit);
 document.getElementById('category-edit-overlay').addEventListener('click', (e) => {
   if(e.target.id==='category-edit-overlay') closeCategoryEdit();

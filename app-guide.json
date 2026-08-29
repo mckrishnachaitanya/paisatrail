@@ -1,6 +1,15 @@
 {
-  "version": "3.49",
+  "version": "3.50",
   "releaseNotes": [
+    {
+      "version": "3.50",
+      "date": "2026-08-29",
+      "highlights": [
+        "New: Merge categories — from Settings → Manage categories, tap \"Merge categories\" to combine two categories into one. Every expense (or income entry) tagged to the one you're merging away moves to the one you keep, then the merged-away category is deleted.",
+        "Works for both expense and income categories, using whichever tab is active on the Manage Categories screen.",
+        "If the category you're merging away has a budget set, that budget is deleted too — the budget on the category you're keeping is left untouched."
+      ]
+    },
     {
       "version": "3.49",
       "date": "2026-08-14",
