@@ -1,6 +1,14 @@
 {
-  "version": "3.50",
+  "version": "3.51",
   "releaseNotes": [
+    {
+      "version": "3.51",
+      "date": "2026-09-05",
+      "highlights": [
+        "New: a ➕ button in the top bar of Recurring transactions, Manage categories, Manage payment methods, Manage groups, and Manage accounts lets you add a new one without scrolling to the bottom of the list — the original \"+ Add\" button at the bottom still works too.",
+        "Fixed: Forecast's \"Next 30 days\" view could count an unpaid recurring bill twice — once for the actual overdue bill, and once for a future occurrence that shouldn't be assumed until the first is confirmed via \"Mark as paid\". It's now counted once, correctly, until you confirm it."
+      ]
+    },
     {
       "version": "3.50",
       "date": "2026-08-29",

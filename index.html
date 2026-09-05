@@ -1376,7 +1376,10 @@ body.inc-revealed .minc-mask{display:none;}
 <div class="screen is-hidden" id="categories-screen">
   <div class="topbar">
     <p class="topbar-title">Manage categories</p>
-    <button class="topbar-close" id="categories-close-btn">✕</button>
+    <div class="topbar-icons">
+      <button type="button" class="topbar-lock-btn" id="categories-add-btn-top" title="Add category">➕</button>
+      <button class="topbar-close" id="categories-close-btn">✕</button>
+    </div>
   </div>
   <div class="scroll">
     <div style="padding:0 20px 28px;">
@@ -1395,7 +1398,10 @@ body.inc-revealed .minc-mask{display:none;}
 <div class="screen is-hidden" id="paymentmethods-screen">
   <div class="topbar">
     <p class="topbar-title">Manage payment methods</p>
-    <button class="topbar-close" id="paymentmethods-close-btn">✕</button>
+    <div class="topbar-icons">
+      <button type="button" class="topbar-lock-btn" id="paymentmethods-add-btn-top" title="Add payment method">➕</button>
+      <button class="topbar-close" id="paymentmethods-close-btn">✕</button>
+    </div>
   </div>
   <div class="scroll">
     <div style="padding:0 20px 28px;">
@@ -1409,7 +1415,10 @@ body.inc-revealed .minc-mask{display:none;}
 <div class="screen is-hidden" id="groups-screen">
   <div class="topbar">
     <p class="topbar-title">Manage groups</p>
-    <button class="topbar-close" id="groups-close-btn">✕</button>
+    <div class="topbar-icons">
+      <button type="button" class="topbar-lock-btn" id="groups-add-btn-top" title="Add group">➕</button>
+      <button class="topbar-close" id="groups-close-btn">✕</button>
+    </div>
   </div>
   <div class="scroll">
     <div style="padding:0 20px 28px;">
@@ -1467,7 +1476,10 @@ body.inc-revealed .minc-mask{display:none;}
 <div class="screen is-hidden" id="recurring-screen">
   <div class="topbar">
     <p class="topbar-title">Recurring transactions</p>
-    <button class="topbar-close" id="recurring-close-btn">✕</button>
+    <div class="topbar-icons">
+      <button type="button" class="topbar-lock-btn" id="recurring-add-btn-top" title="Add recurring transaction">➕</button>
+      <button class="topbar-close" id="recurring-close-btn">✕</button>
+    </div>
   </div>
   <div class="scroll">
     <div style="padding:0 20px 28px;">
@@ -1875,7 +1887,10 @@ body.inc-revealed .minc-mask{display:none;}
     <div class="edit-sheet-grip"></div>
     <div class="edit-sheet-head">
       <p class="edit-sheet-title">Manage accounts</p>
-      <button type="button" class="topbar-close" id="manage-accounts-close-btn">✕</button>
+      <div class="topbar-icons">
+        <button type="button" class="topbar-lock-btn" id="manage-accounts-add-btn-top" title="Add account">➕</button>
+        <button type="button" class="topbar-close" id="manage-accounts-close-btn">✕</button>
+      </div>
     </div>
     <div id="manage-accounts-list" style="margin-top:14px;"></div>
     <button type="button" class="warranty-toggle-btn" id="manage-accounts-add-btn" style="margin-top:12px;">+ Add account</button>
@@ -6355,6 +6370,15 @@ function projectRecurringTotal(windowEndISO){
       if(rule.endDate && cursor>rule.endDate) break;
       total+=Number(rule.amount);
       items.push({ name:rule.name, amount:rule.amount, dateISO:cursor, categoryId:rule.categoryId });
+      // Rules awaiting manual confirmation (autoAdd:false) never auto-advance
+      // in real life until the user taps "Mark as paid" — so this simulation
+      // must not assume a second future occurrence exists yet either. Without
+      // this guard, an overdue unconfirmed bill was counted once for the real
+      // overdue occurrence AND again for a hypothetical "next" occurrence that
+      // can't legitimately happen until the first is actually confirmed —
+      // double-counting it in any window wide enough to span both dates
+      // (most visibly "Next 30 days" for a bill just past due).
+      if(rule.autoAdd===false) break;
       cursor=advanceRecurringDate(rule, cursor);
       count++;
     }
@@ -9344,6 +9368,9 @@ document.getElementById('categories-list').addEventListener('click', (e) => {
 document.getElementById('categories-add-btn').addEventListener('click', () => {
   openCategoryEdit(null, (state.categoriesScreenType==='income') ? 'incomeCategory' : 'category');
 });
+document.getElementById('categories-add-btn-top').addEventListener('click', () => {
+  openCategoryEdit(null, (state.categoriesScreenType==='income') ? 'incomeCategory' : 'category');
+});
 document.getElementById('categories-merge-btn').addEventListener('click', openCategoryMergeScreen);
 document.getElementById('category-merge-close-btn').addEventListener('click', closeCategoryMergeScreen);
 document.getElementById('category-merge-overlay').addEventListener('click', (e) => {
@@ -9384,6 +9411,7 @@ document.getElementById('paymentmethods-list').addEventListener('click', (e) => 
   openPaymentMethodEdit(row.dataset.pmid);
 });
 document.getElementById('paymentmethods-add-btn').addEventListener('click', () => openPaymentMethodEdit(null));
+document.getElementById('paymentmethods-add-btn-top').addEventListener('click', () => openPaymentMethodEdit(null));
 document.getElementById('paymentmethod-edit-close-btn').addEventListener('click', closePaymentMethodEdit);
 document.getElementById('paymentmethod-edit-overlay').addEventListener('click', (e) => {
   if(e.target.id==='paymentmethod-edit-overlay') closePaymentMethodEdit();
@@ -9409,6 +9437,7 @@ document.getElementById('groups-list').addEventListener('click', (e) => {
   openGroupEdit(row.dataset.groupid);
 });
 document.getElementById('groups-add-btn').addEventListener('click', () => openGroupEdit(null));
+document.getElementById('groups-add-btn-top').addEventListener('click', () => openGroupEdit(null));
 document.getElementById('groups-tag-btn').addEventListener('click', openTagExpensesScreen);
 document.getElementById('group-edit-close-btn').addEventListener('click', closeGroupEdit);
 document.getElementById('group-edit-overlay').addEventListener('click', (e) => {
@@ -9436,6 +9465,7 @@ document.getElementById('recurring-list').addEventListener('click', (e) => {
   openRecurringEdit(row.dataset.recurringid);
 });
 document.getElementById('recurring-screen-add-btn').addEventListener('click', () => openRecurringEdit(null));
+document.getElementById('recurring-add-btn-top').addEventListener('click', () => openRecurringEdit(null));
 document.getElementById('recurring-edit-close-btn').addEventListener('click', closeRecurringEdit);
 document.getElementById('recurring-edit-overlay').addEventListener('click', (e) => {
   if(e.target.id==='recurring-edit-overlay') closeRecurringEdit();
@@ -9619,6 +9649,7 @@ document.getElementById('manage-accounts-overlay').addEventListener('click', (e)
   if(e.target.id==='manage-accounts-overlay') closeManageAccountsScreen();
 });
 document.getElementById('manage-accounts-add-btn').addEventListener('click', ()=> openAccountEdit(null,'settings'));
+document.getElementById('manage-accounts-add-btn-top').addEventListener('click', ()=> openAccountEdit(null,'settings'));
 document.getElementById('manage-accounts-bulkassign-btn').addEventListener('click', openBulkAccountScreen);
 
 // Bulk account assign screen
