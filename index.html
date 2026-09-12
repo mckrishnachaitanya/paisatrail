@@ -6386,6 +6386,24 @@ function projectRecurringTotal(windowEndISO){
   items.sort((a,b)=>a.dateISO.localeCompare(b.dateISO));
   return { total, items };
 }
+// Shared by the savings projection's income loop (projectRecurringTotal
+// above needs per-occurrence items for the expense side, so it keeps its
+// own loop) — same walk-forward-from-nextDueISO logic, respecting endDate
+// and the autoAdd:false "awaiting confirmation" guard, so a rule's total
+// is computed identically regardless of which side (expense or income)
+// projects it. v3.52: extracted so the two loops can't silently drift out
+// of sync again, which is exactly what happened before this fix.
+function projectRuleTotal(rule, windowEndISO){
+  let total=0, cursor=rule.nextDueISO, count=0;
+  while(cursor<=windowEndISO && count<RECURRING_CATCHUP_CAP){
+    if(rule.endDate && cursor>rule.endDate) break;
+    total+=Number(rule.amount);
+    if(rule.autoAdd===false) break;
+    cursor=advanceRecurringDate(rule, cursor);
+    count++;
+  }
+  return total;
+}
 // Estimates everything that ISN'T a known recurring rule — food, shopping,
 // one-off purchases — from a trailing daily average. Excludes expenses that
 // already have a recurringId so the same spending never gets counted both
@@ -6409,18 +6427,30 @@ const FORECAST_MIN_EXPENSE_COUNT=5;
 const FORECAST_MIN_DISTINCT_DAYS=7;
 async function estimateDailyOtherSpend(lookbackDays, prefetched){
   const today=todayISO();
-  const lookbackStartISO=dateToISO(addDays(new Date(today+'T00:00:00'), -lookbackDays));
+  // -(lookbackDays-1) so the query spans exactly lookbackDays days INCLUSIVE
+  // of today, matching the divisor used for the rate below. Previously this
+  // was -lookbackDays, which queried lookbackDays+1 days (today plus a full
+  // lookbackDays back) but still divided by lookbackDays — a ~3% overestimate
+  // of the daily rate at a 30-day lookback (smaller at 90/180).
+  const lookbackStartISO=dateToISO(addDays(new Date(today+'T00:00:00'), -(lookbackDays-1)));
   const source = prefetched ? sliceByDateRange(prefetched, lookbackStartISO, today) : await DB.getExpensesByDateRange(lookbackStartISO, today);
   const all=source.filter(e => !pendingDeletes[e.id] && !e.recurringId && isExpenseEntry(e));
-  const excluded=all.filter(e => e.excludeFromForecast);
+  // Reconciliation (balance-adjustment) entries also carry excludeFromForecast
+  // (deliberately, so they never skew the rate) but they're a system
+  // correction, not a real one-time purchase — split them out of the
+  // "Excluded as one-time" figure so that line doesn't read as confusing
+  // "one-time expenses" that Krishna never actually logged as such.
+  const excluded=all.filter(e => e.excludeFromForecast && !isReconEntry(e));
+  const reconExcluded=all.filter(e => e.excludeFromForecast && isReconEntry(e));
   const expenses=all.filter(e => !e.excludeFromForecast);
   const excludedTotal=excluded.reduce((s,e)=>s+Number(e.amount),0);
+  const reconExcludedTotal=reconExcluded.reduce((s,e)=>s+Number(e.amount),0);
   const distinctDays=new Set(expenses.map(e=>e.date)).size;
   if(expenses.length<FORECAST_MIN_EXPENSE_COUNT || distinctDays<FORECAST_MIN_DISTINCT_DAYS){
-    return { rate:null, excludedTotal, excludedCount:excluded.length };
+    return { rate:null, excludedTotal, excludedCount:excluded.length, reconExcludedTotal, reconExcludedCount:reconExcluded.length };
   }
   const total=expenses.reduce((s,e)=>s+Number(e.amount),0);
-  return { rate: total/lookbackDays, excludedTotal, excludedCount:excluded.length };
+  return { rate: total/lookbackDays, excludedTotal, excludedCount:excluded.length, reconExcludedTotal, reconExcludedCount:reconExcluded.length };
 }
 function setForecastWindow(win){
   state.forecastWindow=win;
@@ -6448,14 +6478,28 @@ async function renderHomeForecastPanel(prefetched){
     const bounds=cycleBounds(today);
     windowEndISO=bounds.endISO;
     remainingDays=Math.max(0, Math.round((new Date(windowEndISO+'T00:00:00') - new Date(today+'T00:00:00'))/86400000));
-    spentSoFar=(prefetched ? sliceByDateRange(prefetched, bounds.startISO, today) : await DB.getExpensesByDateRange(bounds.startISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
+    const rawSpentSoFar=(prefetched ? sliceByDateRange(prefetched, bounds.startISO, today) : await DB.getExpensesByDateRange(bounds.startISO, today)).filter(e => !pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
+    // Refunds reduce "spent so far" the same way Home/Budgets/Insights already
+    // net them out — previously Forecast was the one screen that didn't,
+    // overstating spent-so-far (and therefore projected total/savings) by
+    // any refund landed this cycle. Buckets by effectiveDate, same as
+    // everywhere else, so a refund only counts here if the ORIGINAL
+    // expense's date fell within this cycle.
+    const { total:cycleRefundTotal } = await getRefundTotalsForPeriod(bounds.startISO, today);
+    spentSoFar=Math.max(0, rawSpentSoFar-cycleRefundTotal);
   } else {
-    windowEndISO=dateToISO(addDays(new Date(today+'T00:00:00'), FORECAST_ROLLING_WINDOW_DAYS));
+    // -1 so the window is exactly FORECAST_ROLLING_WINDOW_DAYS days INCLUSIVE
+    // of today (today + 29 more = 30 days total), matching remainingDays used
+    // to scale "estimated other spending" below. Previously this was +30 (a
+    // 31-day span including today), one day wider than "Next 30 days" claimed
+    // and than the days-based average it was combined with — recurring-due
+    // and estimated-other were quietly scoped to different-length windows.
+    windowEndISO=dateToISO(addDays(new Date(today+'T00:00:00'), FORECAST_ROLLING_WINDOW_DAYS-1));
     remainingDays=FORECAST_ROLLING_WINDOW_DAYS;
   }
 
   const { total:recurringTotal, items:upcoming } = projectRecurringTotal(windowEndISO);
-  const { rate:dailyOtherRate, excludedTotal, excludedCount } = await estimateDailyOtherSpend(state.forecastLookbackDays, prefetched);
+  const { rate:dailyOtherRate, excludedTotal, excludedCount, reconExcludedTotal, reconExcludedCount } = await estimateDailyOtherSpend(state.forecastLookbackDays, prefetched);
   const estimatedOther = dailyOtherRate!=null ? dailyOtherRate*remainingDays : null;
   const projectedTotal = spentSoFar + recurringTotal + (estimatedOther || 0);
 
@@ -6470,6 +6514,9 @@ async function renderHomeForecastPanel(prefetched){
   breakdown.insertAdjacentHTML('beforeend', `<div class="legend-row"><span>Estimated other spending</span><span>${estimatedOther!=null ? '~'+formatINR(estimatedOther) : `Not enough history yet (last ${state.forecastLookbackDays} days)`}</span></div>`);
   if(excludedCount>0){
     breakdown.insertAdjacentHTML('beforeend', `<div class="legend-row"><span>Excluded as one-time</span><span>${formatINR(excludedTotal)} · ${excludedCount} expense${excludedCount===1?'':'s'}</span></div>`);
+  }
+  if(reconExcludedCount>0){
+    breakdown.insertAdjacentHTML('beforeend', `<div class="legend-row"><span>Excluded as balance adjustment</span><span>${formatINR(reconExcludedTotal)} · ${reconExcludedCount} entr${reconExcludedCount===1?'y':'ies'}</span></div>`);
   }
 
   // ── Savings projection ──
@@ -6486,16 +6533,17 @@ async function renderHomeForecastPanel(prefetched){
     nudge.classList.add('hidden');
     savingsCard.classList.remove('hidden');
 
-    // Project recurring income due within the window (same engine as expenses)
+    // Project recurring income due within the window — uses the shared
+    // projectRuleTotal() helper (see CASH-FLOW FORECASTING section) so this
+    // stays in sync with projectRecurringTotal's expense-side logic instead
+    // of drifting, as it previously did: this loop was missing BOTH the
+    // rule.endDate guard and the autoAdd:false break that the expense loop
+    // already had (v3.51), so a past-end-date income rule kept projecting
+    // forever, and an overdue-unconfirmed income rule was double-counted —
+    // the exact v3.51 bug, just on the income side. Fixed v3.52.
     let projectedRecurringIncome=0;
     incomeRules.forEach(rule=>{
-      let cursor=rule.nextDueISO;
-      let count=0;
-      while(cursor<=windowEndISO && count<RECURRING_CATCHUP_CAP){
-        projectedRecurringIncome+=Number(rule.amount);
-        cursor=advanceRecurringDate(rule, cursor);
-        count++;
-      }
+      projectedRecurringIncome += projectRuleTotal(rule, windowEndISO);
     });
 
     // Actual income logged so far this cycle (only for month window).
@@ -6516,12 +6564,25 @@ async function renderHomeForecastPanel(prefetched){
     // nextDueISO always sits strictly after every occurrence already logged,
     // so "still due" (projectedRecurringIncome) and "already logged"
     // (incomeLoggedSoFar) can never overlap.
+    // v3.52: extended to the rolling 30-day window too — it had the exact
+    // same gap the v3.45 fix closed for month view, just unaddressed here.
+    // The rolling window always starts today, so the only day whose income
+    // could already be logged-yet-uncounted is today itself (any earlier
+    // occurrence is before the window and correctly excluded from both
+    // totals; any later one is still ahead of nextDueISO and still counted
+    // by projectedRecurringIncome). Scoping to today only (not the whole
+    // window-to-date, since there is no "week/cycle so far" concept for a
+    // forward-looking window) keeps this from ever double-counting.
     let incomeLoggedSoFar=0;
     if(isMonth){
       const bounds=cycleBounds(today);
       const incomeEntries=(await DB.getExpensesByDateRange(bounds.startISO, today))
         .filter(e=>!pendingDeletes[e.id] && isIncomeEntry(e) && !isReconEntry(e));
       incomeLoggedSoFar=incomeEntries.reduce((s,e)=>s+Number(e.amount),0);
+    } else {
+      const todaysIncome=(await DB.getExpensesByDateRange(today, today))
+        .filter(e=>!pendingDeletes[e.id] && isIncomeEntry(e) && !isReconEntry(e));
+      incomeLoggedSoFar=todaysIncome.reduce((s,e)=>s+Number(e.amount),0);
     }
 
     const projectedIncome=projectedRecurringIncome+incomeLoggedSoFar;
@@ -6535,10 +6596,10 @@ async function renderHomeForecastPanel(prefetched){
         <span>Projected income</span>
         <span>${maskIncomeHTML(formatINR(projectedIncome))}</span>
       </div>`);
-    if(isMonth && incomeLoggedSoFar>0){
+    if(incomeLoggedSoFar>0){
       savingsBreakdown.insertAdjacentHTML('beforeend',
         `<div class="legend-row" style="color:rgba(255,255,255,0.6);font-size:12px;">
-          <span style="padding-left:10px;">└ Logged so far</span>
+          <span style="padding-left:10px;">└ ${isMonth ? 'Logged so far' : 'Logged today'}</span>
           <span>${maskIncomeHTML(formatINR(incomeLoggedSoFar))}</span>
         </div>`);
     }

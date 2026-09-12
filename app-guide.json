@@ -1,6 +1,17 @@
 {
-  "version": "3.51",
+  "version": "3.52",
   "releaseNotes": [
+    {
+      "version": "3.52",
+      "date": "2026-09-12",
+      "highlights": [
+        "Fixed: Forecast's projected income could double-count (or keep counting past its end date) an overdue recurring income rule awaiting confirmation — the same bug v3.51 fixed on the expense side, now fixed for income too.",
+        "Fixed: an overdue balance owed to you (recurring income) that had already been logged today could vanish from \"Next 30 days\" projected income instead of being counted.",
+        "Fixed: Forecast's \"spent so far\" this cycle now correctly subtracts any refunds received for purchases made this cycle, matching how Home, Budgets, and Insights already treat refunds.",
+        "Fixed: a small rounding mismatch that made \"Next 30 days\" span 31 days instead of 30, and made the trailing-average spending estimate look at one extra day than it divided by.",
+        "The Forecast breakdown now separates balance adjustments from genuine one-time expenses in the \"excluded\" line, so a reconciliation entry doesn't read as an odd one-time purchase."
+      ]
+    },
     {
       "version": "3.51",
       "date": "2026-09-05",
