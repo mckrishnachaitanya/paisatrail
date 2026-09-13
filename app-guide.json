@@ -1,6 +1,15 @@
 {
-  "version": "3.52",
+  "version": "3.53",
   "releaseNotes": [
+    {
+      "version": "3.53",
+      "date": "2026-09-13",
+      "highlights": [
+        "New: Forecast now shows a \"Savings pace for upcoming bills\" card whenever at least one recurring transaction has \"High expense alert\" turned on — it pools every flagged bill (yearly insurance, quarterly school fees, etc.) into one required monthly set-aside, compares it against your actual recent savings rate, and tells you whether you're on track or short.",
+        "The card lists each flagged bill individually — amount, frequency, due date, and its own monthly contribution to the pooled total — so the headline number is never a black box.",
+        "Your actual savings rate is based on real logged income and expenses over the last few cycles whenever there's enough history; it falls back to this cycle's Forecast projection only for a fresh install with nothing to average yet."
+      ]
+    },
     {
       "version": "3.52",
       "date": "2026-09-12",
@@ -493,7 +502,7 @@
       "id": "home-forecast",
       "icon": "📈",
       "title": "Home — Forecast",
-      "body": "A look ahead at what you're likely to spend for the rest of the month (or the next 30 days), based on what's already gone out, what's due to repeat, and your typical day-to-day spending."
+      "body": "A look ahead at what you're likely to spend for the rest of the month (or the next 30 days), based on what's already gone out, what's due to repeat, and your typical day-to-day spending. If any recurring transaction has \"High expense alert\" turned on, a Savings Pace card also shows here — it pools every flagged bill into one required monthly savings target and tells you whether your actual savings are keeping up."
     },
     {
       "id": "home-budgets",

@@ -783,6 +783,14 @@ body.inc-revealed .minc-mask{display:none;}
           <p style="font-size:13px;font-weight:600;color:var(--mint);margin-bottom:4px;">See your savings projection</p>
           <p style="font-size:12px;color:var(--muted);">Add recurring income (salary, rent received) in Settings → Recurring transactions</p>
         </button>
+        <!-- Savings pace for high-value bills (v3.53) — shown only when at least
+             one recurring rule has "High expense alert" turned on. Pooled across
+             every such rule, not per-bill (see renderSavingsPaceCard). -->
+        <div id="savings-pace-card" class="hidden" style="margin-top:14px;background:var(--surface);border-radius:20px;padding:16px;">
+          <p class="section-title" style="margin:0 0 10px;">💪 Savings pace for upcoming bills</p>
+          <div id="savings-pace-verdict"></div>
+          <div id="savings-pace-breakdown"></div>
+        </div>
         <div class="spend-card" style="margin-top:14px;">
           <p class="spend-label" id="forecast-total-label">Projected total this month</p>
           <p class="spend-amount" id="forecast-total">₹0</p>
@@ -6404,6 +6412,151 @@ function projectRuleTotal(rule, windowEndISO){
   }
   return total;
 }
+
+/* ============================== SAVINGS PACE FOR HIGH-VALUE BILLS (v3.53) ==============================
+   Answers "am I saving enough for my flagged high-value recurring bills (yearly
+   insurance, school fees, etc.)" — pooled across every active rule with
+   highExpenseAlert on, not per-bill, so two overlapping bills can't each
+   independently claim "you're on track" while double-counting the same rupee
+   (Krishna's explicit call). Deliberately reuses the exact shared helpers
+   Forecast already established (projectRuleTotal, projectRecurringTotal,
+   estimateDailyOtherSpend, getRefundTotalsForPeriod) for the fallback
+   projection rather than re-deriving similar-but-different logic — same
+   lesson as v3.52's projectRuleTotal extraction: one implementation, not two
+   that can silently drift apart. */
+
+// Converts a rule's amount into "how much to set aside per month" for it,
+// regardless of how often it actually fires. Every highExpenseAlert rule is
+// an expense (the alert exists to warn about money going OUT), so no income
+// branch is needed here.
+function monthlyRateForFrequency(amount, frequency){
+  if(frequency==='weekly') return amount * (52/12);
+  if(frequency==='quarterly') return amount/3;
+  if(frequency==='yearly') return amount/12;
+  return amount; // monthly (default/fallback)
+}
+// Deliberately NOT the same set as getHighExpenseAlerts() (Actions pill) —
+// that one windows to "due within alertDaysBefore days," which is right for
+// a nudge but wrong here: a bill 10 months out still needs money set aside
+// for it every month between now and then, so this pulls every ACTIVE
+// flagged rule regardless of proximity.
+function getSavingsPaceRules(){
+  return state.recurringRules.filter(r=>r.active && r.highExpenseAlert);
+}
+async function getIncomeTotalForPeriod(startISO, endISO){
+  const incomes=(await DB.getExpensesByDateRange(startISO,endISO)).filter(e=>!pendingDeletes[e.id] && isIncomeEntry(e) && !isReconEntry(e));
+  return incomes.reduce((s,e)=>s+Number(e.amount),0);
+}
+// Trailing ACTUAL savings rate — real logged income (+ refunds landing that
+// cycle, which are real cash back) minus real logged expenses, averaged
+// across however many of the last 3 cycles had ANY activity at all (same
+// "don't average in silent pre-app cycles" rule getBudgetHistoryData already
+// uses for its own 3-month suggestion). Uses real dates only, not refund
+// effectiveDate bucketing — this is a rough actual-cashflow pulse check, not
+// the precise per-cycle accounting Insights/Budgets do. Returns null when
+// there's no usable history yet (brand new install), signalling the caller
+// to fall back to a Forecast-based projection instead.
+async function getTrailingSavingsRate(){
+  const bounds=[cyclesAgoBounds(1), cyclesAgoBounds(2), cyclesAgoBounds(3)];
+  const perCycle=await Promise.all(bounds.map(async b=>{
+    const all=(await DB.getExpensesByDateRange(b.startISO,b.endISO)).filter(e=>!pendingDeletes[e.id] && !isReconEntry(e));
+    if(all.length===0) return null;
+    const income=all.filter(isIncomeEntry).reduce((s,e)=>s+Number(e.amount),0);
+    const expense=all.filter(isExpenseEntry).reduce((s,e)=>s+Number(e.amount),0);
+    const refund=all.filter(isRefundEntry).reduce((s,e)=>s+Number(e.amount),0);
+    return income + refund - expense;
+  }));
+  const active=perCycle.filter(n=>n!==null);
+  if(active.length===0) return null;
+  return active.reduce((s,n)=>s+n,0)/active.length;
+}
+// Fallback for a brand-new install with no trailing history yet — this
+// cycle's Forecast-projected savings, assembled from the same shared pieces
+// renderHomeForecastPanel's own savings card already uses, so a bug fixed in
+// one place is fixed in both rather than two copies drifting apart. Returns
+// null (same "not enough signal" gate Forecast itself uses) when there's no
+// recurring income set up at all — nothing meaningful to project.
+async function computeCurrentCycleProjectedSavings(prefetched){
+  const incomeRules=state.recurringRules.filter(r=>r.active && r.type==='income');
+  if(incomeRules.length===0) return null;
+  const today=todayISO();
+  const bounds=cycleBounds(today);
+  const windowEndISO=bounds.endISO;
+  let projectedRecurringIncome=0;
+  incomeRules.forEach(rule=>{ projectedRecurringIncome+=projectRuleTotal(rule, windowEndISO); });
+  const incomeEntries=(prefetched ? sliceByDateRange(prefetched, bounds.startISO, today) : await DB.getExpensesByDateRange(bounds.startISO, today)).filter(e=>!pendingDeletes[e.id] && isIncomeEntry(e) && !isReconEntry(e));
+  const incomeLoggedSoFar=incomeEntries.reduce((s,e)=>s+Number(e.amount),0);
+  const projectedIncome=projectedRecurringIncome+incomeLoggedSoFar;
+
+  const rawSpentSoFar=(prefetched ? sliceByDateRange(prefetched, bounds.startISO, today) : await DB.getExpensesByDateRange(bounds.startISO, today)).filter(e=>!pendingDeletes[e.id] && isExpenseEntry(e) && !isReconEntry(e)).reduce((s,e)=>s+Number(e.amount),0);
+  const { total:cycleRefundTotal } = await getRefundTotalsForPeriod(bounds.startISO, today);
+  const spentSoFar=Math.max(0, rawSpentSoFar-cycleRefundTotal);
+  const { total:recurringTotal } = projectRecurringTotal(windowEndISO);
+  const { rate:dailyOtherRate } = await estimateDailyOtherSpend(state.forecastLookbackDays, prefetched);
+  const remainingDays=Math.max(0, Math.round((new Date(windowEndISO+'T00:00:00') - new Date(today+'T00:00:00'))/86400000));
+  const estimatedOther = dailyOtherRate!=null ? dailyOtherRate*remainingDays : 0;
+  const projectedExpenseTotal=spentSoFar+recurringTotal+estimatedOther;
+
+  return projectedIncome-projectedExpenseTotal;
+}
+async function renderSavingsPaceCard(prefetched){
+  const card=document.getElementById('savings-pace-card');
+  if(!card) return;
+  const rules=getSavingsPaceRules();
+  if(rules.length===0){ card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+
+  const today=todayISO();
+  let requiredTotal=0;
+  const rows=rules.map(r=>{
+    const monthlyRate=monthlyRateForFrequency(r.amount, r.frequency);
+    requiredTotal+=monthlyRate;
+    const overdue = r.autoAdd===false && r.nextDueISO<=today;
+    const cat=state.categories.find(c=>c.id===r.categoryId);
+    return { rule:r, monthlyRate, overdue, cat };
+  }).sort((a,b)=>a.rule.nextDueISO.localeCompare(b.rule.nextDueISO));
+  const nearest=rows.find(r=>!r.overdue) || rows[0];
+
+  // Trailing actual wins whenever there's history; Forecast projection is
+  // only a fallback for a fresh install with nothing to average yet.
+  let actualRate=await getTrailingSavingsRate();
+  let source='trailing';
+  if(actualRate===null){
+    actualRate=await computeCurrentCycleProjectedSavings(prefetched);
+    source='forecast';
+  }
+
+  const verdictEl=document.getElementById('savings-pace-verdict');
+  if(actualRate===null){
+    verdictEl.innerHTML=`<p class="empty-hint" style="padding:0;text-align:left;">Not enough history yet to estimate your savings pace — check back after a cycle or two, or add recurring income in Settings for a forecast-based estimate instead.</p>`;
+  } else {
+    const diff=actualRate-requiredTotal;
+    const sourceLabel = source==='trailing' ? 'Based on your actual savings over the last few cycles' : "Based on this cycle's forecast (not enough history yet)";
+    const nearestDateLabel = nearest ? new Date(nearest.rule.nextDueISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}) : '';
+    const nearestPhrase = nearest ? ` — nearest is ${esc(nearest.rule.name)}, due ${esc(nearestDateLabel)}` : '';
+    if(diff>=0){
+      verdictEl.innerHTML = `<div class="budget-pace ok" style="margin-top:0;">✓ On track — about ${formatINR(diff)}/mo ahead of what these bills need</div><p class="empty-hint" style="padding:6px 0 0;text-align:left;">${esc(sourceLabel)}</p>`;
+    } else {
+      verdictEl.innerHTML = `<div class="budget-pace warn" style="margin-top:0;">⚠️ About ${formatINR(Math.abs(diff))}/mo short${esc(nearestPhrase)}</div><p class="empty-hint" style="padding:6px 0 0;text-align:left;">${esc(sourceLabel)}</p>`;
+    }
+  }
+
+  const breakdown=document.getElementById('savings-pace-breakdown');
+  breakdown.innerHTML = `<p class="field-label" style="margin:14px 0 8px;">REQUIRED: ${esc(formatINR(requiredTotal))}/MO, POOLED ACROSS ${rows.length} BILL${rows.length===1?'':'S'}</p>` +
+    rows.map(r=>{
+      const dateLabel=new Date(r.rule.nextDueISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+      const overdueTag = r.overdue ? ` <span class="manage-default-tag" style="color:var(--coral);">Overdue</span>` : '';
+      return `
+        <div class="ins-cat-row">
+          <div class="ins-cat-icon" style="background:${r.cat?r.cat.color:'#9088A8'}22">${r.cat?r.cat.icon:'🔔'}</div>
+          <div class="ins-cat-info">
+            <p class="ins-cat-name">${esc(r.rule.name)}${overdueTag}</p>
+            <span class="ins-cat-prev">${formatINR(r.rule.amount)} ${esc(recurringFrequencyLabel(r.rule.frequency).toLowerCase())} · due ${esc(dateLabel)}</span>
+          </div>
+          <p class="ins-cat-amt">${formatINR(r.monthlyRate)}/mo</p>
+        </div>`;
+    }).join('');
+}
 // Estimates everything that ISN'T a known recurring rule — food, shopping,
 // one-off purchases — from a trailing daily average. Excludes expenses that
 // already have a recurringId so the same spending never gets counted both
@@ -6642,6 +6795,8 @@ async function renderHomeForecastPanel(prefetched){
         </div>`);
     });
   }
+
+  await renderSavingsPaceCard(prefetched);
 }
 
 /* ============================== BUDGETS ============================== */
