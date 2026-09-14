@@ -783,14 +783,22 @@ body.inc-revealed .minc-mask{display:none;}
           <p style="font-size:13px;font-weight:600;color:var(--mint);margin-bottom:4px;">See your savings projection</p>
           <p style="font-size:12px;color:var(--muted);">Add recurring income (salary, rent received) in Settings → Recurring transactions</p>
         </button>
-        <!-- Savings pace for high-value bills (v3.53) — shown only when at least
-             one recurring rule has "High expense alert" turned on. Pooled across
-             every such rule, not per-bill (see renderSavingsPaceCard). -->
-        <div id="savings-pace-card" class="hidden" style="margin-top:14px;background:var(--surface);border-radius:20px;padding:16px;">
-          <p class="section-title" style="margin:0 0 10px;">💪 Savings pace for upcoming bills</p>
-          <div id="savings-pace-verdict"></div>
-          <div id="savings-pace-breakdown"></div>
-        </div>
+        <!-- Savings pace for high-value bills (v3.53, restyled v3.54) — shown only
+             when at least one recurring rule has "High expense alert" turned on.
+             Pooled across every such rule, not per-bill (see renderSavingsPaceCard).
+             Collapsed to a single tappable summary row (Krishna's call after
+             reviewing two mockups) — tapping opens the full breakdown in
+             #savings-pace-detail-overlay, same bottom-sheet pattern as every
+             other detail sheet in the app (High Expense Alert, Cycle Summary). -->
+        <button type="button" id="savings-pace-row" class="settings-row hidden" style="margin-top:14px;">
+          <span class="settings-row-icon" id="savings-pace-row-icon">⚠️</span>
+          <div class="settings-row-info">
+            <p class="settings-row-title">Savings pace</p>
+            <span class="settings-row-sub" id="savings-pace-row-sub"></span>
+          </div>
+          <p id="savings-pace-row-amount" style="font-family:var(--font-mono);font-size:13px;font-weight:700;flex-shrink:0;"></p>
+          <span class="settings-row-chevron">›</span>
+        </button>
         <div class="spend-card" style="margin-top:14px;">
           <p class="spend-label" id="forecast-total-label">Projected total this month</p>
           <p class="spend-amount" id="forecast-total">₹0</p>
@@ -1844,6 +1852,23 @@ body.inc-revealed .minc-mask{display:none;}
     <p class="ins-delta" id="cycle-summary-delta" style="margin:4px 0 18px;"></p>
     <p class="field-label">TOP CATEGORY</p>
     <div class="ins-cat-row" id="cycle-summary-top-cat"></div>
+  </div>
+</div>
+
+<!-- ============================== SAVINGS PACE DETAIL (v3.54) ============================== -->
+<!-- Opened by tapping the compact "Savings pace" summary row in Forecast.
+     Content is populated by renderSavingsPaceCard() at the same time as the
+     row itself, so opening the sheet never re-triggers a computation — it's
+     already sitting in these (hidden) divs. -->
+<div id="savings-pace-detail-overlay" class="edit-sheet-overlay">
+  <div class="edit-sheet">
+    <div class="edit-sheet-grip"></div>
+    <div class="edit-sheet-head">
+      <p class="edit-sheet-title">Savings pace for bills</p>
+      <button type="button" class="topbar-close" id="savings-pace-detail-close-btn">✕</button>
+    </div>
+    <div id="savings-pace-detail-verdict" style="margin-top:12px;"></div>
+    <div id="savings-pace-detail-breakdown"></div>
   </div>
 </div>
 
@@ -6500,11 +6525,11 @@ async function computeCurrentCycleProjectedSavings(prefetched){
   return projectedIncome-projectedExpenseTotal;
 }
 async function renderSavingsPaceCard(prefetched){
-  const card=document.getElementById('savings-pace-card');
-  if(!card) return;
+  const row=document.getElementById('savings-pace-row');
+  if(!row) return;
   const rules=getSavingsPaceRules();
-  if(rules.length===0){ card.classList.add('hidden'); return; }
-  card.classList.remove('hidden');
+  if(rules.length===0){ row.classList.add('hidden'); return; }
+  row.classList.remove('hidden');
 
   const today=todayISO();
   let requiredTotal=0;
@@ -6526,7 +6551,34 @@ async function renderSavingsPaceCard(prefetched){
     source='forecast';
   }
 
-  const verdictEl=document.getElementById('savings-pace-verdict');
+  // ---- Compact row (always visible) ----
+  const rowIcon=document.getElementById('savings-pace-row-icon');
+  const rowSub=document.getElementById('savings-pace-row-sub');
+  const rowAmount=document.getElementById('savings-pace-row-amount');
+  rowSub.textContent = `${rows.length} bill${rows.length===1?'':'s'} tracked`;
+  if(actualRate===null){
+    rowIcon.textContent='🔔';
+    rowIcon.style.background='rgba(134,87,224,.14)';
+    rowAmount.textContent='';
+  } else {
+    const diff=actualRate-requiredTotal;
+    if(diff>=0){
+      rowIcon.textContent='✓';
+      rowIcon.style.background='rgba(46,196,182,.14)';
+      rowAmount.style.color='var(--mint)';
+      rowAmount.textContent=`+${formatINR(diff)}/mo`;
+    } else {
+      rowIcon.textContent='⚠️';
+      rowIcon.style.background='rgba(255,107,91,.14)';
+      rowAmount.style.color='var(--coral)';
+      rowAmount.textContent=`-${formatINR(Math.abs(diff))}/mo`;
+    }
+  }
+
+  // ---- Detail sheet content (populated now, opened later — see
+  // openSavingsPaceDetailSheet — so tapping the row never re-triggers a
+  // computation, it just reveals what's already sitting in these divs). ----
+  const verdictEl=document.getElementById('savings-pace-detail-verdict');
   if(actualRate===null){
     verdictEl.innerHTML=`<p class="empty-hint" style="padding:0;text-align:left;">Not enough history yet to estimate your savings pace — check back after a cycle or two, or add recurring income in Settings for a forecast-based estimate instead.</p>`;
   } else {
@@ -6541,7 +6593,7 @@ async function renderSavingsPaceCard(prefetched){
     }
   }
 
-  const breakdown=document.getElementById('savings-pace-breakdown');
+  const breakdown=document.getElementById('savings-pace-detail-breakdown');
   breakdown.innerHTML = `<p class="field-label" style="margin:14px 0 8px;">REQUIRED: ${esc(formatINR(requiredTotal))}/MO, POOLED ACROSS ${rows.length} BILL${rows.length===1?'':'S'}</p>` +
     rows.map(r=>{
       const dateLabel=new Date(r.rule.nextDueISO+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
@@ -6557,6 +6609,13 @@ async function renderSavingsPaceCard(prefetched){
         </div>`;
     }).join('');
 }
+function openSavingsPaceDetailSheet(){
+  document.getElementById('savings-pace-detail-overlay').classList.add('show');
+}
+function closeSavingsPaceDetailSheet(){
+  document.getElementById('savings-pace-detail-overlay').classList.remove('show');
+}
+
 // Estimates everything that ISN'T a known recurring rule — food, shopping,
 // one-off purchases — from a trailing daily average. Excludes expenses that
 // already have a recurringId so the same spending never gets counted both
@@ -9277,6 +9336,11 @@ document.getElementById('actions-sheet-list').addEventListener('click', (e) => {
 });
 document.getElementById('highexpense-detail-close-btn').addEventListener('click', closeHighExpenseDetailSheet);
 document.getElementById('cycle-summary-close-btn').addEventListener('click', closeCycleSummarySheet);
+document.getElementById('savings-pace-row').addEventListener('click', openSavingsPaceDetailSheet);
+document.getElementById('savings-pace-detail-close-btn').addEventListener('click', closeSavingsPaceDetailSheet);
+document.getElementById('savings-pace-detail-overlay').addEventListener('click', (e) => {
+  if(e.target.id==='savings-pace-detail-overlay') closeSavingsPaceDetailSheet();
+});
 document.getElementById('highexpense-detail-overlay').addEventListener('click', (e) => {
   if(e.target.id==='highexpense-detail-overlay') closeHighExpenseDetailSheet();
 });

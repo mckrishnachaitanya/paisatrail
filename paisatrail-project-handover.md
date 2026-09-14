@@ -6,6 +6,16 @@ Android-installable PWA. Single `index.html`, vanilla JS/CSS, IndexedDB, no fram
 
 ## 1. What's built (all device-confirmed unless noted)
 
+**Savings Pace for high-value bills — restyled as a compact row + detail sheet (v3.54, 2026-09-13, NOT device-tested yet — Playwright-verified only):** Krishna's first-cut UI (v3.53, an always-expanded card with the full bill breakdown inline in Forecast) felt cluttered on review. Shown two mockups via the Visualizer — (1) collapsed verdict + "see breakdown" toggle inline, vs (2) a compact summary row that opens a bottom sheet — Krishna picked (2), matching the Budget-card/Actions-pill pattern already used elsewhere in the app.
+
+- **Row (`#savings-pace-row`):** a `.settings-row`-styled button — icon (✓ mint bg on-track / ⚠️ coral bg short / 🔔 grape bg "not enough history"), title "Savings pace", subtitle "N bills tracked", a signed monthly amount (`+₹X/mo` mint or `-₹X/mo` coral), chevron. Hidden entirely when no rule has `highExpenseAlert` on (same as the old card).
+- **Detail sheet (`#savings-pace-detail-overlay`):** opened by tapping the row — same `edit-sheet-overlay`/bottom-sheet pattern as every other detail sheet (High Expense Alert, Cycle Summary). Contains the full verdict text + source label + the per-bill breakdown list, unchanged in content/logic from v3.53 — only *where* it's shown changed, not the underlying computation.
+- **No duplicate computation:** `renderSavingsPaceCard(prefetched)` still does the math once per Forecast render and populates BOTH the row's compact fields and the sheet's (hidden) detail divs in the same pass — opening the sheet is a pure `classList.add('show')`, never a re-fetch or recompute, same principle as `renderActionsPill`/`openActionsSheet`.
+- **Verified via Playwright:** row hidden with zero flagged rules, visible with two; row subtitle/amount match the pooled numbers; sheet closed by default; tapping the row opens it with the correct verdict + both bills listed + correct pooled total; closing via both the ✕ button and backdrop tap. Zero page errors. **Not yet exercised on-device.**
+
+---
+
+
 **Savings Pace for high-value bills (v3.53, 2026-09-13, NOT device-tested yet — Playwright-verified only):** A new card in Home → Forecast, shown only when at least one recurring rule has `highExpenseAlert` on. Answers "am I saving enough for my flagged high-value bills" — **pooled across every flagged rule, not per-bill** (Krishna's explicit call, made after discussing the alternative: independent per-bill checks can each say "you're on track!" while double-counting the same rupee when two bills overlap).
 
 - **Required monthly set-aside (deterministic):** `monthlyRateForFrequency(amount, frequency)` converts each flagged rule's amount into a monthly rate — yearly÷12, quarterly÷3, weekly×(52/12), monthly as-is — and `getSavingsPaceRules()` sums them across every ACTIVE `highExpenseAlert` rule regardless of how soon it's due (deliberately NOT the same set as `getHighExpenseAlerts()`, the Actions-pill version, which windows to "due within `alertDaysBefore` days" — a bill 10 months out still needs money set aside every month between now and then, so this pulls the full set). Overdue-and-unconfirmed rules (`autoAdd:false` past due) are included in the pooled total but tagged "Overdue" in the breakdown, not hidden.
