@@ -7429,11 +7429,28 @@ async function computeAccountBalance(account){
     .filter(e=>!pendingDeletes[e.id]);
   const isCc=account.type==='cc';
   let balance=account.openingBalance||0;
+  // Refund (v3.56): a refund is real money landing back in whichever account
+  // the ORIGINAL expense was charged to — looked up live via refundOf rather
+  // than stored on the refund record itself. This is deliberate, not a
+  // shortcut: it means any refund saved before this fix picks up the correct
+  // balance impact automatically (no migration needed), and if the original
+  // expense's account is ever reassigned later (e.g. via Bulk assign), the
+  // refund's balance effect follows it rather than going stale. `all` already
+  // contains every expense in range, so this is a same-array lookup, not an
+  // extra DB query.
+  const expenseAccountById=new Map();
+  all.forEach(e=>{ if(isExpenseEntry(e)) expenseAccountById.set(e.id, e.accountId||null); });
   all.forEach(e=>{
     if(isExpenseEntry(e) && e.accountId===account.id){
       balance += isCc ? Number(e.amount) : -Number(e.amount);
     }
     if(isIncomeEntry(e) && e.accountId===account.id){
+      balance += isCc ? -Number(e.amount) : Number(e.amount);
+    }
+    if(isRefundEntry(e) && expenseAccountById.get(e.refundOf)===account.id){
+      // Same direction as income: money back into savings, or outstanding
+      // reduced on a credit card — the exact reverse of what the original
+      // expense did to this account.
       balance += isCc ? -Number(e.amount) : Number(e.amount);
     }
     if(isTransferEntry(e)){

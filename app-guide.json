@@ -1,6 +1,15 @@
 {
-  "version": "3.55",
+  "version": "3.56",
   "releaseNotes": [
+    {
+      "version": "3.56",
+      "date": "2026-09-13",
+      "highlights": [
+        "Fixed: refunds weren't reflected in account balances — the money coming back was correctly subtracted from your spending totals everywhere, but a savings account balance (or credit card outstanding) never actually moved, so it fell out of sync with your real bank balance.",
+        "A refund now updates the account the original purchase was charged to — increasing a savings balance, or reducing a credit card's outstanding — exactly the reverse of what the original expense did.",
+        "This also corrects any refund you'd already logged, automatically, with nothing to redo."
+      ]
+    },
     {
       "version": "3.55",
       "date": "2026-09-13",
