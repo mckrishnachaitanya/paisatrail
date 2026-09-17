@@ -1,6 +1,21 @@
 {
-  "version": "3.53",
+  "version": "3.55",
   "releaseNotes": [
+    {
+      "version": "3.55",
+      "date": "2026-09-13",
+      "highlights": [
+        "Fixed: typing a refund amount and tapping the main Save button (instead of the small \"+ Add refund\" button inside the Refund panel) silently discarded the amount — no error, nothing saved. The main Save button now picks up and saves a typed-but-not-yet-added refund automatically."
+      ]
+    },
+    {
+      "version": "3.54",
+      "date": "2026-09-13",
+      "highlights": [
+        "Forecast's \"Savings pace for upcoming bills\" is now a single compact row instead of an always-expanded card — tap it to see the full bill-by-bill breakdown in a sheet.",
+        "The row itself shows a quick at-a-glance status: a checkmark and how far ahead you are when on track, or a warning and how far short when not."
+      ]
+    },
     {
       "version": "3.53",
       "date": "2026-09-13",

@@ -8786,28 +8786,78 @@ function renderRefundArea(){
   });
   document.getElementById('refund-add-btn').onclick=saveRefundEntry;
 }
-async function saveRefundEntry(){
-  const amount=state.newRefundAmount;
-  if(!amount || amount<=0){ toast('Enter a valid refund amount'); return; }
-  const original=state.editingExpense;
-  if(!original){ toast('Save the expense first'); return; }
+// Writes one refund record and pushes it onto state.refundsForEditingExpense
+// — the single place both the interactive "+ Add refund" button and the
+// safety-net flush (see flushPendingRefundIfAny) create a refund, so both
+// paths produce an identical record through identical logic.
+async function createRefundRecord(original, amount, dateISO){
   const refund={
     id: genId(), type:'refund', amount,
     refundOf: original.id,
     categoryId: original.categoryId || null,
-    date: state.newRefundDate || todayISO(),
+    date: dateISO || todayISO(),
     effectiveDate: original.date,
     note: '',
     createdAt: Date.now(),
   };
   await DB.addExpense(refund);
   state.refundsForEditingExpense.push(refund);
-  state.newRefundAmount=null;
-  state.newRefundDate=todayISO();
-  renderRefundArea();
-  renderOptRow();
-  await refreshAllExpenseViews();
-  toast('Refund added');
+  return refund;
+}
+// Guards against saveRefundEntry and flushPendingRefundIfAny ever both firing
+// for the same typed amount (e.g. a fast tap on "+ Add refund" immediately
+// followed by the main Save button before the first write finishes) — whichever
+// starts first holds the lock, the other is a no-op.
+let refundSaveInFlight=false;
+async function saveRefundEntry(){
+  if(refundSaveInFlight) return;
+  const amount=state.newRefundAmount;
+  if(!amount || amount<=0){ toast('Enter a valid refund amount'); return; }
+  const original=state.editingExpense;
+  if(!original){ toast('Save the expense first'); return; }
+  refundSaveInFlight=true;
+  const btn=document.getElementById('refund-add-btn');
+  if(btn){ btn.disabled=true; btn.style.opacity='0.6'; }
+  try{
+    await createRefundRecord(original, amount, state.newRefundDate);
+    state.newRefundAmount=null;
+    state.newRefundDate=todayISO();
+    renderRefundArea();
+    renderOptRow();
+    await refreshAllExpenseViews();
+    toast('Refund added');
+  } finally {
+    refundSaveInFlight=false;
+  }
+}
+// Safety net (v3.55): a refund amount typed into the panel but never
+// explicitly submitted via "+ Add refund" used to be silently discarded the
+// instant the main Save button was tapped instead — no error, nothing saved,
+// easy to miss since the screen just navigates away like any normal save.
+// Called from saveExpense() right before it finishes (expense path only —
+// refunds only ever exist on an already-saved expense, see ADD_OPT_DEFS'
+// visible() check, so there's nothing to flush on a brand-new entry).
+// Can never double-add: it reads state.newRefundAmount directly, which
+// saveRefundEntry clears to null the instant it succeeds, and which starts
+// null every time a transaction is freshly opened for edit (see
+// openAddScreen) — so a refund already added via the button, or left over
+// from a previous time this transaction was opened, is never re-flushed
+// here. Returns true if it actually flushed something, so the caller can
+// fold that into its own save toast.
+async function flushPendingRefundIfAny(){
+  if(refundSaveInFlight) return false;
+  const amount=state.newRefundAmount;
+  if(!amount || amount<=0) return false;
+  const original=state.editingExpense;
+  if(!original) return false;
+  refundSaveInFlight=true;
+  try{
+    await createRefundRecord(original, amount, state.newRefundDate);
+    state.newRefundAmount=null;
+    return true;
+  } finally {
+    refundSaveInFlight=false;
+  }
 }
 // Deleting a refund directly is always a plain, unconfirmed delete — reversing
 // it just "un-reduces" the original expense's numbers back to normal. No undo
@@ -9093,6 +9143,9 @@ async function saveExpense(){
   }
   await finalizeMarkPaidIfNeeded();
 
+  // Safety net (v3.55) — see flushPendingRefundIfAny for the bug this closes.
+  const refundFlushed = await flushPendingRefundIfAny();
+
   // Persist last used account/category/payment method for next Add screen open
   if(state.accountsEnabled && state.selectedAccountId){
     Store.set('pt_last_account', state.selectedAccountId);
@@ -9112,13 +9165,13 @@ async function saveExpense(){
       document.getElementById('acct-addpm-sub').textContent=`This payment method isn't linked to ${acct.name} yet. Add it so it appears automatically next time?`;
       document.getElementById('acct-addpm-overlay').classList.add('show');
       // Don't wait — return now so the toast and navigation happen immediately
-      toast(isEdit ? 'Expense updated ✓' : 'Expense saved ✓');
+      toast((isEdit ? 'Expense updated ✓' : 'Expense saved ✓') + (refundFlushed ? ' · Refund added' : ''));
       goToReturnScreen();
       return;
     }
   }
 
-  toast(isEdit ? 'Expense updated ✓' : 'Expense saved ✓');
+  toast((isEdit ? 'Expense updated ✓' : 'Expense saved ✓') + (refundFlushed ? ' · Refund added' : ''));
   goToReturnScreen();
 }
 
